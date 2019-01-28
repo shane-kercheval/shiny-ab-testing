@@ -178,6 +178,8 @@ metrics_names <- c('Sign Up', 'Use Feature 1', 'Talk to Sales', 'Pay/Subscribe')
 # e.g. signup should happen quick, but we may want to give people more time to subscribe/pay for the service,
 # since people want to try out the features before they decide to pay (e.g. if the service offers a trial or freemium)
 attribution_windows_days <- c(2, 3, 5, 7)
+historical_conversion_rates <- c(0.3, 0.2, 0.1, 0.08)
+# conversion_rates contain the conversion rates of each metric for the A & B groups
 
 
 experiments_metrics <- data.frame(metric_id=metrics_names, attribution_windows=attribution_windows_days)
@@ -295,92 +297,167 @@ experiments_all <- rbind(experiment_visits_1,
 
 ```
 
-```{r conversion_rates}
-simulate_conversion <- function(user_id, historical_conversion_rate) {
+```{r adjust_crs}
+# we want to adjust conversion rates for the people who were part of certain experiments
+# such that the A/B groups have different conversion rates 
+# some will have different CRs due to random noise, some will have differences in probability distributions
+# i.e. true differences.
+
+
+adjusted_conversion_rates <- inner_join(experiments_metrics,
+                                        data.frame(metric_id=metrics_names, historical_conversion_rate=historical_conversion_rates),
+                                        by = "metric_id") %>%
+    select(-attribution_windows) %>%
+    mutate(index=row_number())
+
+# Experiment 1 has positive conversion rates, # we'll assum
+adjusted_conversion_rates <- inner_join(adjusted_conversion_rates,
+                                        expand.grid(index=adjusted_conversion_rates$index, variation=c('A', 'B')),
+                                        by="index") %>%
+    select(experiment_id, variation, metric_id, historical_conversion_rate)
+
+adjusted_conversion_rates$adjusted_conversion_rate <- adjusted_conversion_rates$historical_conversion_rate
+
+percent_change_adjustments <- c(
+                    NA, # Experiment 1                        A   Sign Up
+                    0.10, # Experiment 1                        B   Sign Up
+                    NA, # Experiment 1                        A   Use Feature 1  
+                    0.05, # Experiment 1                        B   Use Feature 1  
+                    NA, # Experiment 1                        A   Talk to Sales  
+                    NA, # Experiment 1                        B   Talk to Sales  
+                    NA, # Experiment 1                        A   Pay/Subscribe  
+                    0.03, # Experiment 1                        B   Pay/Subscribe  
+                    NA, # Experiment 2                        A   Sign Up
+                    -0.10, # Experiment 2                        B   Sign Up
+                    NA, # Experiment 2                        A   Use Feature 1  
+                    -0.05, # Experiment 2                        B   Use Feature 1  
+                    NA, # Experiment 2                        A   Talk to Sales  
+                    -0.03, # Experiment 2                        B   Talk to Sales  
+                    NA, # Experiment 2                        A   Pay/Subscribe  
+                    0.01, # Experiment 2                        B   Pay/Subscribe  
+                    NA, # Experiment Sim Currently Running    A   Sign Up
+                    0.10, # Experiment Sim Currently Running    B   Sign Up
+                    NA, # Experiment Sim Currently Running    A   Use Feature 1  
+                    0.05, # Experiment Sim Currently Running    B   Use Feature 1  
+                    NA, # Experiment Sim Currently Running    A   Talk to Sales  
+                    0.03, # Experiment Sim Currently Running    B   Talk to Sales  
+                    NA, # Experiment Sim Currently Running    A   Pay/Subscribe  
+                    0.03) # Experiment Sim Currently Running    B   Pay/Subscribe  
+            
+
+adjusted_conversion_rates <- adjusted_conversion_rates %>%
+    mutate(adjusted_conversion_rate=ifelse(is.na(percent_change_adjustments),
+                                           historical_conversion_rate,
+                                           (percent_change_adjustments * historical_conversion_rate) + historical_conversion_rate))
+
+# Experiment 1 has c("original", "variant") rather than A/B
+temp_names <- c("original", "variant")
+adjusted_conversion_rates <- adjusted_conversion_rates %>%
+    mutate(variation = as.character(variation),
+           variation = ifelse(experiment_id == experiment_names[1],
+                              ifelse(variation == 'A', temp_names[1], temp_names[2]),
+                              variation))
+adjusted_conversion_rates
+```
+
+```{r conversion_rates_for_id_experiment_metric}
+# now we want to determine the conversion rates for each person, based on experiment, metric_id, variation, so we can binom distribution based on the conversion rate
+# if the person isn't part of an experiment, then we will use the historical conversion rate
+names(historical_conversion_rates) <- metrics_names
+# historical_conversion_rates[metrics_names[1]]
+
+# create a dateframe that has a historical conversion rate for each user/metric combo
+user_metric_crs <- expand.grid(user_id=unique(visits$user_id), metric_id=metrics_names) %>%
+    arrange(user_id, metric_id) %>%
+    mutate(historical_conversion_rate=historical_conversion_rates[metric_id])
+
+# now add experiment/variation columns for users that were part of experiments
+user_metric_crs <- full_join(user_metric_crs,
+          experiments_all %>% select(user_id, experiment_id, variation), by='user_id')
+
+# based on experiment/variation/metric, get the chosen conversion rate
+user_metric_crs <- left_join(user_metric_crs %>% 
+              mutate(metric_id = as.character(metric_id)),
+          adjusted_conversion_rates %>%
+              select(-historical_conversion_rate) %>%
+              mutate(experiment_id = as.character(experiment_id),
+                     metric_id = as.character(metric_id)),
+          by=c('experiment_id', 'variation', 'metric_id')) %>%
+    mutate(conversion_rate=ifelse(is.na(adjusted_conversion_rate), historical_conversion_rate, adjusted_conversion_rate)) %>%
+    select(user_id, metric_id, conversion_rate)
+
+
+# some people will have partipated in multiple experiments, so we'll take the average to get a dataset that is unique per user/metric
+user_metric_crs <- user_metric_crs %>% 
+    group_by(user_id, metric_id) %>%
+    summarise(conversion_rate = mean(conversion_rate)) %>%
+    ungroup()
+
+stopifnot(length(unique(user_metric_crs$user_id)) == length(unique(visits$user_id)))
+
+# now we will determine if each person convertes based on their conversion rate using the binomial distribution
+
+#rbinom(1000, 1, 0.08)
+
+simulate_conversion <- function(user_id, conversion_rate) {
     set.seed(user_id)
-    return (rbinom(1, 1, historical_conversion_rate))
-}
-create_conversion_dataset <- function(metric_name, historical_conversion_rate, standard_number_days_to_convert) {
-    
-    conversion_data <- visits %>% 
-        group_by(user_id) %>%
-        summarise(first_visit=min(visit_date))
-
-    conversion_data$converted <- as.logical(map_int(conversion_data$user_id,
-                                                       ~ simulate_conversion(., historical_conversion_rate)))
-
-    print(conversion_data %>%
-        count(converted) %>%
-        ggplot(aes(x=converted, y=n)) +
-        geom_col())
-
-    print(conversion_data %>%
-        count(first_visit, converted) %>%
-        ggplot(aes(x=first_visit, y=n, color=converted)) +
-        geom_line())
-
-    conversion_data <- conversion_data %>%
-        filter(converted)
-
-    # NOTE: i had trouble using the same pattern (setting seed) as before to make data reproducable, so for now, it's not
-    # setting the seed based on the user_id seemed to changed the distribution
-    conversion_offsets <- map_dbl(conversion_data$user_id, ~ rbinom(1, 30, standard_number_days_to_convert/30))
-    conversion_data$conversion_date = conversion_data$first_visit + conversion_offsets
-
-    print(conversion_data %>%
-        mutate(days_to_convert = as.numeric(conversion_date - first_visit)) %>%
-        count(days_to_convert) %>%
-        mutate(days_to_convert=factor(days_to_convert)) %>%
-        ggplot(aes(x=days_to_convert, y=n)) +
-            geom_col())
-
-    conversion_data <- conversion_data %>%
-        mutate(metric=metric_name) %>%
-        select(user_id, metric, conversion_date)
-
-    stopifnot(nrow(conversion_data) == length(unique(conversion_data$user_id)))
-    
-    return (conversion_data)
+    return (rbinom(1, 1, conversion_rate))
 }
 
-metric_name <- metrics_names[1]
-historical_conversion_rate <- 0.3
-standard_number_days_to_convert <- attribution_windows_days[1]
-conversion_data_1 <- create_conversion_dataset(metric_name, historical_conversion_rate, standard_number_days_to_convert)
-conversion_data_1
-```
+# now we simulating them converting or not by using their assigned conversion rates as a probability in a binom distribution
+user_metric_crs$converted <- as.logical(map2_dbl(user_metric_crs$user_id,
+                    user_metric_crs$conversion_rate, 
+                    ~ simulate_conversion(.x, .y)))
 
-```{r conversion_rates_2}
-metric_name <- metrics_names[2]
-historical_conversion_rate <- 0.2
-standard_number_days_to_convert <- attribution_windows_days[2]
-conversion_data_2 <- create_conversion_dataset(metric_name, historical_conversion_rate, standard_number_days_to_convert)
-conversion_data_2
-```
+user_metric_crs %>%
+    count(metric_id, converted) %>%
+    mutate(n = n / length(unique(user_metric_crs$user_id))) %>%
+    ggplot(aes(x=metric_id, y=n, group=converted, fill=converted)) +
+    geom_col(position='dodge') +
+    geom_text(aes(label=percent(n)))
 
-```{r conversion_rates_3}
-metric_name <- metrics_names[3]
-historical_conversion_rate <- 0.10
-standard_number_days_to_convert <- attribution_windows_days[3]
-conversion_data_3 <- create_conversion_dataset(metric_name, historical_conversion_rate, standard_number_days_to_convert)
-conversion_data_3
-```
+conversion_data <- inner_join(user_metric_crs %>%
+                                  filter(converted) %>%
+                                  select(user_id, metric_id),
+                              visits %>% 
+                                  group_by(user_id) %>%
+                                  summarise(first_visit=min(visit_date)),
+                              by='user_id')
 
-```{r conversion_rates_4}
-# NOTE: in this dataset there is no correlation between talk-to-sales and paying for the product/service
+generate_offset <- function(user_id, metric) {
+ 
+    # NOTE setting the seed is messing up the distribution   
+    #  set.seed(user_id)
+    rbinom(1, 30, attribution_windows_days[metric]/30)
+}
 
-metric_name <- metrics_names[4]
-historical_conversion_rate <- 0.08
-standard_number_days_to_convert <- attribution_windows_days[4]
-conversion_data_4 <- create_conversion_dataset(metric_name, historical_conversion_rate, standard_number_days_to_convert)
-conversion_data_4
-```
+names(attribution_windows_days) <- metrics_names
+conversion_offsets <- map2_dbl(conversion_data$user_id, 
+                               conversion_data$metric_id,
+                               #~ rbinom(1, 30, attribution_windows_days[.y]/30))
+                               ~ generate_offset(.x, .y))
+conversion_data <- conversion_data %>%
+    mutate(offset=conversion_offsets,
+           conversion_date = first_visit + offset)
 
-```{r}
-conversion_data <- rbind(conversion_data_1,
-                         conversion_data_2,
-                         conversion_data_3,
-                         conversion_data_4)
+conversion_data %>%
+    count(metric_id, offset) %>%
+    mutate(offset=factor(offset)) %>%
+    mutate(metric_id=fct_reorder(metric_id, n, .desc = TRUE)) %>%
+    ggplot(aes(x=offset, y=n)) +
+        geom_col() +
+    facet_wrap( ~ metric_id, scales = 'free_y') +
+    labs(title='Distribution of Days from First Visit to Event Conversion, for those that convert')
+
+conversion_data %>%
+    count(conversion_date, metric_id) %>%
+    ggplot(aes(x=conversion_date, y=n)) +
+        geom_line() +
+    facet_wrap( ~ metric_id, scales = 'free_y') +
+    labs(title='Daily Conversions')
+
+conversion_data <- conversion_data %>%
+    select(user_id, metric_id, conversion_date)
 
 conversion_data
 ```
@@ -395,7 +472,7 @@ write.csv(conversion_data, file='../simulated_data/conversion_data.csv', row.nam
 ```{r}
 #seeds <- 0:1000
 seeds <- 1000:2000
-seeds <- signup_conversions$user_id
+#seeds <- signup_conversions$user_id
 # temp <- function(seed, use_seeds) {
 #     if(use_seeds) {
 #         set.seed(seed)    
