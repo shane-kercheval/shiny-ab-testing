@@ -1,0 +1,13 @@
+"experiment_id","metric_id","attribution_windows"
+"Experiment 1","Sign Up",2
+"Experiment 1","Use Feature 1",3
+"Experiment 1","Talk to Sales",5
+"Experiment 1","Pay/Subscribe",7
+"Experiment 2","Sign Up",2
+"Experiment 2","Use Feature 1",3
+"Experiment 2","Talk to Sales",5
+"Experiment 2","Pay/Subscribe",7
+"Experiment Sim Currently Running","Sign Up",2
+"Experiment Sim Currently Running","Use Feature 1",3
+"Experiment Sim Currently Running","Talk to Sales",5
+"Experiment Sim Currently Running","Pay/Subscribe",7

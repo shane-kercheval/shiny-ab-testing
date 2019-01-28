@@ -1,0 +1,449 @@
+---
+title: "sandbox"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+```
+
+```{r simulate_user_traffic}
+# unique daily visits e.g. 1 record means that the person may have visited the site 1+ times for that day (the number of times does not matter)
+# what is the distribution of returning visitors? i.e. how many unique days will most people visit the website?
+
+# 20K visits users per month, over 10 months
+total_visits_per_unique_data <- 100000
+#return_visit
+#user_traffic
+set.seed(42)
+ids <- floor(runif(total_visits_per_unique_data, min=1, max=total_visits_per_unique_data * 0.50))
+num_unique_ids <- length(unique(ids))
+
+visits <- data.frame(user_id=ids) %>%
+    arrange(user_id)
+
+visits %>%
+    count(user_id) %>%
+    count(n) %>%
+    mutate(n=factor(n),
+           nn=nn / num_unique_ids) %>%
+    rename(unique_days_visited=n,
+           number_of_ids=nn) %>%
+    ggplot(aes(x=unique_days_visited, y=number_of_ids)) +
+        geom_col() +
+        geom_text(aes(label=percent(number_of_ids)), vjust=-0.3)
+```
+
+
+```{r traffic_2}
+# simulate dates over last e.g 10 months
+# we need to duplicate ids/days to simulate people visiting multiple paths per day; we'll use this information for our priors
+number_of_months <- 10
+
+# unique visitors per month
+num_unique_ids / number_of_months
+
+set.seed(42)
+first_time_visit_index <- floor(runif(num_unique_ids, min=0, max=300))
+
+# create dataframe with the user-id and the offset that we will use from the current date
+# we'll use the current date so we can simulate the latest experiment is currently running 
+first_time_users <- data.frame(user_id=unique(ids), visit_offset=first_time_visit_index) %>% 
+    arrange(user_id)
+
+library(lubridate)
+first_time_users <- first_time_users %>%
+    mutate(first_visit_date=today() - visit_offset) %>%
+    select(-visit_offset)
+
+first_time_users %>%
+    count(first_visit_date) %>%
+    ggplot(aes(x=first_visit_date, y=n)) +
+        geom_line() +
+        expand_limits(y=0) +
+        labs(title='Simulated Daily Visits, no trend')
+
+
+visits <- inner_join(visits, first_time_users, by = 'user_id')
+
+stopifnot(nrow(visits) == length(ids))
+stopifnot(all((visits %>%
+    group_by(user_id) %>%
+    summarise(num_unique_date=length(unique(first_visit_date))))$num_unique_date == 1))
+
+# now simulate adding number of days between subsequent visits
+hist(rgamma(1000, shape=4))
+
+
+visits <- visits %>%
+    group_by(user_id) %>%
+    mutate(visit_index = row_number()) %>%
+    ungroup()
+
+generate_new_date <- function(visit_index, original_date, user_id) {
+
+    if(visit_index == 1) {
+        return (original_date)
+    }
+    
+    set.seed(user_id)
+    offset <- floor(rgamma(1, shape=visit_index + 3))
+    return (original_date + max(offset, 1))
+}
+
+#generate_new_date(visits$visit_index[1], visits$first_visit_date[1], visits$user_id[1])
+generated_visits <- pmap(list(visits$visit_index,
+                              visits$first_visit_date,
+                              visits$user_id),
+                         function(x, y, z) generate_new_date(x, y, z))
+
+# pmap is losing the "date" and is returning a number, so we have to convert back; not sure this is the best way
+generated_visits <- unlist(generated_visits)
+visits$visit_date <- as.Date(generated_visits, origin = Sys.Date() - as.numeric(Sys.Date()))
+
+visits <- visits %>%
+    select(user_id, visit_date) %>%
+    arrange(user_id, visit_date)
+
+stopifnot(nrow(visits) == length(ids))
+
+# some of the dates generated will be the same. BUT, that could represent multiple different pages in the same day
+# so let's add path before we remove duplicates
+```
+
+```{r simulate_paths}
+# duplicate home-page (example.com) to simulate many more home page visits than other pages
+paths <- c('example.com', 'example.com', 'example.com/pricing', 'example.com/features')
+set.seed(42)
+path_index <- ceiling(runif(nrow(visits), min=0, max=4))
+visits$path <- map_chr(path_index, ~ paths[.])
+
+# some of the dates generated will be the same. BUT, that could represent multiple different pages in the same day
+# so let's add path before we remove duplicates
+visits <- distinct(visits)
+nrow(visits)
+
+visits %>%
+    count(path) %>%
+    ggplot(aes(x=path, y=n)) +
+    geom_col() +
+    labs(title='Total Visits (day/user) single row represents >=1 visits for that day/user/path')
+
+visits %>%
+    group_by(user_id) %>%
+    summarise(t=sd(as.numeric(visit_date))) %>%
+    ggplot(aes(x=t)) +
+        geom_histogram() +
+        labs(title='Distribution of Number of Days between Visits')
+
+temp <- inner_join(
+    visits %>% 
+        group_by(user_id) %>%
+        summarise(first_visit_date=min(visit_date)) %>%
+        count(first_visit_date) %>%
+        rename(date=first_visit_date,
+               new_users=n),
+    visits %>%
+        group_by(visit_date) %>%
+        summarise(all_users=n()) %>%
+        rename(date=visit_date),
+    by='date')
+
+temp %>% 
+    gather(user_type, num_users, -date) %>%
+    ggplot(aes(x=date, y=num_users, color=user_type)) +
+        geom_line()
+
+# visits %>%
+#     group_by(user_id) %>%
+#     filter(length(visit_date) != length(unique(visit_date))) %>%  # which users have a different number of unique dates fromf total dates
+#     ungroup()
+
+visits %>%
+    count(visit_date, path) %>%
+    ggplot(aes(x=visit_date, y=n, color=path)) +
+    geom_line() +
+    labs(title='Visits (per day/user) i.e. single row represents >=1 visits for that day/user/path')
+
+prior_data <- visits
+```
+
+```{r simulate_metrics_experiments}
+# experiment names
+experiment_names <- c("Experiment 1", "Experiment 2", "Experiment Sim Currently Running")
+# names of the metrics/conversions to track
+metrics_names <- c('Sign Up', 'Use Feature 1', 'Talk to Sales', 'Pay/Subscribe')
+# allowed number of days between seeing the experiment and giving credit for a conversion
+# e.g. signup should happen quick, but we may want to give people more time to subscribe/pay for the service,
+# since people want to try out the features before they decide to pay (e.g. if the service offers a trial or freemium)
+attribution_windows_days <- c(2, 3, 5, 7)
+
+
+experiments_metrics <- data.frame(metric_id=metrics_names, attribution_windows=attribution_windows_days)
+experiments_metrics <- expand.grid(experiment_id=experiment_names, metric_id=experiments_metrics$metric_id) %>%
+    inner_join(experiments_metrics, by = 'metric_id') %>%
+    arrange(experiment_id, attribution_windows)
+
+experiments_metrics
+```
+
+```{r simulate_experiment_traffic_1}
+# for each experiment, we want to simulate, from the current visits/traffic dataset, who saw the experiment, on which page, and which variation
+
+get_random_variation <- function(variation_names, user_id) {
+    set.seed(user_id)
+    return (variation_names[rbinom(1, 1, 0.5) + 1])
+}
+#get_random_variation(variation_names, user_id=1)
+
+create_experiment_visits <- function(start_date, end_date, experiment_paths, experiment_id, variation_names) {
+    experiment_visits <- visits %>%
+        group_by(user_id) %>%
+        mutate(visit_index=rank(visit_date, ties.method = "first")) %>%
+        ungroup() %>%
+        mutate(new_user = ifelse(visit_index == 1, TRUE, FALSE)) %>%
+        filter(visit_date >= start_date & visit_date <= end_date & path %in% experiment_paths) %>%
+        select(-visit_index)
+    
+    expected_num_users <- length(unique(experiment_visits$user_id))
+    
+    experiment_visits <- experiment_visits %>%
+        group_by(user_id) %>%
+        mutate(visit_index=rank(visit_date, ties.method = "first")) %>%
+        ungroup() %>%
+        filter(visit_index == 1) %>%
+        select(-visit_index) %>%
+        rename(first_saw_experiment=visit_date) %>%
+        mutate(experiment_id=experiment_id)
+    experiment_visits$variation <- map_chr(experiment_visits$user_id, ~ get_random_variation(variation_names, .))
+    
+    stopifnot(nrow(experiment_visits) == expected_num_users)
+    # make sure no duplicated user_ids
+    stopifnot(nrow(experiment_visits) == length(unique(experiment_visits$user_id)))
+    
+    print(experiment_visits %>%
+        count(variation) %>%
+        ggplot(aes(x=variation, y=n)) +
+        geom_col())
+    
+    print(experiment_visits %>%
+        count(first_saw_experiment) %>%
+        ggplot(aes(x=first_saw_experiment, y=n)) +
+        geom_line() +
+        labs(title='Number of People Entering Experiment'))
+    
+    print(experiment_visits %>%
+        count(first_saw_experiment, new_user) %>%
+        ggplot(aes(x=first_saw_experiment, y=n, color=new_user)) +
+        geom_line() +
+        labs(title='Number of People Entering Experiment, shows affect of including new returning users in experiment'))
+    
+    print(experiment_visits %>%
+        count(first_saw_experiment, variation) %>%
+        ggplot(aes(x=first_saw_experiment, y=n, color=variation)) +
+        geom_line())
+    
+    return (experiment_visits %>% select(-new_user))
+
+}
+
+#### Experiment 1
+
+# let's start the experiment 2 months after our visits dataset, and run it for a month
+start_date <- min(visits$visit_date) + 60
+end_date <- start_date + 30 # 
+# all paths
+experiment_paths <- unique(paths)
+# experiment 1
+variation_names <- c("original", "variant")
+experiment_id <- experiment_names[1]
+experiment_visits_1 <- create_experiment_visits(start_date, end_date, experiment_paths, experiment_id, variation_names)
+experiment_visits_1
+```
+
+```{r simulate_experiment_traffic_2}
+#### Experiment 2
+start_date <- min(visits$visit_date) + 75
+end_date <- start_date + 30 # 
+# all paths
+experiment_paths <- paths[4] # just features page
+# experiment 1
+variation_names <- c("A", "B")
+experiment_id <- experiment_names[2]
+experiment_visits_2 <- create_experiment_visits(start_date, end_date, experiment_paths, experiment_id, variation_names)
+experiment_visits_2
+```
+
+```{r simulate_experiment_traffic_currently_running}
+#### Experiment 2
+start_date <- Sys.Date() - 5
+end_date <- start_date + 30 # 
+# all paths
+experiment_paths <- paths[1] # just homepage
+# experiment 1
+variation_names <- c("A", "B")
+experiment_id <- experiment_names[length(experiment_names)]
+experiment_visits_currently_running <- create_experiment_visits(start_date, end_date, experiment_paths, experiment_id, variation_names)
+experiment_visits_currently_running
+```
+
+```{r experiments}
+experiments_all <- rbind(experiment_visits_1,
+                         experiment_visits_2,
+                         experiment_visits_currently_running)
+
+```
+
+```{r conversion_rates}
+simulate_conversion <- function(user_id, historical_conversion_rate) {
+    set.seed(user_id)
+    return (rbinom(1, 1, historical_conversion_rate))
+}
+create_conversion_dataset <- function(metric_name, historical_conversion_rate, standard_number_days_to_convert) {
+    
+    conversion_data <- visits %>% 
+        group_by(user_id) %>%
+        summarise(first_visit=min(visit_date))
+
+    conversion_data$converted <- as.logical(map_int(conversion_data$user_id,
+                                                       ~ simulate_conversion(., historical_conversion_rate)))
+
+    print(conversion_data %>%
+        count(converted) %>%
+        ggplot(aes(x=converted, y=n)) +
+        geom_col())
+
+    print(conversion_data %>%
+        count(first_visit, converted) %>%
+        ggplot(aes(x=first_visit, y=n, color=converted)) +
+        geom_line())
+
+    conversion_data <- conversion_data %>%
+        filter(converted)
+
+    # NOTE: i had trouble using the same pattern (setting seed) as before to make data reproducable, so for now, it's not
+    # setting the seed based on the user_id seemed to changed the distribution
+    conversion_offsets <- map_dbl(conversion_data$user_id, ~ rbinom(1, 30, standard_number_days_to_convert/30))
+    conversion_data$conversion_date = conversion_data$first_visit + conversion_offsets
+
+    print(conversion_data %>%
+        mutate(days_to_convert = as.numeric(conversion_date - first_visit)) %>%
+        count(days_to_convert) %>%
+        mutate(days_to_convert=factor(days_to_convert)) %>%
+        ggplot(aes(x=days_to_convert, y=n)) +
+            geom_col())
+
+    conversion_data <- conversion_data %>%
+        mutate(metric=metric_name) %>%
+        select(user_id, metric, conversion_date)
+
+    stopifnot(nrow(conversion_data) == length(unique(conversion_data$user_id)))
+    
+    return (conversion_data)
+}
+
+metric_name <- metrics_names[1]
+historical_conversion_rate <- 0.3
+standard_number_days_to_convert <- attribution_windows_days[1]
+conversion_data_1 <- create_conversion_dataset(metric_name, historical_conversion_rate, standard_number_days_to_convert)
+conversion_data_1
+```
+
+```{r conversion_rates_2}
+metric_name <- metrics_names[2]
+historical_conversion_rate <- 0.2
+standard_number_days_to_convert <- attribution_windows_days[2]
+conversion_data_2 <- create_conversion_dataset(metric_name, historical_conversion_rate, standard_number_days_to_convert)
+conversion_data_2
+```
+
+```{r conversion_rates_3}
+metric_name <- metrics_names[3]
+historical_conversion_rate <- 0.10
+standard_number_days_to_convert <- attribution_windows_days[3]
+conversion_data_3 <- create_conversion_dataset(metric_name, historical_conversion_rate, standard_number_days_to_convert)
+conversion_data_3
+```
+
+```{r conversion_rates_4}
+# NOTE: in this dataset there is no correlation between talk-to-sales and paying for the product/service
+
+metric_name <- metrics_names[4]
+historical_conversion_rate <- 0.08
+standard_number_days_to_convert <- attribution_windows_days[4]
+conversion_data_4 <- create_conversion_dataset(metric_name, historical_conversion_rate, standard_number_days_to_convert)
+conversion_data_4
+```
+
+```{r}
+conversion_data <- rbind(conversion_data_1,
+                         conversion_data_2,
+                         conversion_data_3,
+                         conversion_data_4)
+
+conversion_data
+```
+
+```{r save_simulated_data}
+write.csv(experiments_metrics, file='../simulated_data/experiments_metrics.csv', row.names = FALSE)
+write.csv(prior_data, file='../simulated_data/prior_data.csv', row.names = FALSE)
+write.csv(experiments_all, file='../simulated_data/experiments_data.csv', row.names = FALSE)
+write.csv(conversion_data, file='../simulated_data/conversion_data.csv', row.names = FALSE)
+```
+
+```{r}
+#seeds <- 0:1000
+seeds <- 1000:2000
+seeds <- signup_conversions$user_id
+# temp <- function(seed, use_seeds) {
+#     if(use_seeds) {
+#         set.seed(seed)    
+#     }
+#     rbinom(1, 30, 3/30)
+# }
+temp <- function(seed, use_seeds) {
+    if(use_seeds) {
+        set.seed(seed)    
+    }
+    max(round(rnorm(1, 3, 2)), 0)
+}
+hist(map_dbl(seeds, ~ temp(., TRUE)))
+hist(map_dbl(seeds, ~ temp(., FALSE)))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

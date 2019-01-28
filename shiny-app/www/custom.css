@@ -1,0 +1,62 @@
+.shiny-notification {
+    height: 100%;
+    width: 100%;
+    position:fixed;
+    top: 0;
+    left: 0;
+}
+.shiny-notification-content {
+    height: 100px;
+    width: 800px;
+    position:fixed;
+    top: calc(50% - 50px);
+    left: calc(50% - 400px);
+}
+.shiny-notification-close { 
+    visibility: hidden; 
+}
+.progress-text {
+    text-align: center;
+    font-size: 18px;
+}
+.results-table {
+    font-size: 85%;
+    width: 70%;
+}
+.input-control-style {
+    background-color: #f5f5f5;
+    padding: 10px;
+    margin: 0px 0px 10px 0px;
+    border: 1px solid #e3e3e3;
+    border-radius: 4px
+}
+.column-input-control-style {
+    margin-left: 0px;
+    padding-left: 0px;
+}
+
+.shiny-plot-output {
+    height: 100% !important;
+    margin-bottom: 10px;
+}
+
+.bold_checkbox_input span {
+    font-weight: 700 !important;
+}
+
+.inline_label_control .inline_label {
+    float: left;
+    width: 30%;
+    padding-top: 10px;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.inline_label_control .shiny-input-container {
+    display: grid !important;
+    width: 70%;
+}
+
+.inline_label_control .form-group {
+    margin-bottom: 0px !important;
+}
