@@ -462,17 +462,19 @@ conversion_data %>%
     labs(title='Daily Conversions')
 
 conversion_data <- conversion_data %>%
-    select(user_id, metric_id, conversion_date)
+    select(user_id, metric_id, conversion_date) %>%
+    arrange(user_id, conversion_date)
 
 conversion_data
 ```
 
 ```{r save_simulated_data}
-write.csv(experiments_metrics, file='../simulated_data/experiments_metrics.csv', row.names = FALSE)
-write.csv(prior_data, file='../simulated_data/prior_data.csv', row.names = FALSE)
-write.csv(experiments_all, file='../simulated_data/experiments_data.csv', row.names = FALSE)
-write.csv(conversion_data, file='../simulated_data/conversion_data.csv', row.names = FALSE)
+write.csv(experiments_metrics, file='../shiny-app/simulated_data/attribution_windows.csv', row.names = FALSE)
+write.csv(prior_data, file='../shiny-app/simulated_data/website_traffic.csv', row.names = FALSE)
+write.csv(experiments_all, file='../shiny-app/simulated_data/experiment_traffic.csv', row.names = FALSE)
+write.csv(conversion_data, file='../shiny-app/simulated_data/conversion_rate_data.csv', row.names = FALSE)
 ```
+
 
 ```{r}
 #seeds <- 0:1000
@@ -495,6 +497,71 @@ hist(map_dbl(seeds, ~ temp(., FALSE)))
 ```
 
 
+# historical traffic
+
+```{r}
+website_traffic <- prior_data
+
+
+create_cohort <- function(date_object, cohort_method=month, pad_width=2) {
+
+    return (
+        paste0(year(date_object),
+               '-',
+               str_pad(cohort_method(date_object), width=pad_width, side='left', pad = '0'))
+    )
+}
+
+#######
+show_path <- TRUE
+top_x_paths <- 2
+start_date <- Sys.Date() - 270
+end_date <- Sys.Date() - 30
+
+cohort_type <- month
+######
+
+visitors_per_day_per_path <- website_traffic %>%
+    filter(visit_date >= start_date & visit_date <= end_date) %>%
+    group_by(user_id) %>%
+    mutate(visit_index=rank(visit_date, ties.method = "first")) %>%
+    ungroup() %>%
+    mutate(date = factor(create_cohort(visit_date)),
+           path= fct_lump(path,  n=top_x_paths),
+           visit_type = ifelse(visit_index == 1, 'New', 'Returning'))
+    
+if(show_path) {
+
+    visitors_per_day_per_path %>%
+        count(date, path, visit_type) %>%
+        ggplot(aes(x=date, y=n, color=path, group=path)) +
+            geom_line() +
+            geom_point() + 
+            facet_grid(visit_type ~ .) + 
+            scale_y_continuous(labels = comma_format()) +
+            geom_text(aes(label=n), vjust=-1, size=3, check_overlap=TRUE) +    
+            theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+            labs(title='Website Visitors',
+                 y='Number of Visits',
+                 x='Month',
+                 color='Path')
+} else {
+
+    visitors_per_day_per_path %>%
+        count(date, visit_type) %>%
+        ggplot(aes(x=date, y=n, color=visit_type, group=visit_type)) +
+            geom_line() +
+            geom_point() + 
+            expand_limits(y=0) +
+            scale_y_continuous(labels = comma_format()) +
+            geom_text(aes(label=n), vjust=-1, size=3, check_overlap=TRUE) +
+            theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+            labs(title='Website Visitors',
+                 y='Number of Visits',
+                 x='Month',
+                 color='Visitor Type')
+}
+```
 
 
 

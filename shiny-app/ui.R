@@ -27,6 +27,24 @@ shinyUI(fluidPage(theme="custom.css",
             )
         ),
         tabPanel(
+            'Website Traffic',
+            column(3,
+                class='column-input-control-style'
+                # bsCollapse(id='dashboard__bscollapse', 
+                #            open=c('TBD'),
+                #            multiple=TRUE,
+                #     bsCollapsePanel(
+                #         'TBD',
+                #         style='default'
+                #     )
+                # )
+
+            ),
+            column(9,
+                plotOutput(outputId='website_traffic__plot')
+            )
+        ),
+        tabPanel(
             'Load Dataset',
             tabsetPanel(type='tabs',
                 tabPanel(
@@ -56,16 +74,16 @@ shinyUI(fluidPage(theme="custom.css",
                     tags$br(),
                     tags$p("This dataset contains per-day website traffic. A single row represents one or more visits to a specific path (i.e. url) for a given user_id, on a given day."),
                     tags$br(),
-                    fileInput(inputId='prior_data__uploadFile', "Load .csv:"),
+                    fileInput(inputId='website_traffic__uploadFile', "Load .csv:"),
                     tags$br(),tags$br(),
                     tabsetPanel(type='tabs',
                         tabPanel(
                             "First 500 Records of Website Traffic",
-                            tags$div(class='results-table', dataTableOutput(outputId='prior_data__head_table'))
+                            tags$div(class='results-table', dataTableOutput(outputId='website_traffic__head_table'))
                         ),
                         tabPanel(
                             'Variable Types',
-                            tags$div(class='results-table', dataTableOutput(outputId='prior_data__types_table'))
+                            tags$div(class='results-table', dataTableOutput(outputId='website_traffic__types_table'))
                         )
                     )
                 ),
@@ -76,16 +94,16 @@ shinyUI(fluidPage(theme="custom.css",
                     tags$br(),
                     tags$p("This dataset contains gives a list of user_ids and the experiments they have been part of, including the variation, the date they first joined the experiment, and the path/url they were on."),
                     tags$br(),
-                    fileInput(inputId='experiment_data__uploadFile', "Load .csv:"),
+                    fileInput(inputId='experiment_traffic__uploadFile', "Load .csv:"),
                     tags$br(),tags$br(),
                     tabsetPanel(type='tabs',
                         tabPanel(
                             "First 500 Records of Experiment Traffic",
-                            tags$div(class='results-table', dataTableOutput(outputId='experiment_data__head_table'))
+                            tags$div(class='results-table', dataTableOutput(outputId='experiment_traffic__head_table'))
                         ),
                         tabPanel(
                             'Variable Types',
-                            tags$div(class='results-table', dataTableOutput(outputId='experiment_data__types_table'))
+                            tags$div(class='results-table', dataTableOutput(outputId='experiment_traffic__types_table'))
                         )
                     )
                 ),
