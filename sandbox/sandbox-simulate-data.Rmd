@@ -215,7 +215,7 @@ create_experiment_visits <- function(start_date, end_date, experiment_paths, exp
         ungroup() %>%
         filter(visit_index == 1) %>%
         select(-visit_index) %>%
-        rename(first_saw_experiment=visit_date) %>%
+        rename(first_joined_experiment=visit_date) %>%
         mutate(experiment_id=experiment_id)
     experiment_visits$variation <- map_chr(experiment_visits$user_id, ~ get_random_variation(variation_names, .))
     
@@ -229,20 +229,20 @@ create_experiment_visits <- function(start_date, end_date, experiment_paths, exp
         geom_col())
     
     print(experiment_visits %>%
-        count(first_saw_experiment) %>%
-        ggplot(aes(x=first_saw_experiment, y=n)) +
+        count(first_joined_experiment) %>%
+        ggplot(aes(x=first_joined_experiment, y=n)) +
         geom_line() +
         labs(title='Number of People Entering Experiment'))
     
     print(experiment_visits %>%
-        count(first_saw_experiment, new_user) %>%
-        ggplot(aes(x=first_saw_experiment, y=n, color=new_user)) +
+        count(first_joined_experiment, new_user) %>%
+        ggplot(aes(x=first_joined_experiment, y=n, color=new_user)) +
         geom_line() +
         labs(title='Number of People Entering Experiment, shows affect of including new returning users in experiment'))
     
     print(experiment_visits %>%
-        count(first_saw_experiment, variation) %>%
-        ggplot(aes(x=first_saw_experiment, y=n, color=variation)) +
+        count(first_joined_experiment, variation) %>%
+        ggplot(aes(x=first_joined_experiment, y=n, color=variation)) +
         geom_line())
     
     return (experiment_visits %>% select(-new_user))
@@ -292,8 +292,14 @@ experiment_visits_currently_running
 ```{r experiments}
 experiments_all <- rbind(experiment_visits_1,
                          experiment_visits_2,
-                         experiment_visits_currently_running)
+                         experiment_visits_currently_running) %>%
+    select(user_id, experiment_id, variation, first_joined_experiment, path) %>%
+    arrange(user_id, experiment_id)
 
+# ensure dataset is unique by user-id/experiment-id
+stopifnot(nrow(distinct(experiments_all %>% select(user_id, experiment_id))) == nrow(experiments_all))
+
+experiments_all
 ```
 
 ```{r adjust_crs}
