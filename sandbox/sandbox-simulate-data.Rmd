@@ -6,6 +6,8 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
+library(scales)
+library(lubridate)
 ```
 
 ```{r simulate_user_traffic}
@@ -35,7 +37,6 @@ visits %>%
         geom_text(aes(label=percent(number_of_ids)), vjust=-0.3)
 ```
 
-
 ```{r traffic_2}
 # simulate dates over last e.g 10 months
 # we need to duplicate ids/days to simulate people visiting multiple paths per day; we'll use this information for our priors
@@ -52,7 +53,6 @@ first_time_visit_index <- floor(runif(num_unique_ids, min=0, max=300))
 first_time_users <- data.frame(user_id=unique(ids), visit_offset=first_time_visit_index) %>% 
     arrange(user_id)
 
-library(lubridate)
 first_time_users <- first_time_users %>%
     mutate(first_visit_date=today() - visit_offset) %>%
     select(-visit_offset)
@@ -63,7 +63,6 @@ first_time_users %>%
         geom_line() +
         expand_limits(y=0) +
         labs(title='Simulated Daily Visits, no trend')
-
 
 visits <- inner_join(visits, first_time_users, by = 'user_id')
 

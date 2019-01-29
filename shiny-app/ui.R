@@ -69,5 +69,4 @@ shinyUI(fluidPage(theme="custom.css",
         ),
         widths=c(2,10)
     )
-
 ))
