@@ -27,6 +27,58 @@ shinyUI(fluidPage(theme="custom.css",
             )
         ),
         tabPanel(
+            'Experiment Results & Analysis',
+            column(3,
+                class='column-input-control-style',
+                bsCollapse(id='dashboard__bscollapse', 
+                           open=c('TBD'),
+                           multiple=TRUE,
+                    bsCollapsePanel(
+                        'TBD',
+                        style='default'
+                    )
+                )
+            ),
+            column(9,
+                tabsetPanel(type='tabs',
+                    tabPanel(
+                        'Overview',
+                        tags$p('TBD')
+                    ),
+                    tabPanel(
+                        'Bayesian',
+                        tags$p('TBD')
+                    ),
+                    tabPanel(
+                        'p-value oscillation',
+                        tags$p('TBD')
+                    ),
+                    tabPanel(
+                        'Misc',
+                        tags$p('TBD')
+                    )
+                )
+            )
+        ),
+        tabPanel(
+            'Duration Calculator',
+            column(3,
+                class='column-input-control-style'
+                # bsCollapse(id='dashboard__bscollapse', 
+                #            open=c('TBD'),
+                #            multiple=TRUE,
+                #     bsCollapsePanel(
+                #         'TBD',
+                #         style='default'
+                #     )
+                # )
+
+            ),
+            column(9,
+                tags$p('TBD')
+            )
+        ),
+        tabPanel(
             'Website Traffic',
             column(3,
                 class='column-input-control-style'
