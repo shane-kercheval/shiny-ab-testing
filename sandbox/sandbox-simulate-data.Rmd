@@ -610,9 +610,6 @@ experiments_all %>%
 ```
 
 ```{r}
-# goal is to create a dataset containing conversion rates for an experiment
-# user_id | variation | first_saw_experiment | metric | attribution window | conversion_date | -> converted
-
 experiments_metrics <- experiments_metrics %>%
     mutate_if(is.factor, as.character) 
 
@@ -641,6 +638,14 @@ stopifnot(!any(is.na(user_conversion_rates)))
 temp_conversions_ignore_window <- user_conversion_rates %>% count(variation, metric_id)
 
 
+# we have to filter out anyone that who first joined the experiment in the last x days, where x is less than the attribution window for that metric
+users_to_filter_out <- (user_conversion_rates %>%
+    filter(first_joined_experiment >= Sys.Date() - attribution_windows))$user_id
+
+user_conversion_rates <- user_conversion_rates %>%
+    filter(! user_id %in% users_to_filter_out)
+
+
 # this dataset contains all the conversions, but some will not have converted within the time window; we still want to keep them for now to analyze how many converted before/during/after the experiment/window
 user_conversion_rates <- user_conversion_rates %>%
     select(-experiment_id, -first_joined_experiment, -conversion_date, -attribution_windows)
@@ -651,7 +656,8 @@ experiment_summary <- user_conversion_rates %>%
     rename(converted=n)
 
 total_users <- experiments_all %>%
-    filter(experiment_id == experiment_name) %>%
+    filter(experiment_id == experiment_name,
+           ! user_id %in% users_to_filter_out) %>%
     group_by(variation) %>%
     summarise(num_users=n(),
               num_distinct_users=n_distinct(user_id),
@@ -707,18 +713,121 @@ experiment_summary
 ```
 
 ```{r}
+prior_days <- 15
 
-prior_data
+
+experiment_start_stop <- experiments_all %>%
+    group_by(experiment_id) %>%
+    summarise(start=min(first_joined_experiment),
+              end=max(first_joined_experiment)) %>%
+    arrange(desc(start))
+
+
+max_attribution_window <- max((experiments_metrics %>%
+    filter(experiment_id == experiment_name))$attribution_windows)
 
 
 experiment_paths <- unique((experiments_all %>% filter(experiment_id == experiment_name))$path)
+start_stop <- experiment_start_stop %>% filter(experiment_id == experiment_name)
+experiment_start_date <- start_stop$start
 
-prior_history
+prior_start_date <- experiment_start_date - prior_days - max_attribution_window
+prior_end_date <- experiment_start_date - max_attribution_window
 
 
-prior_distributions
 
 
+prior_history <- visits %>%
+    filter(path %in% experiment_paths,
+           visit_date >= prior_start_date & visit_date <= prior_end_date) %>%   # give extra days to allow for attribution window
+    group_by(user_id) %>%
+    summarise(first_prior_visit = min(visit_date))
+
+prior_conversion_rates <- inner_join(conversion_data, prior_history, by='user_id')
+prior_conversion_rates <- inner_join(prior_conversion_rates,
+           experiments_metrics %>%
+               filter(experiment_id == experiment_name) %>%
+               select(-experiment_id),
+           by='metric_id')
+
+
+prior_conversion_rates <- prior_conversion_rates %>%
+    mutate(days_from_prior_visit_to_conversion = as.numeric(difftime(conversion_date,  # negative days means the conversion happened before the experiment started
+                                                                    first_prior_visit,
+                                                                    units = 'days')),
+           converted_within_window = days_from_prior_visit_to_conversion >= 0 & days_from_prior_visit_to_conversion <= attribution_windows) %>%
+    filter(converted_within_window)
+
+prior_summary <- prior_conversion_rates %>%
+    count(metric_id) %>%
+    mutate(total = length(prior_history$user_id),
+           conversion_rate = n / total) %>%
+    rename(successes=n,
+           trials=total) %>%
+    mutate(alpha=successes,
+           beta=trials-successes)
+
+
+prior_summary %>%
+    mutate(metric_id = factor(metric_id, levels=metrics_names)) %>%
+    ggplot(aes(x=metric_id, y=conversion_rate)) +
+        geom_col() +
+        geom_text(aes(label=round(conversion_rate, 3)), vjust=-0.5)
+    
+
+#prior_distributions
+prior_alpha <- 464
+prior_beta <- 2863 - 464
+
+new_alpha_a <- prior_alpha + 445
+new_beta_a <- prior_beta + (2555 - 445)
+
+new_alpha_b <- prior_alpha + 506
+new_beta_b <- prior_beta + (2507 - 506)
+
+experiment_summary
+summary
+x <- seq(0, 1, 0.001)
+temp <- data.frame(x,
+                   prior=dbeta(x, prior_alpha, prior_beta),
+                   a=dbeta(x, new_alpha_a, new_beta_a),
+                   b=dbeta(x, new_alpha_b, new_beta_b)) %>%
+    gather(type, value, -x)
+
+a_cr_simulation <- rbeta(1e6, new_alpha_a, new_beta_a)
+b_cr_simulation <- rbeta(1e6, new_alpha_b, new_beta_b)
+percent_of_time_b_wins <- mean(b_cr_simulation > a_cr_simulation)
+
+
+temp %>%
+    ggplot(aes(x, value, group=type, color=type)) +
+    geom_line() +
+    geom_vline(xintercept = 895 / 5009) +
+    coord_cartesian(x=c(0.15, 0.25))
+
+percent_of_time_b_wins
+
+
+
+# we want a daily count of successes & trails, for both variations, per metric, considering only the people who have 
+# allowed enough time for the time windows (i.e. the entered the experiment more than x days prior from the relative point/day in time, where x is the attribution window for the metric)
+#
+daily_totals_joined_experiment <- experiments_all %>% 
+    filter(experiment_id == experiment_name) %>%
+    count(first_joined_experiment)
+    
+
+metric_selected <- 'Sign Up'
+attribution_window <- (experiments_metrics %>% filter(experiment_id == experiment_name & metric_id == metric_selected))$attribution_windows
+inner_join(experiments_all %>% 
+               filter(experiment_id == experiment_name),
+           conversion_data %>%
+               filter(metric_id == metric_selected), by = 'user_id') %>%
+    mutate()
+    count()
+    
+
+experiment
 ```
 
 
