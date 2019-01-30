@@ -82,6 +82,100 @@ shinyServer(function(session, input, output) {
     output$conversion_rate_data__types_table <- renderDataTable__types(data__conversion_rate_data)
 
 
+
+    ##########################################################################################################
+    # Derived Datasets
+    ##########################################################################################################
+
+
+    # experiment start/end dates
+    data__experiment_start_stop <- reactive({
+
+        withProgress(value=1/2, message='Processing Data', {
+
+            data__experiment_traffic() %>%
+                group_by(experiment_id) %>%
+                summarise(start=min(first_joined_experiment),
+                          end=max(first_joined_experiment)) %>%
+                arrange(desc(start))
+        })
+    })
+
+    # experiment paths & counts
+    data__experiment_paths <- reactive({
+
+        withProgress(value=1/2, message='Processing Data', {
+
+            data__experiment_traffic() %>%
+                count(experiment_id, path) %>%
+                arrange(experiment_id, desc(n)) %>%
+                rename(visits = n)
+        })
+    })
+
+    ##########################################################################################################
+    # Experiment Results & Analysis
+    ##########################################################################################################
+
+    output$experiment_results__experiment_selected__UI <- renderUI({
+
+        withProgress(value=1/2, message='Generating Filters', {
+            
+            req(data__experiment_start_stop())
+
+            experiments <- unique(data__experiment_start_stop()$experiment_id)
+            selectInput(inputId='experiment_results__experiment_selected',
+                        label = 'Experiment',
+                        choices = experiments,
+                        selected = experiments[1],
+                        multiple = FALSE,
+                        selectize = TRUE,
+                        width = 500,
+                        size = NULL)
+        })
+    })
+
+    output$experiment_results__metrics_selected__UI <- renderUI({
+            
+        withProgress(value=1/2, message='Generating Filters', {
+
+            req(data__attribution_windows())
+            req(input$experiment_results__experiment_selected)
+
+            metrics <- (data__attribution_windows() %>% 
+                filter(experiment_id == input$experiment_results__experiment_selected))$metric_id
+
+            checkboxGroupInput(inputId='experiment_results__metrics_selected',
+                               label="Metrics",
+                               choices=metrics,
+                               selected=metrics,
+                               inline=FALSE,
+                               width=NULL)
+        })
+    })
+
+    output$experiment_results__paths_selected__UI <- renderUI({
+            
+        withProgress(value=1/2, message='Generating Filters', {
+
+            req(data__experiment_paths())
+            req(input$experiment_results__experiment_selected)
+
+            paths <- (data__experiment_paths() %>% 
+                filter(experiment_id == input$experiment_results__experiment_selected))$path
+
+            checkboxGroupInput(inputId='experiment_results__paths_selected',
+                               label="Paths",
+                               choices=paths,
+                               selected=paths,
+                               inline=FALSE,
+                               width=NULL)
+        })
+    })
+
+    ##########################################################################################################
+    # Website Traffic
+    ##########################################################################################################
     output$website_traffic__plot <- renderPlot({
 
         show_path <- TRUE

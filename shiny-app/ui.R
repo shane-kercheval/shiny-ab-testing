@@ -10,32 +10,22 @@ shinyUI(fluidPage(theme="custom.css",
     titlePanel("AB Testing"),
     navlistPanel(
         tabPanel(
-            'Dashboard',
-            column(3,
-                class='column-input-control-style',
-                bsCollapse(id='dashboard__bscollapse', 
-                           open=c('TBD'),
-                           multiple=TRUE,
-                    bsCollapsePanel(
-                        'TBD',
-                        style='default'
-                    )
-                )
-            ),
-            column(9,
-                tags$h1("TBD")
-            )
-        ),
-        tabPanel(
             'Experiment Results & Analysis',
             column(3,
                 class='column-input-control-style',
                 bsCollapse(id='dashboard__bscollapse', 
-                           open=c('TBD'),
+                           open=c("Experiment", "Metrics", "Paths"),
                            multiple=TRUE,
                     bsCollapsePanel(
-                        'TBD',
-                        style='default'
+                        "Experiment",
+                        style='default',
+                        uiOutput('experiment_results__experiment_selected__UI'),
+                        uiOutput('experiment_results__metrics_selected__UI')
+                    ),
+                    bsCollapsePanel(
+                        "Paths",
+                        style='default',
+                        uiOutput('experiment_results__paths_selected__UI')
                     )
                 )
             ),
@@ -58,6 +48,23 @@ shinyUI(fluidPage(theme="custom.css",
                         tags$p('TBD')
                     )
                 )
+            )
+        ),
+        tabPanel(
+            'Dashboard',
+            column(3,
+                class='column-input-control-style',
+                bsCollapse(id='dashboard__bscollapse', 
+                           open=c('TBD'),
+                           multiple=TRUE,
+                    bsCollapsePanel(
+                        'TBD',
+                        style='default'
+                    )
+                )
+            ),
+            column(9,
+                tags$h1("TBD")
             )
         ),
         tabPanel(
