@@ -1005,8 +1005,23 @@ p_value_intervals %>%
         labs(title='Freq. prop.test conf interval')
 
 experiment_summary
+
+
+
+
+temp %>%
+    select(expired_time_window, variation, metric_id, cumulative_successes, cumulative_trials) %>%
+    mutate(cr=cumulative_successes / cumulative_trials) %>%
+    ggplot(aes(x=expired_time_window, y=cr, group=variation, color=variation)) +
+        geom_line() +
+        facet_wrap( ~ metric_id) + 
+        expand_limits(y=0) +
+        labs(title='Conversion Rates over time')
+
+
+experiment_summary
 ```
-data
+
 
 
 
