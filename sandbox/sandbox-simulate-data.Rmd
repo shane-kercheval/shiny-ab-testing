@@ -648,7 +648,7 @@ user_conversion_rates <- user_conversion_rates %>%
 
 # this dataset contains all the conversions, but some will not have converted within the time window; we still want to keep them for now to analyze how many converted before/during/after the experiment/window
 user_conversion_rates <- user_conversion_rates %>%
-    select(-experiment_id, -first_joined_experiment, -conversion_date, -attribution_windows)
+    select(-experiment_id, -first_joined_experiment, -attribution_windows)
 
 experiment_summary <- user_conversion_rates %>%
     filter(converted_within_window) %>%
@@ -794,6 +794,7 @@ temp <- data.frame(x,
                    b=dbeta(x, new_alpha_b, new_beta_b)) %>%
     gather(type, value, -x)
 
+prior_summary
 a_cr_simulation <- rbeta(1e6, new_alpha_a, new_beta_a)
 b_cr_simulation <- rbeta(1e6, new_alpha_b, new_beta_b)
 percent_of_time_b_wins <- mean(b_cr_simulation > a_cr_simulation)
@@ -812,23 +813,200 @@ percent_of_time_b_wins
 # we want a daily count of successes & trails, for both variations, per metric, considering only the people who have 
 # allowed enough time for the time windows (i.e. the entered the experiment more than x days prior from the relative point/day in time, where x is the attribution window for the metric)
 #
-daily_totals_joined_experiment <- experiments_all %>% 
+daily_totals_per_variation <- experiments_all %>% 
     filter(experiment_id == experiment_name) %>%
-    count(first_joined_experiment)
-    
+    count(first_joined_experiment, variation) %>%
+    arrange(first_joined_experiment, variation)
 
-metric_selected <- 'Sign Up'
-attribution_window <- (experiments_metrics %>% filter(experiment_id == experiment_name & metric_id == metric_selected))$attribution_windows
-inner_join(experiments_all %>% 
-               filter(experiment_id == experiment_name),
-           conversion_data %>%
-               filter(metric_id == metric_selected), by = 'user_id') %>%
-    mutate()
-    count()
-    
 
-experiment
+experiments_current <- experiments_all %>% filter(experiment_id == experiment_name)
+attribution_windows_current <- experiments_metrics %>% filter(experiment_id == experiment_name)
+
+experiment_start_date
+experiment_end_date <- (start_stop %>% filter(experiment_id == experiment_name))$end
+
+experiment_day <- seq(experiment_start_date, experiment_end_date, 1)
+
+temp <- expand.grid(user_id=experiments_current$user_id,
+            metric_id=(experiments_metrics %>% filter(experiment_id == experiment_name))$metric_id) %>%
+    inner_join(experiments_current, by='user_id') %>%
+    inner_join(experiments_metrics, by=c('experiment_id', 'metric_id')) %>%
+    mutate(expired_time_window=first_joined_experiment + attribution_windows)
+    
+cumulative_conversions <- left_join(temp %>% select(user_id, variation, metric_id, expired_time_window),
+          user_conversion_rates %>% select(user_id, variation, metric_id, converted_within_window) %>% filter(converted_within_window),
+          by=c('user_id', 'variation', 'metric_id')) %>%
+    mutate(converted_within_window=ifelse(is.na(converted_within_window), FALSE, converted_within_window)) %>%
+    group_by(expired_time_window, variation, metric_id) %>%
+    summarise(successes=sum(converted_within_window),
+              trials=n()) %>% 
+    ungroup() %>%
+    arrange(expired_time_window, variation, metric_id) %>%
+    group_by(variation, metric_id) %>%
+    mutate(cumulative_successes=cumsum(successes),
+           cumulative_trials=cumsum(trials)) %>%
+    ungroup()
+
+cumulative_conversions %>%
+    filter(metric_id == 'Sign Up') %>%
+    select(-successes, -trials) %>%
+    gather(type, value, -expired_time_window, -variation, -metric_id) %>%
+    ggplot(aes(x=expired_time_window, y=value, group=type, color=type)) +
+    geom_line() +
+    facet_wrap(~variation) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+    labs(title='Success/Trials over time - Signups')
+
+
+cumulative_conversions %>%
+    filter(metric_id == 'Talk to Sales') %>%
+    select(-successes, -trials) %>%
+    gather(type, value, -expired_time_window, -variation, -metric_id) %>%
+    ggplot(aes(x=expired_time_window, y=value, group=type, color=type)) +
+    geom_line() +
+    facet_wrap(~variation) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+    labs(title='Success/Trials over time - Talk to Sales')
+
+
+variation_names <- sort(unique(cumulative_conversions$variation))
+variation_a <- variation_names[1]
+variation_b <- variation_names[2]
+
+temp <- inner_join(cumulative_conversions %>% select(-successes, -trials),
+           prior_summary %>% select(metric_id, alpha, beta) %>% rename(prior_alpha=alpha, prior_beta=beta),
+           by='metric_id') %>%
+    mutate(new_alpha = prior_alpha + cumulative_successes,
+           new_beta = prior_beta + (cumulative_trials - cumulative_successes))
+
+
+simulate_b_wins <- function(alpha_a, beta_a, alpha_b, beta_b, number_of_draws=1e6) {
+    
+    a_cr_simulation <- rbeta(number_of_draws, alpha_a, beta_a)
+    b_cr_simulation <- rbeta(number_of_draws, alpha_b, beta_b)
+    
+    return ( mean(b_cr_simulation > a_cr_simulation) )
+}
+    
+prob_over_time <- temp %>%
+    group_by(expired_time_window, metric_id) %>%
+    summarise(prob_b_better_a=simulate_b_wins(alpha_a=new_alpha[variation == variation_a],
+                                              beta_a=new_beta[variation == variation_a],
+                                              alpha_b=new_alpha[variation == variation_b],
+                                              beta_b=new_beta[variation == variation_b],
+                                              number_of_draws=1e4)) %>%
+    arrange(expired_time_window, metric_id)
+prob_over_time %>%
+    ggplot(aes(x=expired_time_window, y=prob_b_better_a, group=metric_id, color=metric_id)) +
+    geom_line(alpha=0.5) +
+#    geom_smooth(method='loess', se=FALSE) +
+    expand_limits(y=0)
+
+
+credible_interval_approx <- function(alpha_a, beta_a, alpha_b, beta_b) {
+# https://github.com/dgrtwo/empirical-bayes-book/blob/master/bayesian-ab.Rmd
+    u1 <- alpha_a / (alpha_a + beta_a)
+    u2 <- alpha_b / (alpha_b + beta_b)
+    var1 <- alpha_a * beta_a / ((alpha_a + beta_a) ^ 2 * (alpha_a + beta_a + 1))
+    var2 <- alpha_b * beta_b / ((alpha_b + beta_b) ^ 2 * (alpha_b + beta_b + 1))
+    
+    mu_diff <- u2 - u1
+    sd_diff <- sqrt(var1 + var2)
+    
+    # in D.R. code, the first player had a higher probability but a negative estimate (i.e. negative difference in conversion rate, mu_diff)
+    # This doesn't make sense, so we'll 1) use the first player as the A group and the second as the B group), so B-A 
+    # which gives the expected intervals (but flips the posterior probability), and 2) use 1-pnorm(...) to get the correct posterior probability
+    c(posterior = 1 - pnorm(0, mu_diff, sd_diff),
+            estimate = mu_diff,
+            conf.low = qnorm(.025, mu_diff, sd_diff),
+            conf.high = qnorm(.975, mu_diff, sd_diff))
+}
+
+temp_credible_interval <- temp %>%
+    group_by(expired_time_window, metric_id) %>%
+    summarise(asdf=list(credible_interval_approx(alpha_a=new_alpha[variation == variation_a],
+                                       beta_a=new_beta[variation == variation_a],
+                                       alpha_b=new_alpha[variation == variation_b],
+                                       beta_b=new_beta[variation == variation_b]))) %>%
+    ungroup()
+
+credible_intervals <- cbind(temp_credible_interval, as.data.frame(do.call("rbind", temp_credible_interval$asdf))) %>%
+    select(expired_time_window, metric_id, posterior, estimate, conf.low, conf.high) %>%
+    arrange(expired_time_window, metric_id)
+
+
+credible_interval_approx(alpha_a=3872,
+                         beta_a=8880,
+                        alpha_b=2228,
+                         beta_b=5071
+                         )
+qnorm(0.5, mu_diff, sd_diff)
+
+
+credible_intervals %>%
+    ggplot(aes(x=expired_time_window, y=estimate)) +
+        geom_line() +
+        geom_hline(yintercept = 0, color='red') +
+        geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2) +
+        facet_wrap(~metric_id)
+
+
+p_values <- function(successes_a, trials_a, successes_b, trials_b) {
+    
+    test_results <- prop.test(x=c(successes_b, successes_a), n=c(trials_b, trials_a))
+    return (c(p_value = test_results$p.value,
+              estimate = as.numeric(test_results$estimate[1] - test_results$estimate[2]),
+              conf.low = test_results$conf.int[1],
+              conf.high = test_results$conf.int[2]))
+}
+
+# 
+# 
+# test_results <- prop.test(x=c(3872, 2228), n=c((3872+8880), (2228+5071)))
+# test_results$p.value
+# test_results$conf.int[1]
+# test_results$conf.int[2]
+# 
+# p_values(3872, 3872+8880, 2228, 2228+5071)
+
+temp_p_value <- temp %>%
+    group_by(expired_time_window, metric_id) %>%
+    summarise(asdf=list(p_values(successes_a=cumulative_successes[variation == variation_a],
+                                 trials_a=cumulative_trials[variation == variation_a],
+                                 successes_b=cumulative_successes[variation == variation_b],
+                                 trials_b=cumulative_trials[variation == variation_b]))) %>%
+    ungroup()
+
+p_value_intervals <- cbind(temp_p_value, as.data.frame(do.call("rbind", temp_p_value$asdf))) %>%
+    select(expired_time_window, metric_id, p_value, estimate, conf.low, conf.high) %>%
+    arrange(expired_time_window, metric_id)
+
+p_value_intervals %>%
+    group_by(metric_id) %>%
+    mutate(visit_index=rank(-as.numeric(expired_time_window), ties.method = "first")) %>%
+    ungroup() %>%
+    ggplot(aes(x=expired_time_window, y=p_value)) +
+        geom_line() +
+        geom_hline(yintercept = 0.05, color='red') +
+        geom_text(aes(label=ifelse(visit_index == 1, round(p_value, 3), '')), vjust=-1) +
+        facet_wrap(~metric_id) +
+        labs(title='P-value over time i.e. cumuatlive successes/trails')
+
+p_value_intervals %>%
+    group_by(metric_id) %>%
+    mutate(visit_index=rank(-as.numeric(expired_time_window), ties.method = "first")) %>%
+    ungroup() %>%
+    ggplot(aes(x=expired_time_window, y=estimate)) +
+        geom_line() +
+        geom_hline(yintercept = 0.00, color='red') +
+        geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2) +
+        geom_text(aes(label=ifelse(visit_index == 1, percent(estimate), '')), vjust=-1) +
+        facet_wrap(~metric_id) +
+        labs(title='Freq. prop.test conf interval')
+
+experiment_summary
 ```
+data
 
 
 
