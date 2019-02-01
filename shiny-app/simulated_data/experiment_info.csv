@@ -1,0 +1,9 @@
+"experiment_id","variation_name","is_baseline"
+"Experiment 1","original",TRUE
+"Experiment 1","Site Redesign",FALSE
+"Experiment 2","Green Signup CTA",TRUE
+"Experiment 2","Blue Signup CTA",FALSE
+"Experiment 3","No Offer",TRUE
+"Experiment 3","Sales Offer",FALSE
+"Current Experiment","Old Signup",TRUE
+"Current Experiment","New Signup",FALSE
