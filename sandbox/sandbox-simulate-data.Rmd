@@ -917,7 +917,7 @@ credible_interval_approx <- function(alpha_a, beta_a, alpha_b, beta_b) {
     # This doesn't make sense, so we'll 1) use the first player as the A group and the second as the B group), so B-A 
     # which gives the expected intervals (but flips the posterior probability), and 2) use 1-pnorm(...) to get the correct posterior probability
     c(posterior = 1 - pnorm(0, mu_diff, sd_diff),
-            estimate = mu_diff,
+            cr_diff_estimate = mu_diff,
             conf.low = qnorm(.025, mu_diff, sd_diff),
             conf.high = qnorm(.975, mu_diff, sd_diff))
 }
@@ -931,7 +931,7 @@ temp_credible_interval <- temp %>%
     ungroup()
 
 credible_intervals <- cbind(temp_credible_interval, as.data.frame(do.call("rbind", temp_credible_interval$asdf))) %>%
-    select(expired_time_window, metric_id, posterior, estimate, conf.low, conf.high) %>%
+    select(expired_time_window, metric_id, posterior, cr_diff_estimate, conf.low, conf.high) %>%
     arrange(expired_time_window, metric_id)
 
 
@@ -944,18 +944,30 @@ qnorm(0.5, mu_diff, sd_diff)
 
 
 credible_intervals %>%
-    ggplot(aes(x=expired_time_window, y=estimate)) +
+    ggplot(aes(x=expired_time_window, y=cr_diff_estimate)) +
         geom_line() +
         geom_hline(yintercept = 0, color='red') +
         geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2) +
         facet_wrap(~metric_id)
 
+credible_intervals %>%
+    ggplot(aes(x=expired_time_window, y=cr_diff_estimate)) +
+        geom_line() +
+        #     geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2) +
+        geom_ribbon(aes(ymin = conf.low, ymax = conf.high), fill = 'green', alpha=0.1) +
+        geom_ribbon(aes(ymin = ifelse(conf.low <= 0, conf.low, NA), ymax = ifelse(conf.low <= 0, conf.high, NA)), fill = 'red', alpha=0.35) +
+        geom_ribbon(aes(ymin = ifelse(conf.low > 0, conf.low, NA), ymax = ifelse(conf.low > 0, conf.high, NA)), fill = 'green', alpha=0.2) +
+        geom_hline(yintercept = 0, color='red', alpha=0.5) +
+        facet_wrap(~metric_id)
+```
 
+
+```{r}
 p_values <- function(successes_a, trials_a, successes_b, trials_b) {
     
     test_results <- prop.test(x=c(successes_b, successes_a), n=c(trials_b, trials_a))
     return (c(p_value = test_results$p.value,
-              estimate = as.numeric(test_results$estimate[1] - test_results$estimate[2]),
+              cr_diff_estimate = as.numeric(test_results$estimate[1] - test_results$estimate[2]),
               conf.low = test_results$conf.int[1],
               conf.high = test_results$conf.int[2]))
 }
@@ -978,7 +990,7 @@ temp_p_value <- temp %>%
     ungroup()
 
 p_value_intervals <- cbind(temp_p_value, as.data.frame(do.call("rbind", temp_p_value$asdf))) %>%
-    select(expired_time_window, metric_id, p_value, estimate, conf.low, conf.high) %>%
+    select(expired_time_window, metric_id, p_value, cr_diff_estimate, conf.low, conf.high) %>%
     arrange(expired_time_window, metric_id)
 
 p_value_intervals %>%
@@ -986,29 +998,65 @@ p_value_intervals %>%
     mutate(visit_index=rank(-as.numeric(expired_time_window), ties.method = "first")) %>%
     ungroup() %>%
     ggplot(aes(x=expired_time_window, y=p_value)) +
-        geom_line() +
-        geom_hline(yintercept = 0.05, color='red') +
+        geom_hline(yintercept = 0.05, color='red', alpha=0.5) +
+        geom_line(aes(group=metric_id, color = ifelse(p_value <= 0.05, 'green', 'red'))) +
+    #geom_line(aes(col=ifelse(p_value <= 0.05, 'green', 'red'))) +
+        #geom_line() +
+        scale_colour_manual(values=c(green="green",red="red")) +
         geom_text(aes(label=ifelse(visit_index == 1, round(p_value, 3), '')), vjust=-1) +
         facet_wrap(~metric_id) +
-        labs(title='P-value over time i.e. cumuatlive successes/trails')
+        labs(title='P-value over time i.e. cumuatlive successes/trails') +
+        theme(legend.position = 'none')
+        
 
 p_value_intervals %>%
     group_by(metric_id) %>%
     mutate(visit_index=rank(-as.numeric(expired_time_window), ties.method = "first")) %>%
     ungroup() %>%
-    ggplot(aes(x=expired_time_window, y=estimate)) +
+    mutate(group=conf.low > 0) %>%
+    ggplot(aes(x=expired_time_window, y=cr_diff_estimate)) +
+        geom_hline(yintercept = 0, color='red', alpha=0.5) +
         geom_line() +
-        geom_hline(yintercept = 0.00, color='red') +
-        geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2) +
-        geom_text(aes(label=ifelse(visit_index == 1, percent(estimate), '')), vjust=-1) +
+        geom_ribbon(aes(ymax = 0, ymin = ifelse(conf.low >= 0, 0, conf.low)), fill = 'red', alpha=0.3) +
+        geom_ribbon(aes(ymin = ifelse(conf.low >= 0, conf.low, 0), ymax = ifelse(conf.high <= 0, 0, conf.high)), fill = 'green', alpha=0.3) +
+        geom_text(aes(label=ifelse(visit_index == 1, percent(cr_diff_estimate), '')), vjust=-1) +
         facet_wrap(~metric_id) +
-        labs(title='Freq. prop.test conf interval')
+        labs(title='Freq. prop.test conf interval') #+
+        #scale_fill_manual(values=c(green="green",red="red")) +
+        #theme(legend.position = 'none')
 
+
+p_value_intervals %>%
+    group_by(metric_id) %>%
+    mutate(visit_index=rank(-as.numeric(expired_time_window), ties.method = "first")) %>%
+    ungroup() %>%
+    mutate(group=conf.low > 0) %>%
+    ggplot(aes(x=expired_time_window, y=cr_diff_estimate)) +
+        geom_line() +
+        # ribbon if conf.low is above 0
+        geom_ribbon(aes(ymin = conf.low, ymax = conf.high), fill = 'green', alpha=0.15) +
+        geom_ribbon(aes(ymin = ifelse(conf.low <= 0, conf.low, NA), ymax = ifelse(conf.low <= 0, conf.high, NA)), fill = 'red', alpha=0.45) +
+        geom_ribbon(aes(ymin = ifelse(conf.low > 0, conf.low, NA), ymax = ifelse(conf.low > 0, conf.high, NA)), fill = 'green', alpha=0.2) +
+        geom_hline(yintercept = 0, color='red', alpha=0.5) +
+        # geom_ribbon(aes(ymax = 0, ymin = ifelse(conf.low >= 0, 0, conf.low)), fill = 'red', alpha=0.3) +
+        # geom_ribbon(aes(ymin = ifelse(conf.low >= 0, conf.low, 0), ymax = ifelse(conf.high <= 0, 0, conf.high)), fill = 'green', alpha=0.3) +
+        geom_text(aes(label=ifelse(visit_index == 1, percent(cr_diff_estimate), '')), vjust=-1) +
+        facet_wrap(~metric_id) +
+        labs(title='Freq. prop.test conf interval') #+
+        #scale_fill_manual(values=c(green="green",red="red")) +
+        #theme(legend.position = 'none')
+ 
+
+p_value_intervals %>%
+    filter(metric_id == 'Sign Up')
+
+?geom_ribbon
 experiment_summary
+?geom_errorbarh
+```
 
 
-
-
+```{r}
 temp %>%
     select(expired_time_window, variation, metric_id, cumulative_successes, cumulative_trials) %>%
     mutate(cr=cumulative_successes / cumulative_trials) %>%
@@ -1019,10 +1067,45 @@ temp %>%
         labs(title='Conversion Rates over time')
 
 
+cia_list <- pmap(with(experiment_summary, list(original_converted, original_num_users, variant_converted, variant_num_users)),
+                 function(a_success, a_trial, b_success, b_trial){
+                     credible_interval_approx(alpha_a = a_success,
+                                              beta_a = a_trial - a_success,
+                                              alpha_b = b_success,
+                                              beta_b = b_trial - b_success)
+                 })
+
+freq_list <- pmap(with(experiment_summary, list(original_converted, original_num_users, variant_converted, variant_num_users)),
+                 function(a_success, a_trial, b_success, b_trial){
+                     p_values(successes_a = a_success,
+                              trials_a = a_trial,
+                              successes_b = b_success,
+                              trials_b = b_trial)
+                 })
+
+
+
 experiment_summary
+temp_experiment_summary <- experiment_summary %>% 
+    mutate(prob_b_is_better=map_dbl(cia_list, ~.['posterior']),
+           bayesian_cr_diff_estimate=map_dbl(cia_list, ~.['cr_diff_estimate']),
+           bayesian_conf.low=map_dbl(cia_list, ~.['conf.low']),
+           bayesian_conf.high=map_dbl(cia_list, ~.['conf.high']),
+           freq_p_value=map_dbl(freq_list, ~.['p_value']),
+           freq_cr_diff_estimate=map_dbl(freq_list, ~.['cr_diff_estimate']),
+           freq_conf.low=map_dbl(freq_list, ~.['conf.low']),
+           freq_conf.high=map_dbl(freq_list, ~.['conf.high']))
+
+#View(temp_experiment_summary)
+experiment_summary <- temp_experiment_summary
+
 ```
 
+```{r}
+experiment_summary
 
+
+```
 
 
 
