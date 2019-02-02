@@ -493,3 +493,53 @@ test_that("test_helpers: create", {
         theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
         labs(title="% Change in CR from the Baseline (A) variation to the Variant (B)")
     plot_object %>% test_save_plot(file='data/simulate_data/conversion_rates_of_experiments_per_variation.png')
+
+##############################################################################################################
+# For those who convert to a metric, generate the offset (number of days) from first-visit to conversion-date
+##############################################################################################################
+
+    generate_offset <- function(user_id, metric) {
+ 
+        # NOTE setting the seed is messing up the distribution   
+        ##  set.seed(user_id)
+        # convert from 0-30 days, acnored by the attribution window
+        rbinom(1, 30, attribution_windows_days[metric]/30)
+    }
+
+    names(attribution_windows_days) <- metrics_names
+    conversion_offsets <- map2_dbl(conversion_data$user_id, 
+                                   conversion_data$metric_id,
+                                   #~ rbinom(1, 30, attribution_windows_days[.y]/30))
+                                   ~ generate_offset(.x, .y))
+    conversion_data <- conversion_data %>%
+        mutate(offset=conversion_offsets,
+               conversion_date = first_visit + offset) %>%
+        filter(conversion_date <= max(website_traffic$visit_date))  # we don't want to go past the last date of our simulated datasets
+    
+    plot_object <- conversion_data %>%
+        count(metric_id, offset) %>%
+        mutate(offset=factor(offset)) %>%
+        mutate(metric_id=fct_reorder(metric_id, n, .desc = TRUE)) %>%
+        ggplot(aes(x=offset, y=n)) +
+            geom_col() +
+        facet_wrap( ~ metric_id, scales = 'free_y') +
+        labs(title='Distribution of Days from First Visit to Event Conversion, for those that convert')
+    plot_object %>% test_save_plot(file='data/simulate_data/distro_days_from_first_visit_to_conversion_per_metric.png')
+
+    plot_object <- conversion_data %>%
+        count(conversion_date, metric_id) %>%
+        ggplot(aes(x=conversion_date, y=n)) +
+            geom_line() +
+        facet_wrap( ~ metric_id, scales = 'free_y') +
+        labs(title='Daily Conversions')
+    plot_object %>% test_save_plot(file='data/simulate_data/daiy_conversion_events_per_metric.png')
+
+    conversion_data <- conversion_data %>%
+        select(user_id, metric_id, conversion_date) %>%
+        arrange(user_id, conversion_date)
+
+    write.csv(conversion_data, file='../shiny-app/simulated_data/conversion_rate_data.csv', row.names = FALSE)
+
+
+
+})
