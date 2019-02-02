@@ -539,7 +539,4 @@ test_that("test_helpers: create", {
         arrange(user_id, conversion_date)
 
     write.csv(conversion_data, file='../shiny-app/simulated_data/conversion_rate_data.csv', row.names = FALSE)
-
-
-
 })
