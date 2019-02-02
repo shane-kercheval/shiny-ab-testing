@@ -285,9 +285,7 @@ test_that("test_helpers: create", {
     
     experiment_traffic_3 <- create_experiment_visits(website_traffic, start_date, end_date, experiment_paths,
                                                      current_experiment_id, variation_names)
-    
 
-    
     ##########################################################################################################
     # Experiment 4
     ##########################################################################################################
@@ -309,6 +307,16 @@ test_that("test_helpers: create", {
                                 experiment_traffic_2,
                                 experiment_traffic_3,
                                 experiment_traffic_4)
+    
+    plot_object <- experiment_traffic %>%
+        count(first_joined_experiment, experiment_id) %>%
+        mutate(experiment_id = factor(experiment_id, levels=experiment_names)) %>%
+        ggplot(aes(x=first_joined_experiment, y=experiment_id, color=experiment_id)) +
+            geom_line(size=5) +
+            scale_x_date(date_labels="%y-%m-%d",date_breaks  ="10 days") +
+            theme(axis.text.x = element_text(angle = 30, hjust = 1, size=6),
+                  legend.position="none")
+    plot_object %>% test_save_plot(file='data/simulate_data/experiment_start_stop.png')
 
     write.csv(experiment_traffic, file='../shiny-app/simulated_data/experiment_traffic.csv', row.names = FALSE)
     ##########################################################################################################
