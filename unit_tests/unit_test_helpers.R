@@ -86,7 +86,10 @@ create_experiment_visits <- function(website_traffic, start_date, end_date, expe
         select(-visit_index)
     
     stopifnot(min(experiment_visits$visit_date) == start_date)
-    stopifnot(max(experiment_visits$visit_date) == end_date)
+    if(end_date <= max(website_traffic$visit_date)) {
+
+        stopifnot(max(experiment_visits$visit_date) == end_date)
+    }
     stopifnot(all(sort(unique(experiment_visits$path)) == sort(experiment_paths)))
     
     expected_num_users <- length(unique(experiment_visits$user_id))

@@ -232,12 +232,15 @@ test_that("test_helpers: create", {
 
     experiment_names <- unique(experiment_info$experiment_id)
     min_traffic_date <- min(website_traffic$visit_date)
-    #Sys.Date() - min_traffic_date
+    #  max(website_traffic$visit_date) - min_traffic_date
     
+    ##########################################################################################################
+    # Experiment 1
+    ##########################################################################################################
     # let's start the experiment 1 month after our visits dataset, and run it for a month
-    days_of_prior_data <- 30
+    min_traffic_date_offset <- 30
     experiment_duration <- 30
-    start_date <- min_traffic_date + days_of_prior_data + 1
+    start_date <- min_traffic_date + min_traffic_date_offset + 1
     end_date <- start_date + experiment_duration
     # all paths
     experiment_paths <- unique(paths)
@@ -247,17 +250,66 @@ test_that("test_helpers: create", {
     
     experiment_traffic_1 <- create_experiment_visits(website_traffic, start_date, end_date, experiment_paths,
                                                      current_experiment_id, variation_names)
-    experiment_traffic_1
     
+    ##########################################################################################################
+    # Experiment 2
+    ##########################################################################################################
+    min_traffic_date_offset <- 40
+    experiment_duration <- 30
+    start_date <- min_traffic_date + min_traffic_date_offset
+    end_date <- start_date + experiment_duration
+    experiment_paths <- c(#'example.com',
+                          'example.com/features', 
+                          #'example.com/pricing', 
+                          'example.com/demo')
+    current_experiment_id <- experiment_names[2]
+    variation_names <- (experiment_info %>% filter(experiment_id == current_experiment_id))$variation_name
     
+    experiment_traffic_2 <- create_experiment_visits(website_traffic, start_date, end_date, experiment_paths,
+                                                     current_experiment_id, variation_names)
+
     
+    ##########################################################################################################
+    # Experiment 3
+    ##########################################################################################################
+    min_traffic_date_offset <- 60
+    experiment_duration <- 25
+    start_date <- min_traffic_date + min_traffic_date_offset
+    end_date <- start_date + experiment_duration
+    experiment_paths <- c(#'example.com',
+                          #'example.com/features',
+                          'example.com/pricing',
+                          'example.com/demo')
+    current_experiment_id <- experiment_names[3]
+    variation_names <- (experiment_info %>% filter(experiment_id == current_experiment_id))$variation_name
     
+    experiment_traffic_3 <- create_experiment_visits(website_traffic, start_date, end_date, experiment_paths,
+                                                     current_experiment_id, variation_names)
     
+
     
+    ##########################################################################################################
+    # Experiment 4
+    ##########################################################################################################
+    min_traffic_date_offset <- 75
+    experiment_duration <- 30
+    start_date <- min_traffic_date + min_traffic_date_offset
+    end_date <- start_date + experiment_duration
+    experiment_paths <- c('example.com',
+                          'example.com/features', 
+                          'example.com/pricing', 
+                          'example.com/demo')
+    current_experiment_id <- experiment_names[4]
+    variation_names <- (experiment_info %>% filter(experiment_id == current_experiment_id))$variation_name
     
-    
-    
-    
+    experiment_traffic_4 <- create_experiment_visits(website_traffic, start_date, end_date, experiment_paths,
+                                                     current_experiment_id, variation_names)
+
+    experiment_traffic <- rbind(experiment_traffic_1,
+                                experiment_traffic_2,
+                                experiment_traffic_3,
+                                experiment_traffic_4)
+
     write.csv(experiment_traffic, file='../shiny-app/simulated_data/experiment_traffic.csv', row.names = FALSE)
     ##########################################################################################################
     # SIMULATE ATTRIBUTION WINDOWS
