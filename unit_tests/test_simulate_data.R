@@ -18,6 +18,8 @@ source('unit_test_helpers.R')
 
 test_that("test_helpers: create", {
 
+    baseline_conversion_rates=c(0.10, 0.07, 0.05, 0.03)
+    
 ##########################################################################################################
 # SIMULATE EXPERIMENT INFO
 ##########################################################################################################
@@ -26,7 +28,7 @@ test_that("test_helpers: create", {
     # functionality is more suited towards a v2 than a v1
     # We could also include a description, etc., in this dataset.
     experiment_info <- as.data.frame(tribble(
-        ~experiment_id,                             ~variation_name,      ~is_baseline,
+        ~experiment_id,                             ~variation,      ~is_baseline,
         #------------------------------------------|--------------------|----
         "Redesign Website",                         "Original",          TRUE,
         "Redesign Website",                         "Site Redesign",     FALSE,
@@ -246,10 +248,11 @@ test_that("test_helpers: create", {
     experiment_paths <- unique(paths)
     # experiment 1
     current_experiment_id <- experiment_names[1]
-    variation_names <- (experiment_info %>% filter(experiment_id == current_experiment_id))$variation_name
+    variation_names <- (experiment_info %>% filter(experiment_id == current_experiment_id))$variation
     
     experiment_traffic_1 <- create_experiment_visits(website_traffic, start_date, end_date, experiment_paths,
-                                                     current_experiment_id, variation_names)
+                                                     current_experiment_id, variation_names,
+                                                     baseline_conversion_rates=baseline_conversion_rates)
     
     ##########################################################################################################
     # Experiment 2
@@ -263,10 +266,11 @@ test_that("test_helpers: create", {
                           #'example.com/pricing', 
                           'example.com/demo')
     current_experiment_id <- experiment_names[2]
-    variation_names <- (experiment_info %>% filter(experiment_id == current_experiment_id))$variation_name
+    variation_names <- (experiment_info %>% filter(experiment_id == current_experiment_id))$variation
     
     experiment_traffic_2 <- create_experiment_visits(website_traffic, start_date, end_date, experiment_paths,
-                                                     current_experiment_id, variation_names)
+                                                     current_experiment_id, variation_names,
+                                                     baseline_conversion_rates=baseline_conversion_rates)
 
     
     ##########################################################################################################
@@ -281,10 +285,11 @@ test_that("test_helpers: create", {
                           'example.com/pricing',
                           'example.com/demo')
     current_experiment_id <- experiment_names[3]
-    variation_names <- (experiment_info %>% filter(experiment_id == current_experiment_id))$variation_name
+    variation_names <- (experiment_info %>% filter(experiment_id == current_experiment_id))$variation
     
     experiment_traffic_3 <- create_experiment_visits(website_traffic, start_date, end_date, experiment_paths,
-                                                     current_experiment_id, variation_names)
+                                                     current_experiment_id, variation_names,
+                                                     baseline_conversion_rates=baseline_conversion_rates)
 
     ##########################################################################################################
     # Experiment 4
@@ -298,10 +303,11 @@ test_that("test_helpers: create", {
                           'example.com/pricing', 
                           'example.com/demo')
     current_experiment_id <- experiment_names[4]
-    variation_names <- (experiment_info %>% filter(experiment_id == current_experiment_id))$variation_name
+    variation_names <- (experiment_info %>% filter(experiment_id == current_experiment_id))$variation
     
     experiment_traffic_4 <- create_experiment_visits(website_traffic, start_date, end_date, experiment_paths,
-                                                     current_experiment_id, variation_names)
+                                                     current_experiment_id, variation_names,
+                                                     baseline_conversion_rates=baseline_conversion_rates)
 
     experiment_traffic <- rbind(experiment_traffic_1,
                                 experiment_traffic_2,
@@ -319,13 +325,171 @@ test_that("test_helpers: create", {
     plot_object %>% test_save_plot(file='data/simulate_data/experiment_start_stop.png')
 
     write.csv(experiment_traffic, file='../shiny-app/simulated_data/experiment_traffic.csv', row.names = FALSE)
-    ##########################################################################################################
-    # SIMULATE ATTRIBUTION WINDOWS
-    ##########################################################################################################
 
-    historical_conversion_rates <- c(0.3, 0.2, 0.1, 0.08)
+    
+##########################################################################################################
+# Create Conversion Rates
+# We'll have historical baseline conversion rates for each metric, but we'll want to adjust them up
+# or down for each experiment to simulate the experiments (i.e. the variation) having a positive or
+# negative (or no) effect.
+##########################################################################################################
+    # create a dataframe that has baseline (i.e. historical) conversion rates fo each metric (will be the same)
+    # across experiments/variations
+    # NOTE: i do not change the baseline for future experiments (i.e. each experiment will always start with
+    # the baseline, which doesn't simulate changes over time, but this is good enough)
+    adjusted_conversion_rates <- inner_join(inner_join(experiment_info, attribution_windows, by='experiment_id'),
+                                            data.frame(metric_id=metrics_names, 
+                                                       baseline_conversion_rate=baseline_conversion_rates,
+                                                       stringsAsFactors = FALSE),
+                                            by = "metric_id") %>%
+        select(-attribution_windows)
 
-})
+    # now we will want to adjust the conversion rate for the a/b groups, we'll start with the baseline and
+    # update based on a lookup table (of sorts)
+    adjusted_conversion_rates$adjusted_conversion_rate <- adjusted_conversion_rates$baseline_conversion_rates
+    
+    percent_change_adjustments <- c(
+               #                            experiment_id   variation      is_baseline     metric_id
+        NA,    #                       Redesign Website         Original        TRUE       Sign Up
+        NA,    #                       Redesign Website         Original        TRUE Use Feature 1
+        NA,    #                       Redesign Website         Original        TRUE Talk to Sales
+        NA,    #                       Redesign Website         Original        TRUE Pay/Subscribe
+        0.10,  #                       Redesign Website    Site Redesign       FALSE       Sign Up
+        0.07,  #                       Redesign Website    Site Redesign       FALSE Use Feature 1
+        0.07,  #                       Redesign Website    Site Redesign       FALSE Talk to Sales
+        0.05,  #                       Redesign Website    Site Redesign       FALSE Pay/Subscribe
+        NA,    #                   New Signup CTA Color Green Signup CTA        TRUE       Sign Up
+        NA,    #                   New Signup CTA Color Green Signup CTA        TRUE Use Feature 1
+        NA,    #                   New Signup CTA Color Green Signup CTA        TRUE Talk to Sales
+        NA,    #                   New Signup CTA Color Green Signup CTA        TRUE Pay/Subscribe
+        -0.05, #                   New Signup CTA Color  Blue Signup CTA       FALSE       Sign Up
+        -0.05, #                   New Signup CTA Color  Blue Signup CTA       FALSE Use Feature 1
+        0,     #                   New Signup CTA Color  Blue Signup CTA       FALSE Talk to Sales
+        0,     #                   New Signup CTA Color  Blue Signup CTA       FALSE Pay/Subscribe
+        NA,    #  Show Discount for First-Time Visitors         No Offer        TRUE       Sign Up
+        NA,    #  Show Discount for First-Time Visitors         No Offer        TRUE Use Feature 1
+        NA,    #  Show Discount for First-Time Visitors         No Offer        TRUE Talk to Sales
+        NA,    #  Show Discount for First-Time Visitors         No Offer        TRUE Pay/Subscribe
+        0.04,  #  Show Discount for First-Time Visitors      Sales Offer       FALSE       Sign Up
+        0.04,  #  Show Discount for First-Time Visitors      Sales Offer       FALSE Use Feature 1
+        0.14,  #  Show Discount for First-Time Visitors      Sales Offer       FALSE Talk to Sales
+        0.11,  #  Show Discount for First-Time Visitors      Sales Offer       FALSE Pay/Subscribe
+        NA,    # Ask Additional Questions During Signup  Old Signup Path        TRUE       Sign Up
+        NA,    # Ask Additional Questions During Signup  Old Signup Path        TRUE Use Feature 1
+        NA,    # Ask Additional Questions During Signup  Old Signup Path        TRUE Talk to Sales
+        NA,    # Ask Additional Questions During Signup  Old Signup Path        TRUE Pay/Subscribe
+        -0.10, # Ask Additional Questions During Signup  New Signup Path       FALSE       Sign Up
+        0.10,  # Ask Additional Questions During Signup  New Signup Path       FALSE Use Feature 1
+        NA,    # Ask Additional Questions During Signup  New Signup Path       FALSE Talk to Sales
+        NA)    # Ask Additional Questions During Signup  New Signup Path       FALSE Pay/Subscribe
 
+    percent_change_adjustments[is.na(percent_change_adjustments)] <- 0
+    adjusted_conversion_rates <- adjusted_conversion_rates %>%
+        mutate(adjusted_conversion_rate=(percent_change_adjustments * baseline_conversion_rates) + baseline_conversion_rates)
 
+    # now we want to determine the conversion rates for each person, based on experiment, metric_id, variation, 
+    # so we can binom distribution based on the conversion rate
+    # if the person isn't part of an experiment, then we will use the historical conversion rate
+    names(baseline_conversion_rates) <- metrics_names
+    
+    # create a dateframe that has a historical conversion rate for each user/metric combo
+    user_metric_crs <- expand.grid(user_id=unique(website_traffic$user_id),
+                                   metric_id=metrics_names,
+                                   stringsAsFactors = FALSE) %>%
+        arrange(user_id, metric_id) %>%
+        mutate(baseline_conversion_rate=baseline_conversion_rates[metric_id])
 
+    # now add experiment/variation columns for users that were part of experiments
+    user_metric_crs <- full_join(user_metric_crs,
+              experiment_traffic %>% select(user_id, experiment_id, variation), by='user_id')
+
+    # based on experiment/variation/metric, get the chosen conversion rate
+    user_metric_crs <- left_join(user_metric_crs,
+                                 adjusted_conversion_rates %>% select(-baseline_conversion_rate),
+                                 by=c('experiment_id', 'variation', 'metric_id')) %>%
+        mutate(conversion_rate=ifelse(is.na(adjusted_conversion_rate), baseline_conversion_rate, adjusted_conversion_rate)) %>%
+        select(user_id, metric_id, conversion_rate)
+
+    # some people will have partipated in multiple experiments, so we'll take the average to get a dataset that is unique per user/metric
+    user_metric_crs <- user_metric_crs %>% 
+        group_by(user_id, metric_id) %>%
+        summarise(conversion_rate = mean(conversion_rate)) %>%
+        ungroup()
+    # View(distinct(user_metric_crs %>% select(-user_id)))
+    stopifnot(length(unique(user_metric_crs$user_id)) == length(unique(website_traffic$user_id)))
+    
+    # now we will determine if each person convertes based on their simulated conversion rate using the binomial distribution
+    #rbinom(1000, 1, 0.08)
+    simulate_conversion <- function(user_id, conversion_rate) {
+        ##set.seed(user_id+10)
+        return (rbinom(1, 1, conversion_rate))
+    }
+    
+    # now we simulating them converting or not by using their assigned conversion rates as a probability in a binom distribution
+    user_metric_crs$converted <- as.logical(map2_dbl(user_metric_crs$user_id,
+                        user_metric_crs$conversion_rate, 
+                        ~ simulate_conversion(.x, .y)))
+    
+    plot_object <- user_metric_crs %>%
+        count(metric_id, converted) %>%
+        mutate(metric_id = factor(metric_id, levels=metrics_names)) %>%
+        mutate(n = n / length(unique(user_metric_crs$user_id))) %>%
+        ggplot(aes(x=metric_id, y=n, group=converted, fill=converted)) +
+        geom_col(position='dodge') +
+        geom_text(aes(label=percent(n))) +
+        labs(title='Conversion Rates (among all users) for Each Metric',
+             subtitle= "Doesn't account for the lag between first visit and the conversion date.")
+    plot_object %>% test_save_plot(file='data/simulate_data/metric_conversion_rates_no_lag_consideration.png')
+
+    # create a dataset of the website traffic users that have converted
+    conversion_data <- inner_join(user_metric_crs %>%
+                                      filter(converted) %>%
+                                      select(user_id, metric_id),
+                                  website_traffic %>% 
+                                      group_by(user_id) %>%
+                                      summarise(first_visit=min(visit_date)),
+                                  by='user_id') %>%
+        arrange(user_id, metric_id)
+    # View(conversion_data)
+    
+    temp <- inner_join(
+        inner_join(experiment_traffic, conversion_data, by='user_id') %>%
+            mutate(converted=!is.na(first_joined_experiment)) %>%
+            count(experiment_id, variation, metric_id),
+        experiment_traffic %>% count(experiment_id, variation),
+        by=c('experiment_id', 'variation')) %>% 
+        inner_join(experiment_info, by=c('experiment_id', 'variation'))
+    
+    plot_object <- temp %>%
+        mutate(cr=n.x/n.y) %>%
+        arrange(experiment_id, metric_id, is_baseline) %>%
+        mutate(metric_id=factor(metric_id, levels=metrics_names)) %>%
+        ggplot(aes(x=metric_id, y=cr, group=is_baseline, fill=is_baseline)) +
+        geom_col(position='dodge') +
+        facet_wrap(~ experiment_id) +
+        geom_text(aes(label=round(cr, 3)),
+                  position = position_dodge(width = 1), 
+                  size=3) +
+        theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+        labs(title='Conversion Rates Between Variations Per Metric')
+    plot_object %>% test_save_plot(file='data/simulate_data/conversion_rates_of_experiments_per_variation.png')
+
+    plot_object <- temp %>%
+        group_by(experiment_id, metric_id) %>%
+        summarise(baseline_cr = n.x[is_baseline == TRUE] / n.y[is_baseline == TRUE],
+                  variant_cr= n.x[is_baseline == FALSE] / n.y[is_baseline == FALSE],
+                  percent_change_over_baseline= (variant_cr - baseline_cr) / baseline_cr) %>%
+        ungroup() %>%
+        mutate(experiment_id = factor(experiment_id, levels=experiment_names),
+               metric_id=factor(metric_id, levels=metrics_names)) %>%
+        ggplot(aes(x=metric_id, y=percent_change_over_baseline, fill=metric_id)) +
+        geom_col(position='dodge') +
+        geom_hline(yintercept = 0, color='red') +
+        facet_wrap(~ experiment_id) +
+        geom_text(aes(label=percent(percent_change_over_baseline)),
+                  position = position_dodge(width = 1), 
+                  size=3,
+                  vjust=-0.75) +
+        theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+        labs(title="% Change in CR from the Baseline (A) variation to the Variant (B)")
+    plot_object %>% test_save_plot(file='data/simulate_data/conversion_rates_of_experiments_per_variation.png')
