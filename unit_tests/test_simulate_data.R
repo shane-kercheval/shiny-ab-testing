@@ -1,5 +1,10 @@
 library('testthat')
+library(tidyverse)
+library(lubridate)
+library(scales)
+
 source('../shiny-app/r_scripts/helpers.R', chdir=TRUE)
+source('unit_test_helpers.R')
 
 # to run from command line, use:
 # library('testthat')
@@ -17,19 +22,22 @@ test_that("test_helpers: create", {
 # SIMULATE EXPERIMENT INFO
 ##########################################################################################################
 
-    # NOTE: is_baseline can be a setting within the shiny app
+    # NOTE: is_baseline can be a setting within the shiny app; but we'll set it here becuase that 
+    # functionality is more suited towards a v2 than a v1
+    # We could also include a description, etc., in this dataset.
     experiment_info <- as.data.frame(tribble(
-        ~experiment_id,        ~variation_name,      ~is_baseline,
-        #----------------------|--------------------|----
-        "Experiment 1",         "original",          TRUE,
-        "Experiment 1",         "Site Redesign",     FALSE,
-        "Experiment 2",         "Green Signup CTA",  TRUE,
-        "Experiment 2",         "Blue Signup CTA",   FALSE,
-        "Experiment 3",         "No Offer",          TRUE,
-        "Experiment 3",         "Sales Offer",       FALSE,
-        "Current Experiment",   "Old Signup",        TRUE,
-        "Current Experiment",   "New Signup",        FALSE
+        ~experiment_id,                             ~variation_name,      ~is_baseline,
+        #------------------------------------------|--------------------|----
+        "Redesign Website",                         "Original",          TRUE,
+        "Redesign Website",                         "Site Redesign",     FALSE,
+        "New Signup CTA Color",                     "Green Signup CTA",  TRUE,
+        "New Signup CTA Color",                     "Blue Signup CTA",   FALSE,
+        "Show Discount for First-Time Visitors",    "No Offer",          TRUE,
+        "Show Discount for First-Time Visitors",    "Sales Offer",       FALSE,
+        "Ask Additional Questions During Signup",   "Old Signup Path",   TRUE,
+        "Ask Additional Questions During Signup",   "New Signup Path",   FALSE
     ))
+    write.csv(experiment_info, file='../shiny-app/simulated_data/experiment_info.csv', row.names = FALSE)
 
 ##########################################################################################################
 # SIMULATE ATTRIBUTION WINDOWS
@@ -72,14 +80,9 @@ test_that("test_helpers: create", {
     website_traffic <- data.frame(user_id=ids)
     simulate_num_days <- number_of_months*30
 
-    # need to scale the output of the log(exponential) distribution to the number of days we are simulateing
-    scale_a_b <- function(x, a, b) {
-
-        (b - a) * ((x - min(x)) / (max(x) - min(x))) + a 
-    }
-
     # offset from todays day (i.e. today - first_time_visit_index == first-time-visit)
     set.seed(42)
+    # need to scale the output of the log(exponential) distribution to the number of days we are simulateing
     first_time_visit_offset <- round(scale_a_b(log2(rexp(length(unique(website_traffic$user_id)), rate=0.9) +1),
                                                a=0, 
                                                b=simulate_num_days))
@@ -87,7 +90,7 @@ test_that("test_helpers: create", {
     # create dataframe with the user-id and the offset that we will use from the current date
     # we'll use the current date so we can simulate the latest experiment is currently running 
     first_time_users <- data.frame(user_id=unique(ids), visit_offset=first_time_visit_offset)
-    
+
     first_time_users <- first_time_users %>%
         mutate(first_visit_date=today() - visit_offset) %>%
         select(-visit_offset) %>%
@@ -106,20 +109,6 @@ test_that("test_helpers: create", {
 
     # generate a new date based on the gamma distribution; note setting the seed based on the user-id,
     # which i wanted to do to recreate the same data, causes the distribution to become strange
-    generate_new_date <- function(visit_index, original_date, user_id) {
-        
-        # we don't wanto modify the first_visit_date 
-        if(visit_index == 1) {
-
-            return (original_date)
-        }
-        
-        #set.seed(user_id)
-        offset <- floor(rgamma(1, shape=visit_index + 3))
-        return (original_date + max(offset, 1))
-    }
-
-    #generate_new_date(website_traffic$visit_index[1], website_traffic$first_visit_date[1], website_traffic$user_id[1])
     generated_website_traffic <- pmap(list(website_traffic$visit_index,
                               website_traffic$first_visit_date,
                               website_traffic$user_id),
@@ -234,10 +223,102 @@ test_that("test_helpers: create", {
     plot_object %>% test_save_plot(file='data/simulate_data/website_traffic_per_path.png')
 
     write.csv(website_traffic, file='../shiny-app/simulated_data/website_traffic.csv', row.names = FALSE)
-    ##########################################################################################################
-    # SIMULATE ATTRIBUTION WINDOWS
-    ##########################################################################################################
 
+##########################################################################################################
+# SIMULATE EXPERIMENTS
+# for each experiment, we want to simulate, from the current visits/traffic dataset, who saw the experiment,
+# on which page, and which variation
+##########################################################################################################
+
+
+create_experiment_visits <- function(website_traffic, start_date, end_date, experiment_paths, current_experiment_id, variation_names) {
+
+    experiment_visits <- website_traffic %>%
+        group_by(user_id) %>%
+        mutate(visit_index=rank(visit_date, ties.method = "first")) %>%
+        ungroup() %>%
+        mutate(new_user = ifelse(visit_index == 1, TRUE, FALSE)) %>%
+        filter(visit_date >= start_date & visit_date <= end_date & path %in% experiment_paths) %>%
+        select(-visit_index)
+    
+    expected_num_users <- length(unique(experiment_visits$user_id))
+    
+    experiment_visits <- experiment_visits %>%
+        group_by(user_id) %>%
+        mutate(visit_index=rank(visit_date, ties.method = "first")) %>%
+        ungroup() %>%
+        filter(visit_index == 1) %>%
+        select(-visit_index) %>%
+        rename(first_joined_experiment=visit_date) %>%
+        mutate(experiment_id=current_experiment_id)
+    experiment_visits$variation <- map_chr(experiment_visits$user_id, ~ get_random_variation(variation_names, .))
+    
+    stopifnot(nrow(experiment_visits) == expected_num_users)
+    # make sure no duplicated user_ids
+    stopifnot(nrow(experiment_visits) == length(unique(experiment_visits$user_id)))
+    
+    print(experiment_visits %>%
+        count(variation) %>%
+        ggplot(aes(x=variation, y=n)) +
+        geom_col())
+    
+    print(experiment_visits %>%
+        count(first_joined_experiment) %>%
+        ggplot(aes(x=first_joined_experiment, y=n)) +
+        geom_line() +
+        labs(title='Number of People Entering Experiment'))
+    
+    print(experiment_visits %>%
+        count(first_joined_experiment, new_user) %>%
+        ggplot(aes(x=first_joined_experiment, y=n, color=new_user)) +
+        geom_line() +
+        labs(title='Number of People Entering Experiment, shows affect of including new returning users in experiment'))
+    
+    print(experiment_visits %>%
+        count(first_joined_experiment, variation) %>%
+        ggplot(aes(x=first_joined_experiment, y=n, color=variation)) +
+        geom_line())
+    
+    return (experiment_visits %>% select(-new_user))
+
+}
+
+
+
+
+
+
+
+
+    experiment_names <- unique(experiment_info$experiment_id)
+    min_traffic_date <- min(website_traffic$visit_date)
+    #Sys.Date() - min_traffic_date
+    
+    # let's start the experiment 1 month after our visits dataset, and run it for a month
+    days_of_prior_data <- 30
+    experiment_duration <- 30
+    start_date <- min_traffic_date + days_of_prior_data + 1
+    end_date <- start_date + experiment_duration
+    # all paths
+    experiment_paths <- unique(paths)
+    # experiment 1
+    current_experiment_id <- experiment_names[1]
+    variation_names <- (experiment_info %>% filter(experiment_id == current_experiment_id))$variation_name
+    
+    experiment_traffic_1 <- create_experiment_visits(website_traffic, start_date, end_date, experiment_paths,
+                                                     current_experiment_id, variation_names)
+    experiment_traffic_1
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    write.csv(experiment_traffic, file='../shiny-app/simulated_data/experiment_traffic.csv', row.names = FALSE)
     ##########################################################################################################
     # SIMULATE ATTRIBUTION WINDOWS
     ##########################################################################################################
