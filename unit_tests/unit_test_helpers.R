@@ -6,6 +6,7 @@ scale_a_b <- function(x, a, b) {
 
 get_random_variation <- function(variation_names, user_id) {
     #set.seed(user_id)
+    # rbinom will return random 0/1's, i need random 1/2's for the index
     return (variation_names[rbinom(1, 1, 0.5) + 1])
 }
 
