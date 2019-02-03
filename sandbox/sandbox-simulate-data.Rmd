@@ -498,7 +498,7 @@ conversion_data
 
 
 ```{r read_simulated_data}
-experiments_metrics <- as.data.frame(read_csv(file='../shiny-app/simulated_data/attribution_windows.csv'))
+attribution_windows <- as.data.frame(read_csv(file='../shiny-app/simulated_data/attribution_windows.csv'))
 prior_data <- as.data.frame(read_csv(file='../shiny-app/simulated_data/website_traffic.csv'))
 experiments_all <- as.data.frame(read_csv(file='../shiny-app/simulated_data/experiment_traffic.csv'))
 conversion_data <- as.data.frame(read_csv(file='../shiny-app/simulated_data/conversion_rate_data.csv'))
@@ -605,7 +605,7 @@ experiments[1]
 
 
 experiment_name <- 'Experiment 1'
-metrics <- (experiments_metrics %>% 
+metrics <- (attribution_windows %>% 
     filter(experiment_id == experiment_name))$metric_id
 
 
@@ -617,7 +617,7 @@ experiments_all %>%
 ```
 
 ```{r}
-experiments_metrics <- experiments_metrics %>%
+attribution_windows <- attribution_windows %>%
     mutate_if(is.factor, as.character) 
 
 experiment_name <- 'Experiment 1'
@@ -633,7 +633,7 @@ user_conversion_rates <-  experiments_all %>%
     inner_join(conversion_data, by='user_id') %>%
     #left_join()
     arrange(user_id) %>%
-    left_join(experiments_metrics, by=c('experiment_id', 'metric_id')) %>%
+    left_join(attribution_windows, by=c('experiment_id', 'metric_id')) %>%
     mutate(days_from_experiment_to_conversion = as.numeric(difftime(conversion_date,  # negative days means the conversion happened before the experiment started
                                                                     first_joined_experiment,
                                                                     units = 'days')),
@@ -730,7 +730,7 @@ experiment_start_stop <- experiments_all %>%
     arrange(desc(start))
 
 
-max_attribution_window <- max((experiments_metrics %>%
+max_attribution_window <- max((attribution_windows %>%
     filter(experiment_id == experiment_name))$attribution_windows)
 
 
@@ -752,7 +752,7 @@ prior_history <- visits %>%
 
 prior_conversion_rates <- inner_join(conversion_data, prior_history, by='user_id')
 prior_conversion_rates <- inner_join(prior_conversion_rates,
-           experiments_metrics %>%
+           attribution_windows %>%
                filter(experiment_id == experiment_name) %>%
                select(-experiment_id),
            by='metric_id')
@@ -827,7 +827,7 @@ daily_totals_per_variation <- experiments_all %>%
 
 
 experiments_current <- experiments_all %>% filter(experiment_id == experiment_name)
-attribution_windows_current <- experiments_metrics %>% filter(experiment_id == experiment_name)
+attribution_windows_current <- attribution_windows %>% filter(experiment_id == experiment_name)
 
 experiment_start_date
 experiment_end_date <- (start_stop %>% filter(experiment_id == experiment_name))$end
@@ -835,9 +835,9 @@ experiment_end_date <- (start_stop %>% filter(experiment_id == experiment_name))
 experiment_day <- seq(experiment_start_date, experiment_end_date, 1)
 
 temp <- expand.grid(user_id=experiments_current$user_id,
-            metric_id=(experiments_metrics %>% filter(experiment_id == experiment_name))$metric_id) %>%
+            metric_id=(attribution_windows %>% filter(experiment_id == experiment_name))$metric_id) %>%
     inner_join(experiments_current, by='user_id') %>%
-    inner_join(experiments_metrics, by=c('experiment_id', 'metric_id')) %>%
+    inner_join(attribution_windows, by=c('experiment_id', 'metric_id')) %>%
     mutate(expired_time_window=first_joined_experiment + attribution_windows)
     
 cumulative_conversions <- left_join(temp %>% select(user_id, variation, metric_id, expired_time_window),

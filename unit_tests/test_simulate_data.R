@@ -10,12 +10,6 @@ source('unit_test_helpers.R')
 # library('testthat')
 # test_file("test_simulate_data.R")
 
-
-    # attribution_windows <- as.data.frame(read_csv('../shiny-app/simulated_data/attribution_windows.csv', row.names = FALSE))
-    # website_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/website_traffic.csv', row.names = FALSE))
-    # experiment_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/experiment_traffic.csv', row.names = FALSE))
-    # conversion_rate_data <- as.data.frame(read_csv('../shiny-app/simulated_data/conversion_rate_data.csv', row.names = FALSE))
-
 test_that("test_helpers: create", {
 
     baseline_conversion_rates=c(0.10, 0.07, 0.05, 0.03)
@@ -39,6 +33,7 @@ test_that("test_helpers: create", {
         "Ask Additional Questions During Signup",   "Old Signup Path",   TRUE,
         "Ask Additional Questions During Signup",   "New Signup Path",   FALSE
     ))
+    check_data__experiment_info(experiment_info)
     write.csv(experiment_info, file='../shiny-app/simulated_data/experiment_info.csv', row.names = FALSE)
 
 ##########################################################################################################
@@ -53,15 +48,16 @@ test_that("test_helpers: create", {
     # since people want to try out the features before they decide to pay (e.g. if the service offers a trial or freemium)
     attribution_windows_days <- c(2, 3, 5, 7)
     attribution_windows <- data.frame(metric_id = metrics_names,
-                                      attribution_windows = attribution_windows_days,
+                                      attribution_window = attribution_windows_days,
                                       stringsAsFactors = FALSE)
     attribution_windows <- expand.grid(experiment_id=unique(experiment_info$experiment_id),
                                        metric_id = metrics_names,
                                        stringsAsFactors = FALSE) %>%
         inner_join(attribution_windows, by = 'metric_id') %>%
-        arrange(experiment_id, attribution_windows) %>%
+        arrange(experiment_id, attribution_window) %>%
         mutate_if(is.factor, as.character)
 
+    check_data__attribution_windows(attribution_windows, experiment_info)
     write.csv(attribution_windows, file='../shiny-app/simulated_data/attribution_windows.csv', row.names = FALSE)
 
 ##########################################################################################################
@@ -224,7 +220,7 @@ test_that("test_helpers: create", {
         labs(title='Website Traffic (per day/user) i.e. single row represents >=1 Website Traffic for that day/user/path')
     plot_object %>% test_save_plot(file='data/simulate_data/website_traffic_per_path.png')
 
-    check_website_traffic(website_traffic)
+    check_data__website_traffic(website_traffic)
     write.csv(website_traffic, file='../shiny-app/simulated_data/website_traffic.csv', row.names = FALSE)
 
 ##########################################################################################################
@@ -325,6 +321,7 @@ test_that("test_helpers: create", {
                   legend.position="none")
     plot_object %>% test_save_plot(file='data/simulate_data/experiment_start_stop.png')
 
+    check_data__experiment_traffic(experiment_traffic, experiment_info)
     write.csv(experiment_traffic, file='../shiny-app/simulated_data/experiment_traffic.csv', row.names = FALSE)
 
     
@@ -343,7 +340,7 @@ test_that("test_helpers: create", {
                                                        baseline_conversion_rate=baseline_conversion_rates,
                                                        stringsAsFactors = FALSE),
                                             by = "metric_id") %>%
-        select(-attribution_windows)
+        select(-attribution_window)
 
     # now we will want to adjust the conversion rate for the a/b groups, we'll start with the baseline and
     # update based on a lookup table (of sorts)
@@ -538,5 +535,6 @@ test_that("test_helpers: create", {
         select(user_id, metric_id, conversion_date) %>%
         arrange(user_id, conversion_date)
 
-    write.csv(conversion_data, file='../shiny-app/simulated_data/conversion_rate_data.csv', row.names = FALSE)
+    check_data__conversion_rates(conversion_data, attribution_windows)
+    write.csv(conversion_data, file='../shiny-app/simulated_data/conversion_rates.csv', row.names = FALSE)
 })
