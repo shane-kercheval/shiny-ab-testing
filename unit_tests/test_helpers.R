@@ -11,11 +11,11 @@ source('unit_test_helpers.R')
 # test_file("test_helpers.R")
 
 
-    # experiment_info <- as.data.frame(read_csv('../shiny-app/simulated_data/experiment_info.csv'))
-    # attribution_windows <- as.data.frame(read_csv('../shiny-app/simulated_data/attribution_windows.csv'))
-    # website_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/website_traffic.csv'))
-    # experiment_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/experiment_traffic.csv'))
-    # conversion_rate_data <- as.data.frame(read_csv('../shiny-app/simulated_data/conversion_rate_data.csv'))
+    # experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
+    # attribution_windows <- as.data.frame(read_csv('data/cached_simulated_data/attribution_windows.csv'))
+    # website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
+    # experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
+    # conversion_rate_data <- as.data.frame(read_csv('data/cached_simulated_data/conversion_rate_data.csv'))
 
 
 
@@ -23,7 +23,7 @@ source('unit_test_helpers.R')
 # Misc Helpers
 ##############################################################################################################
 test_that("Misc Helpers: calculate_total_sample_size", {
-    
+
     result <- calculate_total_sample_size(original_conversion_rate=0.30,
                                           percent_increase=0.1,
                                           power=0.8,
@@ -122,48 +122,21 @@ test_that("Misc Helpers: create_cohort", {
 ##############################################################################################################
 test_that("test_helpers: create", {
 
-    website_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/website_traffic.csv'))
+    website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
 
+    daily_first_time_num_users <- website_traffic__to_daily_num_users(website_traffic, only_first_time_visits=TRUE)
+    daily_first_time_path_num_users <- website_traffic__to_daily_num_users(website_traffic, per_path = TRUE, only_first_time_visits=TRUE)
 
-    website_traffic__to_daily_num_users <- function(website_traffic, per_path=TRUE) {
+    cohort_first_time_num_users <- website_traffic__to_cohort_num_users(website_traffic, only_first_time_visits=TRUE)
+    cohort_first_time_path_num_users <- website_traffic__to_cohort_num_users(website_traffic, per_path = TRUE, only_first_time_visits=TRUE)
+    
+    # because we are only counting first-time visits, the sum across all dates should match regardless if
+    # counted by daily/cohorted; the sum should also equal the number of distinct users in the dataset
+    expect_equal(min(daily_first_time_num_users$visit_date), min(website_traffic$visit_date))
+    expect_equal(sum(daily_first_time_num_users$num_users), length(unique(website_traffic$user_id)))
+    expect_equal(min(daily_first_time_path_num_users$visit_date), min(website_traffic$visit_date))
+    expect_equal(sum(daily_first_time_path_num_users$num_users), length(unique(website_traffic$user_id)))
 
-        # counts UNIQUE user visits per day (and optionally per path)
-        # per day and per path counts will not sum to the same total because a single user can visit multiple
-        # pages in the same day, so they will be represented >=1 rows for a single day when per_path is TRUE,
-        # but will only be count once when per_path is FALSE
-        # the same day counts as 1)
-        if(per_path) {
-        
-            # 
-            return (website_traffic %>% count(visit_date, path) %>% rename(num_users=n_distinct(user_id)))    
-        } else {
-            
-            return (website_traffic %>% count(visit_date))
-        }
-    }
-
-    website_traffic__to_cohort_num_users <- function(website_traffic, cohort_format='%W') {
-        
-        # a single count/value of 1 represents multiple (>=1) visits to the same page by the same user in
-        # the same day
-        return (website_traffic %>% 
-                    mutate(cohort=create_cohort(visit_date, cohort_format = cohort_format)) %>%
-                    count(cohort, path))
-    }
-    
-    temp <- website_traffic %>% count(visit_date, path) %>% rename(num_users=n)
-    temp2 <- website_traffic %>% group_by(visit_date) %>% summarise(num_users=n_distinct(user_id))
-    
-    
-    
-    
-    
-    
-    website_traffic__to_daily_traffic(website_traffic)
-    
-    website_traffic__to_cohort_traffic_per_path(website_traffic)
-    
+    expect_equal(sum(cohort_first_time_num_users$num_users), length(unique(website_traffic$user_id)))
+    expect_equal(sum(cohort_first_time_path_num_users$num_users), length(unique(website_traffic$user_id)))
 })
-
-
-
