@@ -1,4 +1,4 @@
-"experiment_id","metric_id","attribution_windows"
+"experiment_id","metric_id","attribution_window"
 "Ask Additional Questions During Signup","Sign Up",2
 "Ask Additional Questions During Signup","Use Feature 1",3
 "Ask Additional Questions During Signup","Talk to Sales",5
