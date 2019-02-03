@@ -490,12 +490,19 @@ conversion_data
 ```
 
 ```{r save_simulated_data}
-write.csv(experiments_metrics, file='../shiny-app/simulated_data/attribution_windows.csv', row.names = FALSE)
-write.csv(prior_data, file='../shiny-app/simulated_data/website_traffic.csv', row.names = FALSE)
-write.csv(experiments_all, file='../shiny-app/simulated_data/experiment_traffic.csv', row.names = FALSE)
-write.csv(conversion_data, file='../shiny-app/simulated_data/conversion_rate_data.csv', row.names = FALSE)
+# write.csv(experiments_metrics, file='../shiny-app/simulated_data/attribution_windows.csv', row.names = FALSE)
+# write.csv(prior_data, file='../shiny-app/simulated_data/website_traffic.csv', row.names = FALSE)
+# write.csv(experiments_all, file='../shiny-app/simulated_data/experiment_traffic.csv', row.names = FALSE)
+# write.csv(conversion_data, file='../shiny-app/simulated_data/conversion_rate_data.csv', row.names = FALSE)
 ```
 
+
+```{r read_simulated_data}
+experiments_metrics <- as.data.frame(read_csv(file='../shiny-app/simulated_data/attribution_windows.csv'))
+prior_data <- as.data.frame(read_csv(file='../shiny-app/simulated_data/website_traffic.csv'))
+experiments_all <- as.data.frame(read_csv(file='../shiny-app/simulated_data/experiment_traffic.csv'))
+conversion_data <- as.data.frame(read_csv(file='../shiny-app/simulated_data/conversion_rate_data.csv'))
+```
 
 ```{r eval=FALSE, include=FALSE}
 #seeds <- 0:1000

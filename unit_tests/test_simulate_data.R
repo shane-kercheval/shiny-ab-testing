@@ -362,8 +362,8 @@ test_that("test_helpers: create", {
         NA,    #                   New Signup CTA Color Green Signup CTA        TRUE Use Feature 1
         NA,    #                   New Signup CTA Color Green Signup CTA        TRUE Talk to Sales
         NA,    #                   New Signup CTA Color Green Signup CTA        TRUE Pay/Subscribe
-        -0.05, #                   New Signup CTA Color  Blue Signup CTA       FALSE       Sign Up
-        -0.05, #                   New Signup CTA Color  Blue Signup CTA       FALSE Use Feature 1
+        -0.08, #                   New Signup CTA Color  Blue Signup CTA       FALSE       Sign Up
+        -0.08, #                   New Signup CTA Color  Blue Signup CTA       FALSE Use Feature 1
         0,     #                   New Signup CTA Color  Blue Signup CTA       FALSE Talk to Sales
         0,     #                   New Signup CTA Color  Blue Signup CTA       FALSE Pay/Subscribe
         NA,    #  Show Discount for First-Time Visitors         No Offer        TRUE       Sign Up
@@ -372,8 +372,8 @@ test_that("test_helpers: create", {
         NA,    #  Show Discount for First-Time Visitors         No Offer        TRUE Pay/Subscribe
         0.04,  #  Show Discount for First-Time Visitors      Sales Offer       FALSE       Sign Up
         0.04,  #  Show Discount for First-Time Visitors      Sales Offer       FALSE Use Feature 1
-        0.14,  #  Show Discount for First-Time Visitors      Sales Offer       FALSE Talk to Sales
-        0.11,  #  Show Discount for First-Time Visitors      Sales Offer       FALSE Pay/Subscribe
+        0.15,  #  Show Discount for First-Time Visitors      Sales Offer       FALSE Talk to Sales
+        0.15,  #  Show Discount for First-Time Visitors      Sales Offer       FALSE Pay/Subscribe
         NA,    # Ask Additional Questions During Signup  Old Signup Path        TRUE       Sign Up
         NA,    # Ask Additional Questions During Signup  Old Signup Path        TRUE Use Feature 1
         NA,    # Ask Additional Questions During Signup  Old Signup Path        TRUE Talk to Sales
@@ -416,8 +416,7 @@ test_that("test_helpers: create", {
         summarise(conversion_rate = mean(conversion_rate)) %>%
         ungroup()
     # View(distinct(user_metric_crs %>% select(-user_id)))
-    stopifnot(length(unique(user_metric_crs$user_id)) == length(unique(website_traffic$user_id)))
-    
+    expect_true(length(unique(user_metric_crs$user_id)) == length(unique(website_traffic$user_id)))
     # now we will determine if each person convertes based on their simulated conversion rate using the binomial distribution
     #rbinom(1000, 1, 0.08)
     simulate_conversion <- function(user_id, conversion_rate) {
