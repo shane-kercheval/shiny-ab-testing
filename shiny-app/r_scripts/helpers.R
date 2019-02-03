@@ -30,12 +30,12 @@ website_traffic__get_user_first_visit <- function(website_traffic) {
 }
     
 #' Counts UNIQUE users per day (and optionally per path).
-#' If only_first_time_visits is TRUE, the user is only counted the first time they appear in the dataset. In
-#'      this case, calls with `per_path=FALSE` and `per_path=TRUE` will sum to the same values.
+#' If only_first_time_visits is TRUE, the user is only counted the first date they appear in the dataset. In
+#'      this case, calls with `top_n_paths=NULL` and `top_n_paths=x` will sum to the same values.
 #' 
 #' If only_first_time_visits is TRUE, then per day and per path counts will not sum to the same total because
 #'      a single user can visit multiple pages in the same day, so they will be represented in >=1 rows for a
-#'      single day when per_path is TRUE, but will only be count once in a day when per_path is FALSE
+#'      single day when top_n_paths is not NULL, but will only be count once in a day when top_n_paths is NULL
 #' 
 #' NOTE: count of users from `website_traffic__to_daily_num_users` will not sum to
 #'      `website_traffic__to_cohort_num_users` (if for example you create the same cohort and then group-by
@@ -43,10 +43,11 @@ website_traffic__get_user_first_visit <- function(website_traffic) {
 #'      cohorted period where the user-id may have had visits across multiple days
 #' 
 #' @param website_traffic dataframe containing website traffic data in the expected format
-#' @param per_path count per path
+#' @param top_n_paths if specified, count by the top (i.e. highest traffic) paths, grouping the remaining
+#'      paths into an 'Other' category. 
 #' @param only_first_time_visits only count the first time the user appears in the dataset (i.e. first time to website)
 website_traffic__to_daily_num_users <- function(website_traffic,
-                                                per_path=FALSE,
+                                                top_n_paths=NULL,
                                                 only_first_time_visits=FALSE) {
     
     if(only_first_time_visits) {
@@ -54,8 +55,12 @@ website_traffic__to_daily_num_users <- function(website_traffic,
         website_traffic <- website_traffic__get_user_first_visit(website_traffic)
     }
     
-    if(per_path) {
+    if(!is.null(top_n_paths)) {
 
+        path_levels <- c(head(website_traffic %>% count(path, sort=TRUE), top_n_paths)$path, 'Other')
+        website_traffic <- website_traffic %>% mutate(path = fct_lump(path, n=top_n_paths))
+        levels(website_traffic$path) <- path_levels
+    
         return (website_traffic %>% count(visit_date, path) %>% rename(num_users=n))
 
     } else {
@@ -66,19 +71,20 @@ website_traffic__to_daily_num_users <- function(website_traffic,
 
 #' Counts UNIQUE users per cohorted period (and optionally per path).
 #' If only_first_time_visits is TRUE, the user is only counted the first time they appear in the dataset. In
-#'      this case, calls with `per_path=FALSE` and `per_path=TRUE` will sum to the same values.
+#'      this case, calls with `top_n_paths=NULL` and `top_n_paths=x` will sum to the same values.
 #' 
 #' If only_first_time_visits is TRUE, then per cohorted period and per path counts will not sum to the same
 #'      total because a single user can visit multiple pages in the same cohorted period, so they will be
-#'      represented in >=1 rows for a single cohorted period when per_path is TRUE, but will only be count
-#'      once in a cohorted period when per_path is FALSE
+#'      represented in >=1 rows for a single cohorted period when top_n_paths is not NULL, but will only be count
+#'      once in a cohorted period when top_n_paths is NULL
 #' 
 #' @param website_traffic dataframe containing website traffic data in the expected format
-#' @param per_path count per path
+#' @param top_n_paths if specified, count by the top (i.e. highest traffic) paths, grouping the remaining
+#'      paths into an 'Other' category.
 #' @param only_first_time_visits only count the first time the user appears in the dataset (i.e. first time to website)
 website_traffic__to_cohort_num_users <- function(website_traffic,
                                                  cohort_format='%W',
-                                                 per_path=FALSE,
+                                                 top_n_paths=NULL,
                                                  only_first_time_visits=FALSE) {
 
     if(only_first_time_visits) {
@@ -89,7 +95,12 @@ website_traffic__to_cohort_num_users <- function(website_traffic,
     website_traffic <- website_traffic %>%
         mutate(cohort = create_cohort(visit_date, cohort_format = cohort_format))
 
-    if(per_path) {
+    if(!is.null(top_n_paths)) {
+
+        path_levels <- c(head(website_traffic %>% count(path, sort=TRUE), top_n_paths)$path, 'Other')
+        website_traffic <- website_traffic %>% mutate(path = fct_lump(path, n=top_n_paths))
+        levels(website_traffic$path) <- path_levels
+    
         
         return (website_traffic %>% count(cohort, path) %>% rename(num_users=n))
 
