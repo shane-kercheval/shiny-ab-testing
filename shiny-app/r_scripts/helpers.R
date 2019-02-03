@@ -345,3 +345,13 @@ experiments__get_experiment_conversion_rates <- function(experiment_traffic, att
     
         return (user_conversion_rates)
 }
+
+get_p_values_info <- function(baseline_successes, baseline_trials, variant_successes, variant_trials) {
+
+    test_results <- prop.test(x=c(variant_successes, baseline_successes),
+                              n=c(variant_trials, baseline_trials))
+    return (c(p_value = test_results$p.value,
+              cr_diff_estimate = as.numeric(test_results$estimate[1] - test_results$estimate[2]),
+              conf.low = test_results$conf.int[1],
+              conf.high = test_results$conf.int[2]))
+}

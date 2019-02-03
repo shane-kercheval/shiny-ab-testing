@@ -280,13 +280,27 @@ test_that("test_helpers: experiments__get_summary", {
     conversion_rates <- as.data.frame(read_csv('data/cached_simulated_data/conversion_rates.csv'))
 
 experiments__get_summary <- function(experiment_info, experiment_traffic, attribution_windows) {
+# distinction between end_date and last_event_date is that end_date is the date of the last event we have in
+# the entire experiment_traffic dataset, but we exclude people who have joined the experiment recently
+# according to the attribution windows, so `last_event_date` is the date of the last event that was included
+# and counted towards the successes/trials
+# so the test could still be running but we only look
 
 
+
+
+    ##########################################################################################################
+    # Add trials i.e. count of people in experiment
     # TRIALS (i.e. count of peeople in experiment/varation) needs to exclude people who have entered into
     # the experiment less than x day ago, where x is the attribution window per metric
     # so the Experiment Summary will be per experiment/metric (the variation_data will be in the columns)
+    ##########################################################################################################
 
-
+    experiment_start_end_dates <- experiment_traffic %>%
+        group_by(experiment_id) %>%
+        summarise(start_date = min(first_joined_experiment),
+                  end_date = max(first_joined_experiment))
+    
     # this will duplicate each row in experiment_traffic for each metric
     experiment_summary <- inner_join(experiment_traffic, attribution_windows, by='experiment_id') %>%
         # we only want the people who have had enough time to convert, given the attribution window for a
@@ -296,29 +310,34 @@ experiments__get_summary <- function(experiment_info, experiment_traffic, attrib
         inner_join(experiment_info,
                    by=c('experiment_id', 'variation')) %>%
         group_by(experiment_id, metric_id, is_baseline) %>%
-        summarise(start_date = min(first_joined_experiment),
-                  end_date = max(first_joined_experiment),
+        summarise(last_event_date = max(first_joined_experiment),
                   trials = n()) %>%
         ungroup() %>%
         # on the offchance the start dates (or end dates) are different between the baseline/metric/variation 
         # (e.g. started the experiment at ~midnight and 1 person went into the baseline on day x and the next
         # went
         # into the variation on day x+1)
-        group_by(experiment_id) %>%
-        mutate(start_date = min(start_date),
-               end_date = max(end_date)) %>%
+        group_by(experiment_id, metric_id) %>%
+        mutate(last_event_date = max(last_event_date)) %>%
         ungroup() %>%
         # now format so there is 1 row per experiment
         spread(is_baseline, trials) %>%
         rename(baseline_trials=`TRUE`,
                variant_trials=`FALSE`) %>%
-        select(experiment_id, start_date, end_date, metric_id, baseline_trials, variant_trials) %>%
+        select(experiment_id, last_event_date, metric_id, baseline_trials, variant_trials)
+    
+    experiment_summary <- inner_join(experiment_summary, experiment_start_end_dates, by='experiment_id') %>%
+        select(experiment_id, start_date, end_date, everything()) %>%
         # most recent ended (which is really just the last event, so it may not be stopped), so if
         # there are multiple experiments that are still running, sort by the most recent started
-        arrange(desc(end_date), desc(start_date), metric_id)
+        arrange(desc(last_event_date), desc(start_date), metric_id)
 
     stopifnot(!any(duplicated(experiment_summary %>% select(experiment_id, metric_id))))
 
+    ##########################################################################################################
+    # Add successes and conversion rates
+    ##########################################################################################################
+    
     # experiments__get_experiment_conversion_rates will exclude traffic based on first_joined_experiment &
     # attribution windows like we did above
     experiment_conversion_rates <- experiments__get_experiment_conversion_rates(experiment_traffic,
@@ -336,11 +355,36 @@ experiments__get_summary <- function(experiment_info, experiment_traffic, attrib
     experiment_summary <- inner_join(experiment_summary,
                                      experiment_conversion_rates,
                                      by=c('experiment_id', 'metric_id'))
-    
-    
-    experiment_summary %>%
+
+    experiment_summary <- experiment_summary %>%
         mutate(baseline_conversion_rate=baseline_successes / baseline_trials,
-               variant_conversion_rate=variant_successes / variant_trials)
+               variant_conversion_rate=variant_successes / variant_trials,
+               percent_change_from_baseline = (variant_conversion_rate - baseline_conversion_rate) / baseline_conversion_rate)
+    
+    ##########################################################################################################
+    # Add P-Value Information
+    ##########################################################################################################
+    
+    p_values <- pmap(list(experiment_summary$baseline_successes,
+                          experiment_summary$baseline_trials,
+                          experiment_summary$variant_successes,
+                          experiment_summary$variant_trials),
+                     function(bs, bt, vs, vt) get_p_values_info(bs, bt, vs, vt))
+ 
+    experiment_summary_pvalues <- experiment_summary
+    
+    experiment_summary$p_value <- map_dbl(p_values, ~ .['p_value'])
+    experiment_summary$cr_diff_estimate <- map_dbl(p_values, ~ .['cr_diff_estimate'])
+    experiment_summary$p_value_conf_low <- map_dbl(p_values, ~ .['conf_low'])
+    experiment_summary$p_value_conf_high <- map_dbl(p_values, ~ .['conf_high'])
+
+    # experiment_summary$p_value_conf_low / experiment_summary$baseline_conversion_rate
+    # experiment_summary$p_value_conf_high / experiment_summary$baseline_conversion_rate
+
+    ##########################################################################################################
+    # Add Bayesian Information
+    ##########################################################################################################
+    
 }
 
 
