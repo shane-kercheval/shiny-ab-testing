@@ -1,0 +1,9 @@
+"experiment_id","variation","is_baseline"
+"Redesign Website","Original",TRUE
+"Redesign Website","Site Redesign",FALSE
+"New Signup CTA Color","Green Signup CTA",TRUE
+"New Signup CTA Color","Blue Signup CTA",FALSE
+"Show Discount for First-Time Visitors","No Offer",TRUE
+"Show Discount for First-Time Visitors","Sales Offer",FALSE
+"Ask Additional Questions During Signup","Old Signup Path",TRUE
+"Ask Additional Questions During Signup","New Signup Path",FALSE

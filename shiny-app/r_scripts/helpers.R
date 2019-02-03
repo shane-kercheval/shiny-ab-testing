@@ -1,3 +1,18 @@
+##############################################################################################################
+# Check Dataset Assumptions
+##############################################################################################################
+check_website_traffic <- function(website_traffic) {
+    
+    stopifnot(all(colnames(website_traffic) == c('user_id', 'visit_date', 'path')))
+    # ensure there are no duplicated rows i.e. unique user/date/path
+    stopifnot(nrow(website_traffic) == nrow(distinct(website_traffic)))
+}
+
+
+
+##############################################################################################################
+# Sample Size Functions
+##############################################################################################################
 calculate_total_sample_size <- function(original_conversion_rate,
                                         percent_increase,
                                         power=0.8,
@@ -32,4 +47,9 @@ calculate_days_required <- function(daily_traffic,
     
     return (ifelse(days_required > 365, Inf, days_required))
     
+}
+
+create_cohort <- function(date_vector, cohort_format='%W') {
+    # defaults to %W (Week 00-53 with Monday as first day of the week)
+    return (format(date_vector, paste0('%Y-', cohort_format)))
 }

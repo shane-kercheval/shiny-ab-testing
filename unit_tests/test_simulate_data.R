@@ -224,6 +224,7 @@ test_that("test_helpers: create", {
         labs(title='Website Traffic (per day/user) i.e. single row represents >=1 Website Traffic for that day/user/path')
     plot_object %>% test_save_plot(file='data/simulate_data/website_traffic_per_path.png')
 
+    check_website_traffic(website_traffic)
     write.csv(website_traffic, file='../shiny-app/simulated_data/website_traffic.csv', row.names = FALSE)
 
 ##########################################################################################################

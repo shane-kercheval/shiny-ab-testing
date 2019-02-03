@@ -168,7 +168,7 @@ create_experiment_visits <- function(website_traffic, start_date, end_date, expe
         mutate(experiment_day=row_number()) %>%
         select(experiment_day, contains('baseline_')) %>%
         gather(baseline, value, -experiment_day) %>% 
-        ggplot(aes(x=experiment_day, y=value,color=baseline)) +
+        ggplot(aes(x=experiment_day, y=value, color=baseline)) +
         geom_line() +
         geom_point() +
         geom_text(aes(label=percent(value)), check_overlap = TRUE, vjust=-0.5) +

@@ -1,0 +1,17 @@
+"experiment_id","metric_id","attribution_windows"
+"Ask Additional Questions During Signup","Sign Up",2
+"Ask Additional Questions During Signup","Use Feature 1",3
+"Ask Additional Questions During Signup","Talk to Sales",5
+"Ask Additional Questions During Signup","Pay/Subscribe",7
+"New Signup CTA Color","Sign Up",2
+"New Signup CTA Color","Use Feature 1",3
+"New Signup CTA Color","Talk to Sales",5
+"New Signup CTA Color","Pay/Subscribe",7
+"Redesign Website","Sign Up",2
+"Redesign Website","Use Feature 1",3
+"Redesign Website","Talk to Sales",5
+"Redesign Website","Pay/Subscribe",7
+"Show Discount for First-Time Visitors","Sign Up",2
+"Show Discount for First-Time Visitors","Use Feature 1",3
+"Show Discount for First-Time Visitors","Talk to Sales",5
+"Show Discount for First-Time Visitors","Pay/Subscribe",7
