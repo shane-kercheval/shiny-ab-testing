@@ -382,7 +382,35 @@ experiments__get_baseline_summary <- function(experiment_info, experiment_traffi
         filter(first_joined_experiment < Sys.Date() - attribution_window) %>%
         mutate(metric_id = fct_reorder(metric_id, attribution_window)) %>%
         inner_join(experiment_info,
-                   by=c('experiment_id', 'variation')) %>%
+                   by=c('experiment_id', 'variation')) 
+    
+    
+    # i want to cache the is_baseline/variation-name here so in know i'm joining the actual variation used for
+    # the baseline; i could join on the variation names after the fact but there's an increase risk because e.g.
+    # i could have messed up the baseline/variation combos but joining after the fact wouldn't illuminate this
+    cache_experiment_variations <- distinct(experiments_summary %>% 
+                                                select(experiment_id, variation, is_baseline)) %>% 
+        spread(is_baseline, variation)
+
+
+
+    # now we need to rename `TRUE` and `FALSE` columns to baseline/variant
+    # but, if this is "prior" experiment data, theren't won't be a `FALSE`, so we need to check
+    if("FALSE" %in% colnames(cache_experiment_variations)) {
+
+        cache_experiment_variations <- cache_experiment_variations %>%
+            rename(baseline_name=`TRUE`,
+                   variant_name=`FALSE`)
+
+    } else {
+
+        cache_experiment_variations <- cache_experiment_variations %>%
+            rename(baseline_name=`TRUE`)
+    }
+
+    stopifnot(nrow(cache_experiment_variations) == length(unique(experiment_info$experiment_id)))
+    
+    experiments_summary <- experiments_summary %>%
         group_by(experiment_id, metric_id, is_baseline) %>%
         summarise(last_event_date = max(first_joined_experiment),
                   trials = n()) %>%
@@ -396,7 +424,7 @@ experiments__get_baseline_summary <- function(experiment_info, experiment_traffi
         ungroup() %>%
         # now format so there is 1 row per experiment
         spread(is_baseline, trials)
-        
+    
     # now we need to rename `TRUE` and `FALSE` columns to baseline/variant
     # but, if this is "prior" experiment data, theren't won't be a `FALSE`, so we need to check
     if("FALSE" %in% colnames(experiments_summary)) {
@@ -458,6 +486,8 @@ experiments__get_baseline_summary <- function(experiment_info, experiment_traffi
             rename(baseline_successes=`TRUE`) %>%
             mutate(baseline_conversion_rate=baseline_successes / baseline_trials)
     }
+    
+    experiments_summary <- inner_join(experiments_summary, cache_experiment_variations, by = 'experiment_id')
 
     return (experiments_summary)
 }
@@ -599,10 +629,12 @@ experiments__get_summary <- function(experiment_info,
                variant_conversion_rate,
                percent_change_from_baseline,
                # baseline & variation raw numbers
+               baseline_name,
                baseline_successes,
                baseline_trials,
-               variant_trials,
+               variant_name,
                variant_successes,
+               variant_trials,
                # frequentist
                p_value,
                cr_diff_estimate,
