@@ -346,6 +346,12 @@ experiments__get_experiment_conversion_rates <- function(experiment_traffic, att
         return (user_conversion_rates)
 }
 
+#' get p-values and corresponding confidence intervals
+#' 
+#' @param baseline_successes
+#' @param baseline_trials
+#' @param variant_successes
+#' @param variant_trials
 get_p_values_info <- function(baseline_successes, baseline_trials, variant_successes, variant_trials) {
 
     test_results <- prop.test(x=c(variant_successes, baseline_successes),
