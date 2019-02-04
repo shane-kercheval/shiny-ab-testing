@@ -278,88 +278,142 @@ test_that("test_helpers: experiments__get_summary", {
     attribution_windows <- as.data.frame(read_csv('data/cached_simulated_data/attribution_windows.csv'))
     website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
     conversion_rates <- as.data.frame(read_csv('data/cached_simulated_data/conversion_rates.csv'))
+    
+    ###############
+    # shift all dates relative to today so we can test excluding people (who recently entered into the
+    # experiment) based on the attribution window
+    ###############
+    max_date <- max(max(experiment_traffic$first_joined_experiment),
+                    max(conversion_rates$conversion_date),
+                    max(website_traffic$visit_date))
+    
+    days_offset <- Sys.Date() - max_date
+    
+    experiment_traffic$first_joined_experiment <- experiment_traffic$first_joined_experiment + days_offset
+    website_traffic$visit_date <- website_traffic$visit_date + days_offset
+    conversion_rates$conversion_date <- conversion_rates$conversion_date + days_offset
 
-experiments__get_summary <- function(experiment_info, experiment_traffic, attribution_windows) {
+    
+
+experiments__get_summary <- function(experiment_info, experiment_traffic, website_traffic, attribution_windows, conversion_rates) {
 # distinction between end_date and last_event_date is that end_date is the date of the last event we have in
 # the entire experiment_traffic dataset, but we exclude people who have joined the experiment recently
 # according to the attribution windows, so `last_event_date` is the date of the last event that was included
 # and counted towards the successes/trials
 # so the test could still be running but we only look
 
+    # refactored this to a method because we'll use it for the actual experiments, but then we'll modify website
+    # traffic to mock a PRIOR dataset for bayesian calculations.
+    # specifically, based on how many days of prior data we want, we'll transform website_traffic
+    # to look like experiment_traffic, but based on the prior dates.
+
+    get_baseline_summary <- function(experiment_info, experiment_traffic, attribution_windows, conversion_rates) {
+        ##########################################################################################################
+        # Add trials i.e. count of people in experiment
+        # TRIALS (i.e. count of peeople in experiment/varation) needs to exclude people who have entered into
+        # the experiment less than x day ago, where x is the attribution window per metric
+        # so the Experiment Summary will be per experiment/metric (the variation_data will be in the columns)
+        ##########################################################################################################
+
+        experiment_start_end_dates <- experiment_traffic %>%
+            group_by(experiment_id) %>%
+            summarise(start_date = min(first_joined_experiment),
+                      end_date = max(first_joined_experiment))
+        
+        # this will duplicate each row in experiment_traffic for each metric
+        experiment_summary <- inner_join(experiment_traffic, attribution_windows, by='experiment_id') %>%
+            # we only want the people who have had enough time to convert, given the attribution window for a
+            # given metric (i.e. exclude people who join within the attribution window relative to today)
+            filter(first_joined_experiment < Sys.Date() - attribution_window) %>%
+            mutate(metric_id = fct_reorder(metric_id, attribution_window)) %>%
+            inner_join(experiment_info,
+                       by=c('experiment_id', 'variation')) %>%
+            group_by(experiment_id, metric_id, is_baseline) %>%
+            summarise(last_event_date = max(first_joined_experiment),
+                      trials = n()) %>%
+            ungroup() %>%
+            # on the offchance the start dates (or end dates) are different between the baseline/metric/variation 
+            # (e.g. started the experiment at ~midnight and 1 person went into the baseline on day x and the next
+            # went
+            # into the variation on day x+1)
+            group_by(experiment_id, metric_id) %>%
+            mutate(last_event_date = max(last_event_date)) %>%
+            ungroup() %>%
+            # now format so there is 1 row per experiment
+            spread(is_baseline, trials)
+            
+            # now we need to rename `TRUE` and `FALSE` columns to baseline/variant
+            # but, if this is "prior" experiment data, theren't won't be a `FALSE`, so we need to check
+            if("FALSE" %in% colnames(experiment_summary)) {
+                
+                experiment_summary <- experiment_summary %>%
+                    rename(baseline_trials=`TRUE`,
+                           variant_trials=`FALSE`) %>%
+                    select(experiment_id, last_event_date, metric_id, baseline_trials, variant_trials)
+                
+            } else {
+                
+                experiment_summary <- experiment_summary %>%
+                    rename(baseline_trials=`TRUE`) %>%
+                    select(experiment_id, last_event_date, metric_id, baseline_trials)
+                
+                    
+            }
+
+        experiment_summary <- inner_join(experiment_summary, experiment_start_end_dates, by='experiment_id') %>%
+            select(experiment_id, start_date, end_date, everything()) %>%
+            # most recent ended (which is really just the last event, so it may not be stopped), so if
+            # there are multiple experiments that are still running, sort by the most recent started
+            arrange(desc(end_date), desc(start_date), metric_id)
+
+        stopifnot(!any(duplicated(experiment_summary %>% select(experiment_id, metric_id))))
+
+        ##########################################################################################################
+        # Add successes and conversion rates
+        ##########################################################################################################
+        
+        # experiments__get_experiment_conversion_rates will exclude traffic based on first_joined_experiment &
+        # attribution windows like we did above
+        experiment_conversion_rates <- experiments__get_experiment_conversion_rates(experiment_traffic,
+                                                                                    attribution_windows,
+                                                                                    conversion_rates) %>%
+            filter(converted_within_window) %>%
+            count(experiment_id, variation, metric_id) %>%
+            rename(successes=n) %>%
+            inner_join(experiment_info, by=c('experiment_id', 'variation')) %>%
+            select(-variation) %>%
+            spread(is_baseline, successes)
+        
+        # now we need to rename `TRUE` and `FALSE` columns to baseline/variant
+        # but, if this is "prior" experiment data, theren't won't be a `FALSE`, so we need to check
+        if("FALSE" %in% colnames(experiment_conversion_rates)) {
+            
+            experiment_summary <- inner_join(experiment_summary,
+                                             experiment_conversion_rates,
+                                             by=c('experiment_id', 'metric_id')) %>%
+                rename(baseline_successes=`TRUE`,
+                       variant_successes=`FALSE`) %>% 
+                mutate(baseline_conversion_rate=baseline_successes / baseline_trials,
+                       variant_conversion_rate=variant_successes / variant_trials,
+                       percent_change_from_baseline = (variant_conversion_rate - baseline_conversion_rate) / baseline_conversion_rate)
 
 
-
-    ##########################################################################################################
-    # Add trials i.e. count of people in experiment
-    # TRIALS (i.e. count of peeople in experiment/varation) needs to exclude people who have entered into
-    # the experiment less than x day ago, where x is the attribution window per metric
-    # so the Experiment Summary will be per experiment/metric (the variation_data will be in the columns)
-    ##########################################################################################################
-
-    experiment_start_end_dates <- experiment_traffic %>%
-        group_by(experiment_id) %>%
-        summarise(start_date = min(first_joined_experiment),
-                  end_date = max(first_joined_experiment))
     
-    # this will duplicate each row in experiment_traffic for each metric
-    experiment_summary <- inner_join(experiment_traffic, attribution_windows, by='experiment_id') %>%
-        # we only want the people who have had enough time to convert, given the attribution window for a
-        # given metric (i.e. exclude people who join within the attribution window relative to today)
-        filter(first_joined_experiment < Sys.Date() - attribution_window) %>%
-        mutate(metric_id = fct_reorder(metric_id, attribution_window)) %>%
-        inner_join(experiment_info,
-                   by=c('experiment_id', 'variation')) %>%
-        group_by(experiment_id, metric_id, is_baseline) %>%
-        summarise(last_event_date = max(first_joined_experiment),
-                  trials = n()) %>%
-        ungroup() %>%
-        # on the offchance the start dates (or end dates) are different between the baseline/metric/variation 
-        # (e.g. started the experiment at ~midnight and 1 person went into the baseline on day x and the next
-        # went
-        # into the variation on day x+1)
-        group_by(experiment_id, metric_id) %>%
-        mutate(last_event_date = max(last_event_date)) %>%
-        ungroup() %>%
-        # now format so there is 1 row per experiment
-        spread(is_baseline, trials) %>%
-        rename(baseline_trials=`TRUE`,
-               variant_trials=`FALSE`) %>%
-        select(experiment_id, last_event_date, metric_id, baseline_trials, variant_trials)
-    
-    experiment_summary <- inner_join(experiment_summary, experiment_start_end_dates, by='experiment_id') %>%
-        select(experiment_id, start_date, end_date, everything()) %>%
-        # most recent ended (which is really just the last event, so it may not be stopped), so if
-        # there are multiple experiments that are still running, sort by the most recent started
-        arrange(desc(last_event_date), desc(start_date), metric_id)
+        } else {
+            
+            experiment_summary <- inner_join(experiment_summary,
+                                             experiment_conversion_rates,
+                                             by=c('experiment_id', 'metric_id')) %>%
+                rename(baseline_successes=`TRUE`) %>%
+                mutate(baseline_conversion_rate=baseline_successes / baseline_trials)
+        }
+        
+        
 
-    stopifnot(!any(duplicated(experiment_summary %>% select(experiment_id, metric_id))))
+        return (experiment_summary)
+    }
 
-    ##########################################################################################################
-    # Add successes and conversion rates
-    ##########################################################################################################
-    
-    # experiments__get_experiment_conversion_rates will exclude traffic based on first_joined_experiment &
-    # attribution windows like we did above
-    experiment_conversion_rates <- experiments__get_experiment_conversion_rates(experiment_traffic,
-                                                                                attribution_windows,
-                                                                                conversion_rates) %>%
-        filter(converted_within_window) %>%
-        count(experiment_id, variation, metric_id) %>%
-        rename(successes=n) %>%
-        inner_join(experiment_info, by=c('experiment_id', 'variation')) %>%
-        select(-variation) %>%
-        spread(is_baseline, successes) %>%
-        rename(baseline_successes=`TRUE`,
-               variant_successes=`FALSE`)
-
-    experiment_summary <- inner_join(experiment_summary,
-                                     experiment_conversion_rates,
-                                     by=c('experiment_id', 'metric_id'))
-
-    experiment_summary <- experiment_summary %>%
-        mutate(baseline_conversion_rate=baseline_successes / baseline_trials,
-               variant_conversion_rate=variant_successes / variant_trials,
-               percent_change_from_baseline = (variant_conversion_rate - baseline_conversion_rate) / baseline_conversion_rate)
+    experiment_summary <- get_baseline_summary(experiment_info, experiment_traffic, attribution_windows, conversion_rates)
     
     ##########################################################################################################
     # Add P-Value Information
@@ -385,6 +439,57 @@ experiments__get_summary <- function(experiment_info, experiment_traffic, attrib
     # Add Bayesian Information
     ##########################################################################################################
     
+    
+    # we need to modify website_traffic to mock experiment_traffic in order to genearate a PRIOR dataset for
+    # bayesian calculations.
+    # specifically, based on how many days of prior data we want, we'll transform website_traffic
+    # to look like experiment_traffic, but based on the prior dates.
+    # NOTE: Well only want to use the paths that the experiments where in
+    
+    day_of_prior_information <- 30
+    
+    experiment_prior_dates <- experiment_summary %>%
+        select(experiment_id, start_date, metric_id) %>%
+        inner_join(attribution_windows, by = c('experiment_id', 'metric_id')) %>%
+        group_by(experiment_id) %>%
+        # well take the min calculated start date so we allow enough time for the largest attribution window
+        summarise(prior_start_date = min(start_date - day_of_prior_information - attribution_window - 1),
+                  prior_end_date = prior_start_date + day_of_prior_information)
+    
+    experiment_prior_paths <- distinct(experiment_traffic %>% select(experiment_id, path))
+    
+    prior_data <- data.frame(user_id=NULL, first_joined_experiment=NULL, experiment_id=NULL, variation=NULL)
+    for(experiment in unique(experiment_info$experiment_id)) {
+        
+        prior_start_date <- (experiment_prior_dates %>% filter(experiment_id == experiment))$prior_start_date
+        prior_end_date <- (experiment_prior_dates %>% filter(experiment_id == experiment))$prior_end_date
+        
+        prior_paths <- experiment_prior_paths %>% filter(experiment_id == experiment)
+        variation_name <- (experiment_info %>% 
+            filter(experiment_id == experiment,
+                   is_baseline))$variation
+        
+        prior_data <- rbind(prior_data,
+                            website_traffic %>% 
+                                filter(visit_date >= prior_start_date & visit_date <= prior_end_date,
+                                       path %in% prior_paths$path) %>%
+                                group_by(user_id) %>%
+                                summarise(first_joined_experiment = min(visit_date)) %>%
+                                mutate(experiment_id = experiment,
+                                       variation = variation_name))
+    }
+
+    prior_summary <- get_baseline_summary(experiment_info=experiment_info,
+                                          experiment_traffic=prior_data,
+                                          attribution_windows=attribution_windows,
+                                          conversion_rates=conversion_rates)
+    
+
+    
+    
+    
+    
+    return (experiment_summary)
 }
 
 
@@ -392,7 +497,7 @@ experiments__get_summary <- function(experiment_info, experiment_traffic, attrib
 
 
 
-
+    experiment_summary <- experiments__get_summary(experiment_info, experiment_traffic, website_traffic, attribution_windows, conversion_rates)
 
 
 
