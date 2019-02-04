@@ -79,12 +79,12 @@ website_traffic__plot_traffic <- function(website_traffic,
 
 
 plot_bayesian <- function(prior_alpha,
-                                              prior_beta,
-                                              baseline_alpha,
-                                              baseline_beta,
-                                              variant_alpha,
-                                              variant_beta,
-                                              show_prior_distribution=TRUE) {
+                          prior_beta,
+                          baseline_alpha,
+                          baseline_beta,
+                          variant_alpha,
+                          variant_beta,
+                          show_prior_distribution=TRUE) {
 
         alpha_vector <- c(baseline_alpha, variant_alpha, prior_alpha)
         beta_vector <-  c(baseline_beta, variant_beta, prior_beta)
@@ -100,7 +100,6 @@ plot_bayesian <- function(prior_alpha,
             x_max <- max(qbeta(0.999, alpha_vector[1:2], beta_vector[1:2]))
         }
 
-
         x_axis_spread <- x_max - x_min
 
         # depending on the where we want to graph and how spread out the values are, we will want to get more/less granualar with our plot
@@ -115,11 +114,7 @@ plot_bayesian <- function(prior_alpha,
             mutate(y = dbeta(x, alpha, beta),
                    Parameters = factor(paste0(group, ": alpha= ", alpha, ", beta= ", beta)))
 
-
-
         x_axis_break_steps <- 0.05
-
-
         if(x_axis_spread <= 0.02) {
 
             x_axis_break_steps <- 0.001
