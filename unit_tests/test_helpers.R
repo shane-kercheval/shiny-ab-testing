@@ -272,7 +272,6 @@ test_that("test_helpers: experiments__get_experiment_conversion_rates", {
 
 test_that("test_helpers: experiments__get_summary", {
 
-
     experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
     experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
     attribution_windows <- as.data.frame(read_csv('data/cached_simulated_data/attribution_windows.csv'))
@@ -293,351 +292,53 @@ test_that("test_helpers: experiments__get_summary", {
     website_traffic$visit_date <- website_traffic$visit_date + days_offset
     conversion_rates$conversion_date <- conversion_rates$conversion_date + days_offset
 
+    experiments_summary <- experiments__get_summary(experiment_info,
+                                     experiment_traffic,
+                                     website_traffic,
+                                     attribution_windows,
+                                     conversion_rates,
+                                     days_of_prior_data=15)
     
-
-experiments__get_summary <- function(experiment_info, experiment_traffic, website_traffic, attribution_windows, conversion_rates) {
-# distinction between end_date and last_event_date is that end_date is the date of the last event we have in
-# the entire experiment_traffic dataset, but we exclude people who have joined the experiment recently
-# according to the attribution windows, so `last_event_date` is the date of the last event that was included
-# and counted towards the successes/trials
-# so the test could still be running but we only look
-
-    # refactored this to a method because we'll use it for the actual experiments, but then we'll modify website
-    # traffic to mock a PRIOR dataset for bayesian calculations.
-    # specifically, based on how many days of prior data we want, we'll transform website_traffic
-    # to look like experiment_traffic, but based on the prior dates.
-
-    get_baseline_summary <- function(experiment_info, experiment_traffic, attribution_windows, conversion_rates) {
-        ##########################################################################################################
-        # Add trials i.e. count of people in experiment
-        # TRIALS (i.e. count of peeople in experiment/varation) needs to exclude people who have entered into
-        # the experiment less than x day ago, where x is the attribution window per metric
-        # so the Experiment Summary will be per experiment/metric (the variation_data will be in the columns)
-        ##########################################################################################################
-
-        experiment_start_end_dates <- experiment_traffic %>%
-            group_by(experiment_id) %>%
-            summarise(start_date = min(first_joined_experiment),
-                      end_date = max(first_joined_experiment))
-        
-        # this will duplicate each row in experiment_traffic for each metric
-        experiment_summary <- inner_join(experiment_traffic, attribution_windows, by='experiment_id') %>%
-            # we only want the people who have had enough time to convert, given the attribution window for a
-            # given metric (i.e. exclude people who join within the attribution window relative to today)
-            filter(first_joined_experiment < Sys.Date() - attribution_window) %>%
-            mutate(metric_id = fct_reorder(metric_id, attribution_window)) %>%
-            inner_join(experiment_info,
-                       by=c('experiment_id', 'variation')) %>%
-            group_by(experiment_id, metric_id, is_baseline) %>%
-            summarise(last_event_date = max(first_joined_experiment),
-                      trials = n()) %>%
-            ungroup() %>%
-            # on the offchance the start dates (or end dates) are different between the baseline/metric/variation 
-            # (e.g. started the experiment at ~midnight and 1 person went into the baseline on day x and the next
-            # went
-            # into the variation on day x+1)
-            group_by(experiment_id, metric_id) %>%
-            mutate(last_event_date = max(last_event_date)) %>%
-            ungroup() %>%
-            # now format so there is 1 row per experiment
-            spread(is_baseline, trials)
-            
-            # now we need to rename `TRUE` and `FALSE` columns to baseline/variant
-            # but, if this is "prior" experiment data, theren't won't be a `FALSE`, so we need to check
-            if("FALSE" %in% colnames(experiment_summary)) {
-                
-                experiment_summary <- experiment_summary %>%
-                    rename(baseline_trials=`TRUE`,
-                           variant_trials=`FALSE`) %>%
-                    select(experiment_id, last_event_date, metric_id, baseline_trials, variant_trials)
-                
-            } else {
-                
-                experiment_summary <- experiment_summary %>%
-                    rename(baseline_trials=`TRUE`) %>%
-                    select(experiment_id, last_event_date, metric_id, baseline_trials)
-                
-                    
-            }
-
-        experiment_summary <- inner_join(experiment_summary, experiment_start_end_dates, by='experiment_id') %>%
-            select(experiment_id, start_date, end_date, everything()) %>%
-            # most recent ended (which is really just the last event, so it may not be stopped), so if
-            # there are multiple experiments that are still running, sort by the most recent started
-            arrange(desc(end_date), desc(start_date), metric_id)
-
-        stopifnot(!any(duplicated(experiment_summary %>% select(experiment_id, metric_id))))
-
-        ##########################################################################################################
-        # Add successes and conversion rates
-        ##########################################################################################################
-        
-        # experiments__get_experiment_conversion_rates will exclude traffic based on first_joined_experiment &
-        # attribution windows like we did above
-        experiment_conversion_rates <- experiments__get_experiment_conversion_rates(experiment_traffic,
-                                                                                    attribution_windows,
-                                                                                    conversion_rates) %>%
-            filter(converted_within_window) %>%
-            count(experiment_id, variation, metric_id) %>%
-            rename(successes=n) %>%
-            inner_join(experiment_info, by=c('experiment_id', 'variation')) %>%
-            select(-variation) %>%
-            spread(is_baseline, successes)
-        
-        # now we need to rename `TRUE` and `FALSE` columns to baseline/variant
-        # but, if this is "prior" experiment data, theren't won't be a `FALSE`, so we need to check
-        if("FALSE" %in% colnames(experiment_conversion_rates)) {
-            
-            experiment_summary <- inner_join(experiment_summary,
-                                             experiment_conversion_rates,
-                                             by=c('experiment_id', 'metric_id')) %>%
-                rename(baseline_successes=`TRUE`,
-                       variant_successes=`FALSE`) %>% 
-                mutate(baseline_conversion_rate=baseline_successes / baseline_trials,
-                       variant_conversion_rate=variant_successes / variant_trials,
-                       percent_change_from_baseline = (variant_conversion_rate - baseline_conversion_rate) / baseline_conversion_rate)
-
-
+    expect_equal(nrow(distinct(experiments_summary %>% select(experiment_id, start_date, end_date))),
+                 length(unique(experiment_info$experiment_id)))
     
-        } else {
-            
-            experiment_summary <- inner_join(experiment_summary,
-                                             experiment_conversion_rates,
-                                             by=c('experiment_id', 'metric_id')) %>%
-                rename(baseline_successes=`TRUE`) %>%
-                mutate(baseline_conversion_rate=baseline_successes / baseline_trials)
+    expect_false(any(is.na(experiments_summary)))
+    # for the first experiment, these should equal the attribution window plus 1 day padding the end-date is Today
+    expect_true(all(experiments_summary$end_date - experiments_summary$last_event_date == c(3, 4, 6, 8, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0)))
+    expect_true(all(distinct(experiments_summary %>% select(experiment_id, metric_id)) %>% arrange(experiment_id) == attribution_windows %>% select(-attribution_window)))
+
+    expect_true(all(experiments_summary$baseline_conversion_rate == experiments_summary$baseline_successes / experiments_summary$baseline_trials))
+    expect_true(all(experiments_summary$variant_conversion_rate == experiments_summary$variant_successes / experiments_summary$variant_trials))
+    expect_true(all(experiments_summary$percent_change_from_baseline == (experiments_summary$variant_conversion_rate - experiments_summary$baseline_conversion_rate) / experiments_summary$baseline_conversion_rate))
+
+
+    expect_true(all(with(experiments_summary, baseline_alpha == prior_alpha + baseline_successes)))
+    expect_true(all(with(experiments_summary, baseline_beta == prior_beta + baseline_trials - baseline_successes)))
+
+    expect_true(all(with(experiments_summary, variant_alpha == prior_alpha + variant_successes)))
+    expect_true(all(with(experiments_summary, variant_beta == prior_beta + variant_trials - variant_successes)))
+    expect_true(all(with(experiments_summary, bayesian_conf.low < bayesian_cr_diff_estimate & bayesian_cr_diff_estimate < bayesian_conf.high)))
+    
+    expect_true(all(with(experiments_summary, cr_diff_estimate == variant_conversion_rate - baseline_conversion_rate)))
+    
+    p_values <- with(experiments_summary, pmap_dbl(list(baseline_successes, baseline_trials, variant_successes, variant_trials),
+        function(bs, bt, vs, vt) {
+            prop.test(x=c(bs, vs), n=c(bt, vt))$p.value
         }
-        
-        
+    ))
+    expect_true(all(p_values == experiments_summary$p_value))
 
-        return (experiment_summary)
-    }
+    write.csv(experiments_summary, 'data/helpers/experiments_summary.csv')
 
-    experiment_summary <- get_baseline_summary(experiment_info, experiment_traffic, attribution_windows, conversion_rates)
-    
-    ##########################################################################################################
-    # Add P-Value Information
-    ##########################################################################################################
-    
-    p_values <- pmap(list(experiment_summary$baseline_successes,
-                          experiment_summary$baseline_trials,
-                          experiment_summary$variant_successes,
-                          experiment_summary$variant_trials),
-                     function(bs, bt, vs, vt) get_p_values_info(bs, bt, vs, vt))
- 
-    experiment_summary_pvalues <- experiment_summary
-    
-    experiment_summary$p_value <- map_dbl(p_values, ~ .['p_value'])
-    experiment_summary$cr_diff_estimate <- map_dbl(p_values, ~ .['cr_diff_estimate'])
-    experiment_summary$p_value_conf_low <- map_dbl(p_values, ~ .['conf.low'])
-    experiment_summary$p_value_conf_high <- map_dbl(p_values, ~ .['conf.high'])
-
-    # experiment_summary$p_value_conf_low / experiment_summary$baseline_conversion_rate
-    # experiment_summary$p_value_conf_high / experiment_summary$baseline_conversion_rate
-
-    ##########################################################################################################
-    # Add Bayesian Information
-    ##########################################################################################################
-    
-    
-    # we need to modify website_traffic to mock experiment_traffic in order to genearate a PRIOR dataset for
-    # bayesian calculations.
-    # specifically, based on how many days of prior data we want, we'll transform website_traffic
-    # to look like experiment_traffic, but based on the prior dates.
-    # NOTE: Well only want to use the paths that the experiments where in
-    
-    day_of_prior_information <- 15
-    
-    experiment_prior_dates <- experiment_summary %>%
-        select(experiment_id, start_date, metric_id) %>%
-        inner_join(attribution_windows, by = c('experiment_id', 'metric_id')) %>%
-        group_by(experiment_id) %>%
-        # well take the min calculated start date so we allow enough time for the largest attribution window
-        summarise(prior_start_date = min(start_date - day_of_prior_information - attribution_window - 1),
-                  prior_end_date = prior_start_date + day_of_prior_information)
-    
-    experiment_prior_paths <- distinct(experiment_traffic %>% select(experiment_id, path))
-    
-    prior_data <- data.frame(user_id=NULL, first_joined_experiment=NULL, experiment_id=NULL, variation=NULL)
-    for(experiment in unique(experiment_info$experiment_id)) {
-        
-        prior_start_date <- (experiment_prior_dates %>% filter(experiment_id == experiment))$prior_start_date
-        prior_end_date <- (experiment_prior_dates %>% filter(experiment_id == experiment))$prior_end_date
-        
-        prior_paths <- experiment_prior_paths %>% filter(experiment_id == experiment)
-        variation_name <- (experiment_info %>% 
-            filter(experiment_id == experiment,
-                   is_baseline))$variation
-        
-        prior_data <- rbind(prior_data,
-                            website_traffic %>% 
-                                filter(visit_date >= prior_start_date & visit_date <= prior_end_date,
-                                       path %in% prior_paths$path) %>%
-                                group_by(user_id) %>%
-                                summarise(first_joined_experiment = min(visit_date)) %>%
-                                mutate(experiment_id = experiment,
-                                       variation = variation_name))
-    }
-
-    prior_summary <- get_baseline_summary(experiment_info=experiment_info,
-                                          experiment_traffic=prior_data,
-                                          attribution_windows=attribution_windows,
-                                          conversion_rates=conversion_rates)
-    prior_summary <- prior_summary %>%
-        mutate(prior_alpha=baseline_successes,
-               prior_beta=baseline_trials - baseline_successes) %>%
-        select(experiment_id, metric_id, prior_alpha, prior_beta)
-
-    experiment_summary <- inner_join(experiment_summary,
-                                     prior_summary,
-                                     by = c("experiment_id", "metric_id"))
-
-    experiment_summary <- experiment_summary %>%
-        mutate(baseline_alpha = prior_alpha + baseline_successes,
-               baseline_beta = prior_beta + (baseline_trials - baseline_successes),
-               variant_alpha = prior_alpha + variant_successes,
-               variant_beta = prior_beta + (variant_trials - variant_successes))
-    
-    return (experiment_summary)
-}
-
-
-
-    credible_interval_approx <- function(alpha_a, beta_a, alpha_b, beta_b) {
-    # https://github.com/dgrtwo/empirical-bayes-book/blob/master/bayesian-ab.Rmd
-        u1 <- alpha_a / (alpha_a + beta_a)
-        u2 <- alpha_b / (alpha_b + beta_b)
-        var1 <- as.double(alpha_a) * beta_a / ((alpha_a + beta_a) ^ 2 * (alpha_a + beta_a + 1))
-        var2 <- as.double(alpha_b) * beta_b / ((alpha_b + beta_b) ^ 2 * (alpha_b + beta_b + 1))
-        mu_diff <- u2 - u1
-        sd_diff <- sqrt(var1 + var2)
-        
-        # in D.R. code, the first player had a higher probability but a negative estimate (i.e. negative difference in conversion rate, mu_diff)
-        # This doesn't make sense, so we'll 1) use the first player as the A group and the second as the B group), so B-A 
-        # which gives the expected intervals (but flips the posterior probability), and 2) use 1-pnorm(...) to get the correct posterior probability
-        c(posterior = 1 - pnorm(0, mu_diff, sd_diff),
-                cr_diff_estimate = mu_diff,
-                conf.low = qnorm(.025, mu_diff, sd_diff),
-                conf.high = qnorm(.975, mu_diff, sd_diff))
-    }
-    
-    
-    plot_bayesian <- function(prior_alpha,
-                              prior_beta,
-                              baseline_alpha,
-                              baseline_beta,
-                              variant_alpha,
-                              variant_beta,
-                              show_prior_distribution=TRUE) {
-
-            alpha_vector <- c(baseline_alpha, variant_alpha, prior_alpha)
-            beta_vector <-  c(baseline_beta, variant_beta, prior_beta)
-
-            if(show_prior_distribution) {
-
-                x_min <- min(qbeta(0.001, alpha_vector, beta_vector))
-                x_max <- max(qbeta(0.999, alpha_vector, beta_vector))
-            
-            } else {
-            
-                x_min <- min(qbeta(0.001, alpha_vector[1:2], beta_vector[1:2]))
-                x_max <- max(qbeta(0.999, alpha_vector[1:2], beta_vector[1:2]))
-            }
-
-
-            x_axis_spread <- x_max - x_min
-
-            # depending on the where we want to graph and how spread out the values are, we will want to get more/less granualar with our plot
-
-            distro_names <- c("Baseline", "Variant", "Prior")
-            distros <- data_frame(alpha = alpha_vector,
-                                  beta = beta_vector,
-                                  group = distro_names) %>%
-                group_by(alpha, beta, group) %>%
-                do(data_frame(x = seq(x_min, x_max, x_axis_spread / 1000))) %>%
-                ungroup() %>%
-                mutate(y = dbeta(x, alpha, beta),
-                       Parameters = factor(paste0(group, ": alpha= ", alpha, ", beta= ", beta)))
-
-
-
-            x_axis_break_steps <- 0.05
-
-
-            if(x_axis_spread <= 0.02) {
-
-                x_axis_break_steps <- 0.001
-
-            } else if(x_axis_spread <= 0.05) {
-
-                x_axis_break_steps <- 0.005
-
-            } else if(x_axis_spread <= 0.15) {
-
-                x_axis_break_steps <- 0.01
-
-            } else if(x_axis_spread <= 0.5) {
-
-                x_axis_break_steps <- 0.02
-            }
-
-            custom_colors <- rev(hue_pal()(3))
-
-            if(!show_prior_distribution) {
-
-                distros <- distros %>%
-                    filter(!str_detect(Parameters, "Prior"))
-
-                custom_colors <- custom_colors[1:2]
-            }
-
-            baseline_cred_low <- qbeta(0.025, baseline_alpha, baseline_beta)
-            baseline_cred_high <- qbeta(0.975, baseline_alpha, baseline_beta)
-
-            variant_cred_low <- qbeta(0.025, variant_alpha, variant_beta)
-            variant_cred_high <- qbeta(0.975, variant_alpha, variant_beta)
-
-
-            cia <- credible_interval_approx(alpha_a=baseline_alpha,
-                                            beta_a=baseline_beta,
-                                            alpha_b=variant_alpha,
-                                            beta_b=variant_beta)
-            percent_of_time_b_wins <- cia['posterior']
-
-            # a_cr_simulation <- rbeta(1e6, baseline_alpha, baseline_beta)
-            # b_cr_simulation <- rbeta(1e6, variant_alpha, variant_beta)
-            # percent_of_time_b_wins <- mean(b_cr_simulation > a_cr_simulation)
-
-            max_distros_20th <- max(distros$y) / 20
-            plot_object <- ggplot(data=distros, aes(x, y, color = Parameters)) +
-                geom_line() +
-                geom_area(aes(fill=Parameters, group=Parameters), alpha=0.3, position = 'identity') +
-                geom_errorbarh(aes(xmin = baseline_cred_low, xmax = baseline_cred_high, y = max_distros_20th * -1), height = max_distros_20th * 0.75, color = custom_colors[1], alpha=0.3) + 
-                geom_errorbarh(aes(xmin = variant_cred_low, xmax = variant_cred_high, y = max_distros_20th * -2), height = max_distros_20th * 0.75, color = custom_colors[2], alpha=0.3) + 
-                scale_x_continuous(breaks = seq(0, 1, x_axis_break_steps),
-                                   labels = percent_format()) +
-                theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
-                coord_cartesian(xlim=c(x_min, x_max)) +
-                labs(title='Posterior/Updated Probability Distributions of Baseline & Variant',
-                     x="Conversion Rates",
-                     y="Density of beta") +
-                scale_fill_manual(values=custom_colors) +
-                scale_color_manual(values=custom_colors)
-
-        return (plot_object)
-    }
-
-    
-    experiment <- unique(experiment_summary$experiment_id)[1]
+    experiment <- unique(experiments_summary$experiment_id)[1]
     metric <- 'Sign Up'
-    local_experiment <-  experiment_summary %>%
+    local_experiment <-  experiments_summary %>%
         filter(experiment_id  == experiment & metric_id == metric)
-    plot_bayesian(prior_alpha=local_experiment$prior_alpha,
-                  prior_beta=local_experiment$prior_beta,
-                  baseline_alpha=local_experiment$baseline_alpha,
-                  baseline_beta=local_experiment$baseline_beta,
-                  variant_alpha=local_experiment$variant_alpha,
-                  variant_beta=local_experiment$variant_beta)
-
-
+    plot_object <- plot_bayesian(prior_alpha=local_experiment$prior_alpha,
+                                 prior_beta=local_experiment$prior_beta,
+                                 baseline_alpha=local_experiment$baseline_alpha,
+                                 baseline_beta=local_experiment$baseline_beta,
+                                 variant_alpha=local_experiment$variant_alpha,
+                                 variant_beta=local_experiment$variant_beta)
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot_bayesian/experiment_1_signup.png')
 })

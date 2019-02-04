@@ -76,3 +76,109 @@ website_traffic__plot_traffic <- function(website_traffic,
              y = y_label,
              caption = caption)
 }
+
+
+plot_bayesian <- function(prior_alpha,
+                                              prior_beta,
+                                              baseline_alpha,
+                                              baseline_beta,
+                                              variant_alpha,
+                                              variant_beta,
+                                              show_prior_distribution=TRUE) {
+
+        alpha_vector <- c(baseline_alpha, variant_alpha, prior_alpha)
+        beta_vector <-  c(baseline_beta, variant_beta, prior_beta)
+
+        if(show_prior_distribution) {
+
+            x_min <- min(qbeta(0.001, alpha_vector, beta_vector))
+            x_max <- max(qbeta(0.999, alpha_vector, beta_vector))
+        
+        } else {
+        
+            x_min <- min(qbeta(0.001, alpha_vector[1:2], beta_vector[1:2]))
+            x_max <- max(qbeta(0.999, alpha_vector[1:2], beta_vector[1:2]))
+        }
+
+
+        x_axis_spread <- x_max - x_min
+
+        # depending on the where we want to graph and how spread out the values are, we will want to get more/less granualar with our plot
+
+        distro_names <- c("Baseline", "Variant", "Prior")
+        distros <- data_frame(alpha = alpha_vector,
+                              beta = beta_vector,
+                              group = distro_names) %>%
+            group_by(alpha, beta, group) %>%
+            do(data_frame(x = seq(x_min, x_max, x_axis_spread / 1000))) %>%
+            ungroup() %>%
+            mutate(y = dbeta(x, alpha, beta),
+                   Parameters = factor(paste0(group, ": alpha= ", alpha, ", beta= ", beta)))
+
+
+
+        x_axis_break_steps <- 0.05
+
+
+        if(x_axis_spread <= 0.02) {
+
+            x_axis_break_steps <- 0.001
+
+        } else if(x_axis_spread <= 0.05) {
+
+            x_axis_break_steps <- 0.005
+
+        } else if(x_axis_spread <= 0.15) {
+
+            x_axis_break_steps <- 0.01
+
+        } else if(x_axis_spread <= 0.5) {
+
+            x_axis_break_steps <- 0.02
+        }
+
+        custom_colors <- rev(hue_pal()(3))
+
+        if(!show_prior_distribution) {
+
+            distros <- distros %>%
+                filter(!str_detect(Parameters, "Prior"))
+
+            custom_colors <- custom_colors[1:2]
+        }
+
+        baseline_cred_low <- qbeta(0.025, baseline_alpha, baseline_beta)
+        baseline_cred_high <- qbeta(0.975, baseline_alpha, baseline_beta)
+
+        variant_cred_low <- qbeta(0.025, variant_alpha, variant_beta)
+        variant_cred_high <- qbeta(0.975, variant_alpha, variant_beta)
+
+
+        cia <- credible_interval_approx(alpha_a=baseline_alpha,
+                                        beta_a=baseline_beta,
+                                        alpha_b=variant_alpha,
+                                        beta_b=variant_beta)
+        percent_of_time_b_wins <- cia['posterior']
+
+        # a_cr_simulation <- rbeta(1e6, baseline_alpha, baseline_beta)
+        # b_cr_simulation <- rbeta(1e6, variant_alpha, variant_beta)
+        # percent_of_time_b_wins <- mean(b_cr_simulation > a_cr_simulation)
+
+        max_distros_20th <- max(distros$y) / 20
+        plot_object <- ggplot(data=distros, aes(x, y, color = Parameters)) +
+            geom_line() +
+            geom_area(aes(fill=Parameters, group=Parameters), alpha=0.3, position = 'identity') +
+            geom_errorbarh(aes(xmin = baseline_cred_low, xmax = baseline_cred_high, y = max_distros_20th * -1), height = max_distros_20th * 0.75, color = custom_colors[1], alpha=0.3) + 
+            geom_errorbarh(aes(xmin = variant_cred_low, xmax = variant_cred_high, y = max_distros_20th * -2), height = max_distros_20th * 0.75, color = custom_colors[2], alpha=0.3) + 
+            scale_x_continuous(breaks = seq(0, 1, x_axis_break_steps),
+                               labels = percent_format()) +
+            theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+            coord_cartesian(xlim=c(x_min, x_max)) +
+            labs(title='Posterior/Updated Probability Distributions of Baseline & Variant',
+                 x="Conversion Rates",
+                 y="Density of beta") +
+            scale_fill_manual(values=custom_colors) +
+            scale_color_manual(values=custom_colors)
+
+    return (plot_object)
+}
