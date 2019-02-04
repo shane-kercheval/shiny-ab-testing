@@ -172,6 +172,7 @@ plot_bayesian <- function(prior_alpha,
             geom_errorbarh(aes(xmin = variant_cred_low, xmax = variant_cred_high, y = max_distros_20th * -2), height = max_distros_20th * 0.75, color = custom_colors[2], alpha=0.3) + 
             scale_x_continuous(breaks = seq(0, 1, x_axis_break_steps),
                                labels = percent_format()) +
+            theme_light() +
             theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
             coord_cartesian(xlim=c(x_min, x_max)) +
             labs(title='Posterior/Updated Probability Distributions of Baseline & Variant',
