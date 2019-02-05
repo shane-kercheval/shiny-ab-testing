@@ -36,7 +36,8 @@ check_data__experiment_traffic <- function(experiment_traffic, experiment_info) 
 
     # ensure that there is a 1-1 relationship between the experiment_id/variation in experiment_info and 
     # website_traffic
-    unique_experiment_variation_traffic <- distinct(experiment_traffic %>% select(experiment_id, variation)) %>%
+    unique_experiment_variation_traffic <- distinct(experiment_traffic %>%
+        select(experiment_id, variation)) %>%
         arrange(experiment_id, variation)
     
     unique_experiment_variation_info <- experiment_info %>%
@@ -76,7 +77,8 @@ check_data__attribution_windows <- function(attribution_windows, experiment_info
 
     # ensure that there is a 1-1 relationship between the experiment_id in experiment_info and
     # attribution_windows
-    stopifnot(all(sort(unique(experiment_info$experiment_id)) == sort(unique(attribution_windows$experiment_id))))
+    stopifnot(all(sort(unique(experiment_info$experiment_id)) == 
+                      sort(unique(attribution_windows$experiment_id))))
 }
 
 #' Checks basic assumptions and data structure of conversion rate dataset
@@ -88,7 +90,8 @@ check_data__conversion_rates <- function(user_conversion_rates, attribution_wind
 
     stopifnot(all(colnames(user_conversion_rates) == c('user_id', 'metric_id', 'conversion_date')))
 
-    stopifnot(all(sort(unique(user_conversion_rates$metric_id)) == sort(unique(attribution_windows$metric_id))))
+    stopifnot(all(sort(unique(user_conversion_rates$metric_id)) == 
+                      sort(unique(attribution_windows$metric_id))))
 
     conversion_summary <- user_conversion_rates %>%
         group_by(metric_id) %>%
@@ -129,7 +132,8 @@ website_traffic__get_user_first_visit <- function(website_traffic) {
 #' @param website_traffic dataframe containing website traffic data in the expected format
 #' @param top_n_paths if specified, count by the top (i.e. highest traffic) paths, grouping the remaining
 #'      paths into an 'Other' category. 
-#' @param only_first_time_visits only count the first time the user appears in the dataset (i.e. first time to website)
+#' @param only_first_time_visits only count the first time the user appears in the dataset (i.e. first time to
+#'      website)
 website_traffic__to_daily_num_users <- function(website_traffic,
                                                 top_n_paths=NULL,
                                                 only_first_time_visits=FALSE) {
@@ -159,13 +163,14 @@ website_traffic__to_daily_num_users <- function(website_traffic,
 #' 
 #' If only_first_time_visits is TRUE, then per cohorted period and per path counts will not sum to the same
 #'      total because a single user can visit multiple pages in the same cohorted period, so they will be
-#'      represented in >=1 rows for a single cohorted period when top_n_paths is not NULL, but will only be count
-#'      once in a cohorted period when top_n_paths is NULL
+#'      represented in >=1 rows for a single cohorted period when top_n_paths is not NULL, but will only be
+#'      count once in a cohorted period when top_n_paths is NULL
 #' 
 #' @param website_traffic dataframe containing website traffic data in the expected format
 #' @param top_n_paths if specified, count by the top (i.e. highest traffic) paths, grouping the remaining
 #'      paths into an 'Other' category.
-#' @param only_first_time_visits only count the first time the user appears in the dataset (i.e. first time to website)
+#' @param only_first_time_visits only count the first time the user appears in the dataset (i.e. first time to
+#'      website)
 website_traffic__to_cohort_num_users <- function(website_traffic,
                                                  cohort_format='%W',
                                                  top_n_paths=NULL,
@@ -325,7 +330,8 @@ experiments__get_conversion_rates <- function(experiment_traffic, attribution_wi
     user_conversion_rates <-  experiment_traffic %>% 
         # duplicates user-records when user has converted with multiple metrics
         inner_join(user_conversion_rates, by='user_id') %>%
-        # now we need to get the attribution time windows to figure out if they converted within the time-frame
+        # now we need to get the attribution time windows to figure out if they converted within the
+        # time-frame
         inner_join(attribution_windows, by=c('experiment_id', 'metric_id')) %>%
         # but, we have to filter out anyone who first joined the experiment in the last x days, where x is
         # less than the attribution window for that metric, because they haven't been given the full amount
@@ -339,9 +345,11 @@ experiments__get_conversion_rates <- function(experiment_traffic, attribution_wi
         mutate(days_from_experiment_to_conversion = as.numeric(difftime(conversion_date,  # negative days means the conversion happened before the experiment started
                                                                         first_joined_experiment,
                                                                         units = 'days')),
-               converted_within_window = days_from_experiment_to_conversion >= 0 & days_from_experiment_to_conversion <= attribution_window,
+               converted_within_window = days_from_experiment_to_conversion >= 0 & 
+                   days_from_experiment_to_conversion <= attribution_window,
                metric_id = fct_reorder(metric_id, attribution_window)) %>%
-        select(user_id, experiment_id, variation, first_joined_experiment, metric_id, conversion_date, attribution_window, days_from_experiment_to_conversion, converted_within_window)
+        select(user_id, experiment_id, variation, first_joined_experiment, metric_id, conversion_date,
+               attribution_window, days_from_experiment_to_conversion, converted_within_window)
     
         return (user_conversion_rates)
 }
@@ -376,7 +384,10 @@ get_p_values_info <- function(baseline_successes, baseline_trials, variant_succe
 #' @param experiment_traffic
 #' @param attribution_windows
 #' @param conversion_rates
-experiments__get_base_summary <- function(experiment_info, experiment_traffic, attribution_windows, conversion_rates) {
+experiments__get_base_summary <- function(experiment_info,
+                                          experiment_traffic,
+                                          attribution_windows,
+                                          conversion_rates) {
 
     experiment_start_end_dates <- experiment_traffic %>%
         group_by(experiment_id) %>%
@@ -390,8 +401,9 @@ experiments__get_base_summary <- function(experiment_info, experiment_traffic, a
                                                                                       attribution_windows)
     
     # i want to cache the is_baseline/variation-name here so in know i'm joining the actual variation used for
-    # the baseline; i could join on the variation names after the fact but there's an increase risk because e.g.
-    # i could have messed up the baseline/variation combos but joining after the fact wouldn't illuminate this
+    # the baseline; i could join on the variation names after the fact but there's an increase risk because
+    # e.g. i could have messed up the baseline/variation combos but joining after the fact wouldn't illuminate
+    # this
     cache_experiment_variations <- distinct(filtered_experiment_traffic %>% 
                                                 select(experiment_id, variation, is_baseline)) %>% 
         spread(is_baseline, variation)
@@ -443,7 +455,9 @@ experiments__get_base_summary <- function(experiment_info, experiment_traffic, a
             select(experiment_id, last_join_date, metric_id, baseline_trials)
     }
 
-    experiments_summary <- inner_join(experiments_summary, experiment_start_end_dates, by='experiment_id') %>%
+    experiments_summary <- inner_join(experiments_summary,
+                                      experiment_start_end_dates,
+                                      by='experiment_id') %>%
         select(experiment_id, start_date, end_date, everything()) %>%
         # most recent ended (which is really just the last event, so it may not be stopped), so if
         # there are multiple experiments that are still running, sort by the most recent started
@@ -478,7 +492,8 @@ experiments__get_base_summary <- function(experiment_info, experiment_traffic, a
                    variant_successes=`FALSE`) %>% 
             mutate(baseline_conversion_rate=baseline_successes / baseline_trials,
                    variant_conversion_rate=variant_successes / variant_trials,
-                   percent_change_from_baseline = (variant_conversion_rate - baseline_conversion_rate) / baseline_conversion_rate)
+                   percent_change_from_baseline = (variant_conversion_rate - baseline_conversion_rate) / 
+                       baseline_conversion_rate)
 
     } else {
         
@@ -512,9 +527,10 @@ credible_interval_approx <- function(alpha_a, beta_a, alpha_b, beta_b) {
     mu_diff <- u2 - u1
     sd_diff <- sqrt(var1 + var2)
     
-    # in D.R.'s code, the first player had a higher probability but a negative estimate (i.e. negative difference in conversion rate, mu_diff)
-    # This doesn't make sense, so we'll 1) use the first player as the A group and the second as the B group), so B-A 
-    # which gives the expected intervals (but flips the posterior probability), and 2) use 1-pnorm(...) to get the correct posterior probability
+    # in D.R.'s code, the first player had a higher probability but a negative estimate (i.e. negative
+    # difference in conversion rate, mu_diff). This doesn't make sense, so we'll 1) use the first player as
+    # the A group and the second as the B group), so B-A which gives the expected intervals (but flips the
+    # posterior probability), and 2) use 1-pnorm(...) to get the correct posterior probability
     return (c(posterior = 1 - pnorm(0, mu_diff, sd_diff),
               cr_diff_estimate = mu_diff,
               conf.low = qnorm(.025, mu_diff, sd_diff),
@@ -542,13 +558,11 @@ experiments__get_summary <- function(experiment_info,
                                      attribution_windows,
                                      conversion_rates,
                                      days_of_prior_data=15) {
-# distinction between end_date and last_join_date is that end_date is the date of the last event we have in
-# the entire experiment_traffic dataset, but we exclude people who have joined the experiment recently
-# according to the attribution windows, so `last_join_date` is the date of the last event that was included
-# and counted towards the successes/trials
-# so the test could still be running but we only look
 
-    experiments_summary <- experiments__get_base_summary(experiment_info, experiment_traffic, attribution_windows, conversion_rates)
+    experiments_summary <- experiments__get_base_summary(experiment_info,
+                                                         experiment_traffic,
+                                                         attribution_windows,
+                                                         conversion_rates)
     
     ##########################################################################################################
     # Add P-Value Information
@@ -633,7 +647,8 @@ experiments__get_summary <- function(experiment_info,
                variant_alpha = prior_alpha + variant_successes,
                variant_beta = prior_beta + (variant_trials - variant_successes))
 
-    cia_list <- pmap(with(experiments_summary, list(baseline_alpha, baseline_beta, variant_alpha, variant_beta)),
+    cia_list <- pmap(with(experiments_summary,
+                          list(baseline_alpha, baseline_beta, variant_alpha, variant_beta)),
                      function(alpha_a, beta_a, alpha_b, beta_b){  
                          credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)
                      })
