@@ -109,7 +109,7 @@ plot_bayesian <- function(prior_alpha,
                               beta = beta_vector,
                               group = distro_names) %>%
             group_by(alpha, beta, group) %>%
-            do(data_frame(x = seq(x_min, x_max, x_axis_spread / 1000))) %>%
+            do(tibble(x = seq(x_min, x_max, x_axis_spread / 1000))) %>%
             ungroup() %>%
             mutate(y = dbeta(x, alpha, beta),
                    Parameters = factor(paste0(group, ": alpha= ", alpha, ", beta= ", beta)))

@@ -130,14 +130,14 @@ test_that("Misc Helpers: calculate_total_sample_size", {
 test_that("Misc Helpers: calculate_days_required", {
 
     daily_traffic <- 10000
-    total_sample_size_required <- c(29711, 51165, 115526)  # from calculate_total_sample_size unit test 
+    total_sample_size_required <- c(29711, 51165, 115526)  # from calculate_total_sample_size unit test
     expected_days_required <- ceiling(total_sample_size_required / daily_traffic)
     days_required <- calculate_days_required(daily_traffic=daily_traffic,
                                              conversion_rates=c(0.3, 0.2, 0.1),
                                              percent_increase=0.05,
                                              power=0.8,
                                              alpha=0.05)
-    
+
     expect_true(all(expected_days_required == days_required))
 })
 
@@ -164,11 +164,10 @@ test_that("test_helpers: website_traffic__get_user_first_visit", {
         group_by(user_id) %>%
         summarise(first_visit = min(visit_date),
                   path = path[visit_date == first_visit])
-    
+
     expect_true(all(users_first_visit %>% arrange(user_id) == expected_first_visits %>% arrange(user_id)))
 
 })
-
 
 test_that("test_helpers: website_traffic__to_xxx_num_users", {
 
@@ -178,18 +177,18 @@ test_that("test_helpers: website_traffic__to_xxx_num_users", {
     write.csv(daily_first_time_num_users, file='data/helpers/website_traffic__to_xxx_num_users/daily_first_time_num_users.csv', row.names = FALSE)
     daily_first_time_path_num_users <- website_traffic__to_daily_num_users(website_traffic, top_n_paths = 10, only_first_time_visits=TRUE)
     write.csv(daily_first_time_path_num_users, file='data/helpers/website_traffic__to_xxx_num_users/daily_first_time_path_num_users.csv', row.names = FALSE)
-    
+
 
     daily_first_time_2paths_num_users <- website_traffic__to_daily_num_users(website_traffic, top_n_paths = 2, only_first_time_visits=TRUE)
     write.csv(daily_first_time_2paths_num_users, file='data/helpers/website_traffic__to_xxx_num_users/daily_first_time_2paths_num_users.csv', row.names = FALSE)
-    
+
 
     cohort_first_time_num_users <- website_traffic__to_cohort_num_users(website_traffic, only_first_time_visits=TRUE)
     write.csv(cohort_first_time_num_users, file='data/helpers/website_traffic__to_xxx_num_users/cohort_first_time_num_users.csv', row.names = FALSE)
     cohort_first_time_path_num_users <- website_traffic__to_cohort_num_users(website_traffic, top_n_paths = 10, only_first_time_visits=TRUE)
     write.csv(cohort_first_time_path_num_users, file='data/helpers/website_traffic__to_xxx_num_users/cohort_first_time_path_num_users.csv', row.names = FALSE)
-    
-    # first, let's check that top_n_paths gives expected paths and levels (10 should include all paths, and 
+
+    # first, let's check that top_n_paths gives expected paths and levels (10 should include all paths, and
     # add an 'Other' level)
 
     # check all paths exist
@@ -218,14 +217,14 @@ test_that("test_helpers: website_traffic__to_xxx_num_users", {
 test_that("test_helpers: website_traffic__plot_traffic", {
 
     website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
-    
+
     plot_object <- website_traffic__plot_traffic(website_traffic,
                                                  only_first_time_visits=TRUE,
                                                  is_weekly=TRUE,
                                                  filter_year_end_beginning_weeks=TRUE,
                                                  top_n_paths=NULL)
     plot_object %>% test_save_plot(file='data/plot_helpers/website_traffic__plot_traffic/first-visits-weekly-filter.png')
-    
+
     plot_object <- website_traffic__plot_traffic(website_traffic,
                                                  only_first_time_visits=TRUE,
                                                  is_weekly=TRUE,
@@ -241,14 +240,14 @@ test_that("test_helpers: website_traffic__plot_traffic", {
     plot_object %>% test_save_plot(file='data/plot_helpers/website_traffic__plot_traffic/first-visits-weekly-filter_top_3_paths.png')
 })
 
-test_that("test_helpers: experiments__get_experiment_conversion_rates", {
+test_that("test_helpers: experiments__get_conversion_rates", {
 
     experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
     experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
     attribution_windows <- as.data.frame(read_csv('data/cached_simulated_data/attribution_windows.csv'))
     website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
     conversion_rates <- as.data.frame(read_csv('data/cached_simulated_data/conversion_rates.csv'))
-    
+
     check_data__experiment_info(experiment_info)
     check_data__experiment_traffic(experiment_traffic, experiment_info)
     check_data__attribution_windows(attribution_windows, experiment_info)
@@ -256,26 +255,26 @@ test_that("test_helpers: experiments__get_experiment_conversion_rates", {
     check_data__conversion_rates(conversion_rates, attribution_windows)
 
     # I want to manipulate the simulated dataset to
-    # 1) make sure the dates are relative to today (experiments__get_experiment_conversion_rates filter out based on\
+    # 1) make sure the dates are relative to today (experiments__get_conversion_rates filter out based on\
     #    Sys.Date())
     # 2) simulate people entering the experiment who already converted (so that we can ensure they are not
     #    counted as converted
     max_experiment_traffic_date <- max(experiment_traffic$first_joined_experiment)
     days_offset <- Sys.Date() - max_experiment_traffic_date
-    
+
     experiment_traffic <- experiment_traffic %>%
         mutate(first_joined_experiment = first_joined_experiment + days_offset)
-    
+
     conversion_rates <- conversion_rates %>%
         # the minus 1 will make it so some people will have already converted
         mutate(conversion_date = conversion_date + days_offset - 1)
-    
-    user_conversion_rates <- experiments__get_experiment_conversion_rates(experiment_traffic,
+
+    user_conversion_rates <- experiments__get_conversion_rates(experiment_traffic,
                                                                     attribution_windows,
                                                                     conversion_rates)
-    
+
     expect_equal(min(user_conversion_rates$days_from_experiment_to_conversion), -1)
-    
+
     # make sure no one who converted before they joined the experiment is counted as converted
     temp <- user_conversion_rates %>% filter(days_from_experiment_to_conversion < 0)
     expect_false(any(temp$converted_within_window))
@@ -283,29 +282,61 @@ test_that("test_helpers: experiments__get_experiment_conversion_rates", {
     # make sure no one who converted after the attribution window is counted as converted
     temp <- user_conversion_rates %>% filter(first_joined_experiment + attribution_window < conversion_date)
     expect_false(any(temp$converted_within_window))
-    
+
     # make sure no one that joined the experiment x days ago, where x is attribution window, is in the dataset
-    expect_equal(nrow(user_conversion_rates %>% 
-                          filter(first_joined_experiment + attribution_window >= Sys.Date())), 
+    expect_equal(nrow(user_conversion_rates %>%
+                          filter(first_joined_experiment + attribution_window >= Sys.Date())),
                  0)
-    
+
     # make sure the data is unique by experiment/metric/user
     expect_true(all((user_conversion_rates %>% count(experiment_id, metric_id, user_id))$n == 1))
 
 })
 
-test_that("test_helpers: experiments__get_base_summary", {
-    
+test_that("test_helpers: private__filter_experiment_traffic_via_attribution", {
+
     experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
     experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
     attribution_windows <- as.data.frame(read_csv('data/cached_simulated_data/attribution_windows.csv'))
-    conversion_rates <- as.data.frame(read_csv('data/cached_simulated_data/conversion_rates.csv'))
-    
-    baseline_summary <- experiments__get_base_summary(experiment_info,
-                                     experiment_traffic,
-                                     attribution_windows,
-                                     conversion_rates)
 
+    ###############
+    # shift all dates relative to today so we can test excluding people (who recently entered into the
+    # experiment) based on the attribution window
+    ###############
+    max_date <-max(experiment_traffic$first_joined_experiment)
+    days_offset <- Sys.Date() - max_date
+
+    experiment_traffic$first_joined_experiment <- experiment_traffic$first_joined_experiment + days_offset
+
+    filtered_traffic <- private__filter_experiment_traffic_via_attribution(experiment_info,
+                                                                           experiment_traffic,
+                                                                           attribution_windows)
+
+    # If we add the attribution window to the first-joined-experiment, the max we should get is Today
+    # meaning we are filtering out `today - attribution-window`
+    max_joined_per_metric <- filtered_traffic %>%
+        mutate(joined_plus_attribution = first_joined_experiment + attribution_window) %>%
+        group_by(metric_id) %>%
+        summarise(max_joined_plus_attribution = max(joined_plus_attribution))
+
+    # This might fail due to time-zones
+    expect_true(all(Sys.Date() - max_joined_per_metric$max_joined_plus_attribution == 1))
+
+    # for all experiments that ended before max attribution date (relative to today),
+    # the end date should equal the end date on the filtered dataset
+    start_end_dates <- experiment_traffic %>%
+        group_by(experiment_id) %>%
+        summarise(start_date = min(first_joined_experiment),
+                  end_date = max(first_joined_experiment)) %>%
+        filter(end_date < Sys.Date() - max(attribution_windows$attribution_window))
+
+    start_end_dates_filtered <- filtered_traffic %>%
+        group_by(experiment_id) %>%
+        summarise(start_date = min(first_joined_experiment),
+                  end_date = max(first_joined_experiment)) %>%
+        filter(experiment_id %in% start_end_dates$experiment_id)
+
+    expect_true(all(start_end_dates == start_end_dates_filtered))
 })
 
 test_that("test_helpers: experiments__get_summary", {
@@ -315,7 +346,7 @@ test_that("test_helpers: experiments__get_summary", {
     attribution_windows <- as.data.frame(read_csv('data/cached_simulated_data/attribution_windows.csv'))
     website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
     conversion_rates <- as.data.frame(read_csv('data/cached_simulated_data/conversion_rates.csv'))
-    
+
     ###############
     # shift all dates relative to today so we can test excluding people (who recently entered into the
     # experiment) based on the attribution window
@@ -323,9 +354,9 @@ test_that("test_helpers: experiments__get_summary", {
     max_date <- max(max(experiment_traffic$first_joined_experiment),
                     max(conversion_rates$conversion_date),
                     max(website_traffic$visit_date))
-    
+
     days_offset <- Sys.Date() - max_date
-    
+
     experiment_traffic$first_joined_experiment <- experiment_traffic$first_joined_experiment + days_offset
     website_traffic$visit_date <- website_traffic$visit_date + days_offset
     conversion_rates$conversion_date <- conversion_rates$conversion_date + days_offset
@@ -336,10 +367,10 @@ test_that("test_helpers: experiments__get_summary", {
                                      attribution_windows,
                                      conversion_rates,
                                      days_of_prior_data=15)
-    
+
     expect_equal(nrow(distinct(experiments_summary %>% select(experiment_id, start_date, end_date))),
                  length(unique(experiment_info$experiment_id)))
-    
+
     expect_false(any(is.na(experiments_summary)))
     # for the first experiment, these should equal the attribution window plus 1 day padding the end-date is Today
     expect_true(all(experiments_summary$end_date - experiments_summary$last_join_date == c(3, 4, 6, 8, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0)))
@@ -356,9 +387,9 @@ test_that("test_helpers: experiments__get_summary", {
     expect_true(all(with(experiments_summary, variant_alpha == prior_alpha + variant_successes)))
     expect_true(all(with(experiments_summary, variant_beta == prior_beta + variant_trials - variant_successes)))
     expect_true(all(with(experiments_summary, bayesian_conf.low < bayesian_cr_diff_estimate & bayesian_cr_diff_estimate < bayesian_conf.high)))
-    
+
     expect_true(all(with(experiments_summary, cr_diff_estimate == variant_conversion_rate - baseline_conversion_rate)))
-    
+
     p_values <- with(experiments_summary, pmap_dbl(list(baseline_successes, baseline_trials, variant_successes, variant_trials),
         function(bs, bt, vs, vt) {
             prop.test(x=c(bs, vs), n=c(bt, vt))$p.value

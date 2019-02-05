@@ -1,4 +1,3 @@
-source('private_helpers.R')
 ##############################################################################################################
 # CHECK DATASET ASSUMPTIONS
 ##############################################################################################################
@@ -319,7 +318,7 @@ prettify_numerics <- function(values) {
 #' @param experiment_traffic
 #' @param attribution_windows
 #' @param user_conversion_rates
-experiments__get_experiment_conversion_rates <- function(experiment_traffic, attribution_windows, user_conversion_rates) {
+experiments__get_conversion_rates <- function(experiment_traffic, attribution_windows, user_conversion_rates) {
 
     # dataset only contains users that converted
     # dataset is per user, per experment, per converted metric
@@ -384,30 +383,18 @@ experiments__get_base_summary <- function(experiment_info, experiment_traffic, a
         summarise(start_date = min(first_joined_experiment),
                   end_date = max(first_joined_experiment))
     
-    ##########################################################################################################
-    # Add trials i.e. count of people in experiment
-    # TRIALS (i.e. count of peeople in experiment/varation) needs to exclude people who have entered into
-    # the experiment less than x day ago, where x is the attribution window per metric
-    # so the Experiment Summary will be per experiment/metric (the variation_data will be in the columns)
-    ##########################################################################################################
-    # this will duplicate each row in experiment_traffic for each metric
-    experiments_summary <- inner_join(experiment_traffic, attribution_windows, by='experiment_id') %>%
-        # we only want the people who have had enough time to convert, given the attribution window for a
-        # given metric (i.e. exclude people who join within the attribution window relative to today)
-        filter(first_joined_experiment < Sys.Date() - attribution_window) %>%
-        mutate(metric_id = fct_reorder(metric_id, attribution_window)) %>%
-        inner_join(experiment_info,
-                   by=c('experiment_id', 'variation')) 
-    
+    # filter the traffic by attribution windows;
+    # this will duplicate each row in experiment_traffic for each metric; since attribution is based on metric
+    filtered_experiment_traffic <- private__filter_experiment_traffic_via_attribution(experiment_info,
+                                                                                      experiment_traffic,
+                                                                                      attribution_windows)
     
     # i want to cache the is_baseline/variation-name here so in know i'm joining the actual variation used for
     # the baseline; i could join on the variation names after the fact but there's an increase risk because e.g.
     # i could have messed up the baseline/variation combos but joining after the fact wouldn't illuminate this
-    cache_experiment_variations <- distinct(experiments_summary %>% 
+    cache_experiment_variations <- distinct(filtered_experiment_traffic %>% 
                                                 select(experiment_id, variation, is_baseline)) %>% 
         spread(is_baseline, variation)
-
-
 
     # now we need to rename `TRUE` and `FALSE` columns to baseline/variant
     # but, if this is "prior" experiment data, theren't won't be a `FALSE`, so we need to check
@@ -425,7 +412,7 @@ experiments__get_base_summary <- function(experiment_info, experiment_traffic, a
 
     stopifnot(nrow(cache_experiment_variations) == length(unique(experiment_info$experiment_id)))
     
-    experiments_summary <- experiments_summary %>%
+    experiments_summary <- filtered_experiment_traffic %>%
         group_by(experiment_id, metric_id, is_baseline) %>%
         summarise(last_join_date = max(first_joined_experiment),
                   trials = n()) %>%
@@ -468,9 +455,9 @@ experiments__get_base_summary <- function(experiment_info, experiment_traffic, a
     # Add successes and conversion rates
     ##########################################################################################################
     
-    # experiments__get_experiment_conversion_rates will exclude traffic based on first_joined_experiment &
-    # attribution windows like we did above
-    experiment_conversion_rates <- experiments__get_experiment_conversion_rates(experiment_traffic,
+    # experiments__get_conversion_rates will exclude traffic based on first_joined_experiment &
+    # attribution windows like we did above with
+    experiment_conversion_rates <- experiments__get_conversion_rates(experiment_traffic,
                                                                                 attribution_windows,
                                                                                 conversion_rates) %>%
         filter(converted_within_window) %>%
@@ -507,6 +494,15 @@ experiments__get_base_summary <- function(experiment_info, experiment_traffic, a
     return (experiments_summary)
 }
 
+#' Returns a credible interval approximations using the normal distribution, according to the methods in the
+#' link below.
+#' 
+#' code modified from https://github.com/dgrtwo/empirical-bayes-book/blob/master/bayesian-ab.Rmd
+#' 
+#' @param alpha_a the alpha value for the "A" group
+#' @param beta_a the beta value for the "A" group
+#' @param alpha_b the alpha value for the "B" group
+#' @param beta_b the beta value for the "B" group
 credible_interval_approx <- function(alpha_a, beta_a, alpha_b, beta_b) {
     # https://github.com/dgrtwo/empirical-bayes-book/blob/master/bayesian-ab.Rmd
     u1 <- alpha_a / (alpha_a + beta_a)
@@ -525,6 +521,21 @@ credible_interval_approx <- function(alpha_a, beta_a, alpha_b, beta_b) {
               conf.high = qnorm(.975, mu_diff, sd_diff)))
 }
 
+
+#' Gets the summary ror each experiment/metric.
+#' 
+#' Includes the start/end/last-event dates, the number of successes and trials (and conversion rate) of the
+#' baseline and variant groups, frequentist stats (e.g. p-value), bayesian stats, etc.
+#' 
+#' The difference between `end_date` and `last_join_date` comes from the fact that we exclude users who have
+#' joined the experiment in the last x days where x is the attribution window for that given
+#' experiment/metric. Otherwise (if we included those users) it would distort (likely over-state) the future
+#' conversion rate. 
+#' 
+#' @param experiment_info
+#' @param experiment_traffic
+#' @param attribution_windows
+#' @param conversion_rates
 experiments__get_summary <- function(experiment_info,
                                      experiment_traffic,
                                      website_traffic,
@@ -570,14 +581,16 @@ experiments__get_summary <- function(experiment_info,
     # NOTE: Well only want to use the paths that the experiments where in
     experiment_prior_dates <- experiments_summary %>%
         select(experiment_id, start_date, metric_id) %>%
-        inner_join(attribution_windows, by = c('experiment_id', 'metric_id')) %>%
+        inner_join(attribution_windows %>%
+                       mutate(metric_id = factor(metric_id,
+                                                 levels=levels(experiments_summary$metric_id))),
+                   by = c('experiment_id', 'metric_id')) %>%
         group_by(experiment_id) %>%
         # well take the min calculated start date so we allow enough time for the largest attribution window
         summarise(prior_start_date = min(start_date - days_of_prior_data - attribution_window - 1),
                   prior_end_date = prior_start_date + days_of_prior_data)
-    
-    experiment_prior_paths <- distinct(experiment_traffic %>% select(experiment_id, path))
 
+    experiment_prior_paths <- distinct(experiment_traffic %>% select(experiment_id, path))
     prior_data <- data.frame(user_id=NULL, first_joined_experiment=NULL, experiment_id=NULL, variation=NULL)
 
     for(experiment in unique(experiment_info$experiment_id)) {
@@ -668,4 +681,27 @@ experiments__get_summary <- function(experiment_info,
                bayesian_conf.high)
 
     return (experiments_summary)
+}
+
+#' Filters the experiment_traffic according to the attribution window per experiment/metric.
+#' As a result, this function adds a record for each metric
+#' 
+#' Originally used within the context of, for example, getting the total number of trials and/or the total
+#' number of successes. But, we want to exclude users who have joined the experiment in the last x days where
+#' x is the attribution window for that given experiment/metric. Otherwise (if we included those users) it 
+#' would distort (likely over-state) the future conversion rate. 
+#' 
+#' @param experiment_traffic
+#' @param attribution_windows
+private__filter_experiment_traffic_via_attribution <- function(experiment_info,
+                                                               experiment_traffic,
+                                                               attribution_windows){
+    
+    inner_join(experiment_traffic, attribution_windows, by='experiment_id') %>%
+        # we only want the people who have had enough time to convert, given the attribution window for a
+        # given metric (i.e. exclude people who join within the attribution window relative to today)
+        filter(first_joined_experiment < Sys.Date() - attribution_window) %>%
+        mutate(metric_id = fct_reorder(metric_id, attribution_window)) %>%
+        inner_join(experiment_info,
+                   by=c('experiment_id', 'variation'))
 }
