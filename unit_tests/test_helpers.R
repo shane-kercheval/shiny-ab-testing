@@ -399,15 +399,21 @@ test_that("test_helpers: experiments__get_summary", {
 
     write.csv(experiments_summary, 'data/helpers/experiments_summary.csv')
 
-    experiment <- unique(experiments_summary$experiment_id)[1]
-    metric <- 'Sign Up'
-    local_experiment <-  experiments_summary %>%
-        filter(experiment_id  == experiment & metric_id == metric)
-    plot_object <- plot_bayesian(prior_alpha=local_experiment$prior_alpha,
-                                 prior_beta=local_experiment$prior_beta,
-                                 baseline_alpha=local_experiment$baseline_alpha,
-                                 baseline_beta=local_experiment$baseline_beta,
-                                 variant_alpha=local_experiment$variant_alpha,
-                                 variant_beta=local_experiment$variant_beta)
+    ##########################################################################################################
+    # plots
+    ##########################################################################################################
+    plot_object <- plot_bayesian(experiments_summary,
+                                 experiment=unique(experiments_summary$experiment_id)[1],
+                                 metric='Sign Up')
+
     plot_object %>% test_save_plot(file='data/plot_helpers/plot_bayesian/experiment_1_signup.png')
+    
+    plot_object <- plot_bayesian(experiments_summary,
+                                 experiment=unique(experiments_summary$experiment_id)[1],
+                                 metric='Sign Up',
+                                 show_prior_distribution = FALSE)
+    
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot_bayesian/experiment_1_signup_no_prior.png')
 })
+
+    
