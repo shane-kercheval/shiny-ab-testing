@@ -55,6 +55,7 @@ test_that('prettify_numerics', {
 
 test_that("Misc Helpers: calculate_total_sample_size", {
 
+    # test pre-calculated examples
     result <- calculate_total_sample_size(original_conversion_rate=0.30,
                                           percent_increase=0.1,
                                           power=0.8,
@@ -151,25 +152,48 @@ test_that("Misc Helpers: create_cohort", {
 ##############################################################################################################
 # Historical Traffic & Conversion Rates
 ##############################################################################################################
+test_that("test_helpers: website_traffic__get_user_first_visit", {
+
+    website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
+
+    users_first_visit <- website_traffic__get_user_first_visit(website_traffic)
+
+    # this is another way of creating the data, although it is MUCH slower (almost too slow for a unit test)
+    # could speed it up if we don't want to test path
+    expected_first_visits <- website_traffic %>%
+        group_by(user_id) %>%
+        summarise(first_visit = min(visit_date),
+                  path = path[visit_date == first_visit])
+    
+    expect_true(all(users_first_visit %>% arrange(user_id) == expected_first_visits %>% arrange(user_id)))
+
+})
+
+
 test_that("test_helpers: website_traffic__to_xxx_num_users", {
 
     website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
 
     daily_first_time_num_users <- website_traffic__to_daily_num_users(website_traffic, only_first_time_visits=TRUE)
+    write.csv(daily_first_time_num_users, file='data/helpers/website_traffic__to_xxx_num_users/daily_first_time_num_users.csv', row.names = FALSE)
     daily_first_time_path_num_users <- website_traffic__to_daily_num_users(website_traffic, top_n_paths = 10, only_first_time_visits=TRUE)
-
+    write.csv(daily_first_time_path_num_users, file='data/helpers/website_traffic__to_xxx_num_users/daily_first_time_path_num_users.csv', row.names = FALSE)
+    
 
     daily_first_time_2paths_num_users <- website_traffic__to_daily_num_users(website_traffic, top_n_paths = 2, only_first_time_visits=TRUE)
-
+    write.csv(daily_first_time_2paths_num_users, file='data/helpers/website_traffic__to_xxx_num_users/daily_first_time_2paths_num_users.csv', row.names = FALSE)
+    
 
     cohort_first_time_num_users <- website_traffic__to_cohort_num_users(website_traffic, only_first_time_visits=TRUE)
+    write.csv(cohort_first_time_num_users, file='data/helpers/website_traffic__to_xxx_num_users/cohort_first_time_num_users.csv', row.names = FALSE)
     cohort_first_time_path_num_users <- website_traffic__to_cohort_num_users(website_traffic, top_n_paths = 10, only_first_time_visits=TRUE)
+    write.csv(cohort_first_time_path_num_users, file='data/helpers/website_traffic__to_xxx_num_users/cohort_first_time_path_num_users.csv', row.names = FALSE)
     
     # first, let's check that top_n_paths gives expected paths and levels (10 should include all paths, and 
     # add an 'Other' level)
-    
+
     # check all paths exist
-    expected_paths <- c( "example.com", "example.com/features", "example.com/pricing", "example.com/demo")
+    expected_paths <- c("example.com", "example.com/features", "example.com/pricing", "example.com/demo")
     expect_equal(as.character(sort(unique(daily_first_time_path_num_users$path))), expected_paths)
     # check expected levels
     expect_equal(levels(daily_first_time_path_num_users$path), c(expected_paths, 'Other'))
@@ -270,6 +294,20 @@ test_that("test_helpers: experiments__get_experiment_conversion_rates", {
 
 })
 
+test_that("test_helpers: experiments__get_base_summary", {
+    
+    experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
+    experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
+    attribution_windows <- as.data.frame(read_csv('data/cached_simulated_data/attribution_windows.csv'))
+    conversion_rates <- as.data.frame(read_csv('data/cached_simulated_data/conversion_rates.csv'))
+    
+    baseline_summary <- experiments__get_base_summary(experiment_info,
+                                     experiment_traffic,
+                                     attribution_windows,
+                                     conversion_rates)
+
+})
+
 test_that("test_helpers: experiments__get_summary", {
 
     experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
@@ -304,7 +342,7 @@ test_that("test_helpers: experiments__get_summary", {
     
     expect_false(any(is.na(experiments_summary)))
     # for the first experiment, these should equal the attribution window plus 1 day padding the end-date is Today
-    expect_true(all(experiments_summary$end_date - experiments_summary$last_event_date == c(3, 4, 6, 8, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0)))
+    expect_true(all(experiments_summary$end_date - experiments_summary$last_join_date == c(3, 4, 6, 8, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0)))
     expect_true(all(distinct(experiments_summary %>% select(experiment_id, metric_id)) %>% arrange(experiment_id) == attribution_windows %>% select(-attribution_window)))
 
     expect_true(all(experiments_summary$baseline_conversion_rate == experiments_summary$baseline_successes / experiments_summary$baseline_trials))

@@ -1,3 +1,4 @@
+source('private_helpers.R')
 ##############################################################################################################
 # CHECK DATASET ASSUMPTIONS
 ##############################################################################################################
@@ -362,19 +363,33 @@ get_p_values_info <- function(baseline_successes, baseline_trials, variant_succe
               conf.high = test_results$conf.int[2]))
 }
 
-experiments__get_baseline_summary <- function(experiment_info, experiment_traffic, attribution_windows, conversion_rates) {
-    ##########################################################################################################
-    # Add trials i.e. count of people in experiment
-    # TRIALS (i.e. count of peeople in experiment/varation) needs to exclude people who have entered into
-    # the experiment less than x day ago, where x is the attribution window per metric
-    # so the Experiment Summary will be per experiment/metric (the variation_data will be in the columns)
-    ##########################################################################################################
+#' Gets the "base" summary ror each experiment/metric.
+#' 
+#' Includes the start/end/last-event dates, the number of successes and trials (and conversion rate) of the
+#' baseline and variant groups, etc.
+#' 
+#' The difference between `end_date` and `last_join_date` comes from the fact that we exclude users who have
+#' joined the experiment in the last x days where x is the attribution window for that given
+#' experiment/metric. Otherwise (if we included those users) it would distort (likely over-state) the future
+#' conversion rate. 
+#' 
+#' @param experiment_info
+#' @param experiment_traffic
+#' @param attribution_windows
+#' @param conversion_rates
+experiments__get_base_summary <- function(experiment_info, experiment_traffic, attribution_windows, conversion_rates) {
 
     experiment_start_end_dates <- experiment_traffic %>%
         group_by(experiment_id) %>%
         summarise(start_date = min(first_joined_experiment),
                   end_date = max(first_joined_experiment))
     
+    ##########################################################################################################
+    # Add trials i.e. count of people in experiment
+    # TRIALS (i.e. count of peeople in experiment/varation) needs to exclude people who have entered into
+    # the experiment less than x day ago, where x is the attribution window per metric
+    # so the Experiment Summary will be per experiment/metric (the variation_data will be in the columns)
+    ##########################################################################################################
     # this will duplicate each row in experiment_traffic for each metric
     experiments_summary <- inner_join(experiment_traffic, attribution_windows, by='experiment_id') %>%
         # we only want the people who have had enough time to convert, given the attribution window for a
@@ -412,7 +427,7 @@ experiments__get_baseline_summary <- function(experiment_info, experiment_traffi
     
     experiments_summary <- experiments_summary %>%
         group_by(experiment_id, metric_id, is_baseline) %>%
-        summarise(last_event_date = max(first_joined_experiment),
+        summarise(last_join_date = max(first_joined_experiment),
                   trials = n()) %>%
         ungroup() %>%
         # on the offchance the start dates (or end dates) are different between the baseline/metric/variation 
@@ -420,7 +435,7 @@ experiments__get_baseline_summary <- function(experiment_info, experiment_traffi
         # went
         # into the variation on day x+1)
         group_by(experiment_id, metric_id) %>%
-        mutate(last_event_date = max(last_event_date)) %>%
+        mutate(last_join_date = max(last_join_date)) %>%
         ungroup() %>%
         # now format so there is 1 row per experiment
         spread(is_baseline, trials)
@@ -432,13 +447,13 @@ experiments__get_baseline_summary <- function(experiment_info, experiment_traffi
         experiments_summary <- experiments_summary %>%
             rename(baseline_trials=`TRUE`,
                    variant_trials=`FALSE`) %>%
-            select(experiment_id, last_event_date, metric_id, baseline_trials, variant_trials)
+            select(experiment_id, last_join_date, metric_id, baseline_trials, variant_trials)
 
     } else {
 
         experiments_summary <- experiments_summary %>%
             rename(baseline_trials=`TRUE`) %>%
-            select(experiment_id, last_event_date, metric_id, baseline_trials)
+            select(experiment_id, last_join_date, metric_id, baseline_trials)
     }
 
     experiments_summary <- inner_join(experiments_summary, experiment_start_end_dates, by='experiment_id') %>%
@@ -516,13 +531,13 @@ experiments__get_summary <- function(experiment_info,
                                      attribution_windows,
                                      conversion_rates,
                                      days_of_prior_data=15) {
-# distinction between end_date and last_event_date is that end_date is the date of the last event we have in
+# distinction between end_date and last_join_date is that end_date is the date of the last event we have in
 # the entire experiment_traffic dataset, but we exclude people who have joined the experiment recently
-# according to the attribution windows, so `last_event_date` is the date of the last event that was included
+# according to the attribution windows, so `last_join_date` is the date of the last event that was included
 # and counted towards the successes/trials
 # so the test could still be running but we only look
 
-    experiments_summary <- experiments__get_baseline_summary(experiment_info, experiment_traffic, attribution_windows, conversion_rates)
+    experiments_summary <- experiments__get_base_summary(experiment_info, experiment_traffic, attribution_windows, conversion_rates)
     
     ##########################################################################################################
     # Add P-Value Information
@@ -585,7 +600,7 @@ experiments__get_summary <- function(experiment_info,
                                        variation = variation_name))
     }
 
-    prior_summary <- experiments__get_baseline_summary(experiment_info=experiment_info,
+    prior_summary <- experiments__get_base_summary(experiment_info=experiment_info,
                                           experiment_traffic=prior_data,
                                           attribution_windows=attribution_windows,
                                           conversion_rates=conversion_rates)
@@ -622,7 +637,7 @@ experiments__get_summary <- function(experiment_info,
                experiment_id,
                start_date,
                end_date,
-               last_event_date,
+               last_join_date,
                metric_id,
                # conversion rates
                baseline_conversion_rate,
