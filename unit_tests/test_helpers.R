@@ -149,6 +149,54 @@ test_that("Misc Helpers: create_cohort", {
     expect_true(all(create_cohort(dates, cohort_format = '%m') == format(dates, '%Y-%m')))
 })
 
+test_that("credible_interval_approx", {
+
+    # this is an alternative way of calculating the probability that b > a, simulation of random draws
+    simulate_b_wins <- function(alpha_a, beta_a, alpha_b, beta_b, number_of_draws=1e6) {
+        
+        a_cr_simulation <- rbeta(number_of_draws, alpha_a, beta_a)
+        b_cr_simulation <- rbeta(number_of_draws, alpha_b, beta_b)
+        
+        return ( mean(b_cr_simulation > a_cr_simulation) )
+    }
+    
+    alpha_a <- 3872
+    beta_a <- 8880
+    alpha_b <- 2228
+    beta_b <- 5071
+    prob_b_better_cia <- as.numeric(credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)['posterior'])
+    prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
+    
+    expect_equal(round(prob_b_better_cia, 2) , round( prob_b_better_sim, 2))
+    
+    alpha_a <- 5111
+    beta_a <- 272055
+    alpha_b <- 5253
+    beta_b <- 272251
+    prob_b_better_cia <- as.numeric(credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)['posterior'])
+    prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
+    
+    expect_equal(round(prob_b_better_cia, 3) , round( prob_b_better_sim, 3))
+    
+    alpha_a <- 2724
+    beta_a <- 144083
+    alpha_b <- 2733
+    beta_b <- 144247
+    prob_b_better_cia <- as.numeric(credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)['posterior'])
+    prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
+    
+    expect_equal(round(prob_b_better_cia, 2) , round( prob_b_better_sim, 2))
+    
+    alpha_a <- 22973
+    beta_a <- 341979
+    alpha_b <- 22206
+    beta_b <- 342860
+    prob_b_better_cia <- as.numeric(credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)['posterior'])
+    prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
+    
+    expect_equal(round(prob_b_better_cia, 4) , round( prob_b_better_sim, 4))
+})
+
 ##############################################################################################################
 # Historical Traffic & Conversion Rates
 ##############################################################################################################
