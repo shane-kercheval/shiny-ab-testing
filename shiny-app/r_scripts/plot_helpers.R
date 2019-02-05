@@ -77,7 +77,7 @@ website_traffic__plot_traffic <- function(website_traffic,
              caption = caption)
 }
 
-
+# TODO: refactor so i pass in datasets, not raw values, that way I can add variation names to subtitle etc.
 plot_bayesian <- function(prior_alpha,
                           prior_beta,
                           baseline_alpha,
