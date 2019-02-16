@@ -561,5 +561,5 @@ test_that("test_helpers: create", {
         arrange(user_id, conversion_date)
 
     check_data__conversion_rates(conversion_data, attribution_windows)
-    write.csv(conversion_data, file='../shiny-app/simulated_data/conversion_rates.csv', row.names = FALSE)
+    write.csv(conversion_data, file='../shiny-app/simulated_data/conversion_events.csv', row.names = FALSE)
 })

@@ -214,7 +214,6 @@ test_that("test_helpers: website_traffic__get_user_first_visit", {
                   path = path[visit_date == first_visit])
 
     expect_true(all(users_first_visit %>% arrange(user_id) == expected_first_visits %>% arrange(user_id)))
-
 })
 
 test_that("test_helpers: website_traffic__to_xxx_num_users", {
@@ -294,13 +293,13 @@ test_that("test_helpers: experiments__get_conversion_rates", {
     experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
     attribution_windows <- as.data.frame(read_csv('data/cached_simulated_data/attribution_windows.csv'))
     website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
-    conversion_rates <- as.data.frame(read_csv('data/cached_simulated_data/conversion_rates.csv'))
+    conversion_events <- as.data.frame(read_csv('data/cached_simulated_data/conversion_events.csv'))
 
     check_data__experiment_info(experiment_info)
     check_data__experiment_traffic(experiment_traffic, experiment_info)
     check_data__attribution_windows(attribution_windows, experiment_info)
     check_data__website_traffic(website_traffic)
-    check_data__conversion_rates(conversion_rates, attribution_windows)
+    check_data__conversion_events(conversion_events, attribution_windows)
 
     # I want to manipulate the simulated dataset to
     # 1) make sure the dates are relative to today (experiments__get_conversion_rates filter out based on\
@@ -313,13 +312,13 @@ test_that("test_helpers: experiments__get_conversion_rates", {
     experiment_traffic <- experiment_traffic %>%
         mutate(first_joined_experiment = first_joined_experiment + days_offset)
 
-    conversion_rates <- conversion_rates %>%
+    conversion_events <- conversion_events %>%
         # the minus 1 will make it so some people will have already converted
         mutate(conversion_date = conversion_date + days_offset - 1)
 
     user_conversion_rates <- experiments__get_conversion_rates(experiment_traffic,
-                                                                    attribution_windows,
-                                                                    conversion_rates)
+                                                               attribution_windows,
+                                                               conversion_events)
 
     expect_equal(min(user_conversion_rates$days_from_experiment_to_conversion), -1)
 
@@ -393,27 +392,27 @@ test_that("test_helpers: experiments__get_summary", {
     experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
     attribution_windows <- as.data.frame(read_csv('data/cached_simulated_data/attribution_windows.csv'))
     website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
-    conversion_rates <- as.data.frame(read_csv('data/cached_simulated_data/conversion_rates.csv'))
+    conversion_events <- as.data.frame(read_csv('data/cached_simulated_data/conversion_events.csv'))
 
     ###############
     # shift all dates relative to today so we can test excluding people (who recently entered into the
     # experiment) based on the attribution window
     ###############
     max_date <- max(max(experiment_traffic$first_joined_experiment),
-                    max(conversion_rates$conversion_date),
+                    max(conversion_events$conversion_date),
                     max(website_traffic$visit_date))
 
     days_offset <- Sys.Date() - max_date
 
     experiment_traffic$first_joined_experiment <- experiment_traffic$first_joined_experiment + days_offset
     website_traffic$visit_date <- website_traffic$visit_date + days_offset
-    conversion_rates$conversion_date <- conversion_rates$conversion_date + days_offset
+    conversion_events$conversion_date <- conversion_events$conversion_date + days_offset
 
     experiments_summary <- experiments__get_summary(experiment_info,
                                      experiment_traffic,
                                      website_traffic,
                                      attribution_windows,
-                                     conversion_rates,
+                                     conversion_events,
                                      days_of_prior_data=15)
 
     expect_equal(nrow(distinct(experiments_summary %>% select(experiment_id, start_date, end_date))),

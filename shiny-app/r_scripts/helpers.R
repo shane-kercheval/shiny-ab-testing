@@ -83,17 +83,17 @@ check_data__attribution_windows <- function(attribution_windows, experiment_info
 
 #' Checks basic assumptions and data structure of conversion rate dataset
 #'
-#' @param user_conversion_rates dataframe containing conversion rate data in the expected format
-check_data__conversion_rates <- function(user_conversion_rates, attribution_windows) {
+#' @param user_conversion_events dataframe containing conversion rate data in the expected format
+check_data__conversion_events <- function(user_conversion_events, attribution_windows) {
     
-    stopifnot(!any(is.na(user_conversion_rates)))
+    stopifnot(!any(is.na(user_conversion_events)))
 
-    stopifnot(all(colnames(user_conversion_rates) == c('user_id', 'metric_id', 'conversion_date')))
+    stopifnot(all(colnames(user_conversion_events) == c('user_id', 'metric_id', 'conversion_date')))
 
-    stopifnot(all(sort(unique(user_conversion_rates$metric_id)) == 
+    stopifnot(all(sort(unique(user_conversion_events$metric_id)) == 
                       sort(unique(attribution_windows$metric_id))))
 
-    conversion_summary <- user_conversion_rates %>%
+    conversion_summary <- user_conversion_events %>%
         group_by(metric_id) %>%
         summarise(duplicate_user_ids = any(duplicated(user_id)))
     stopifnot(all(conversion_summary$duplicate_user_ids == FALSE))
@@ -322,14 +322,14 @@ prettify_numerics <- function(values) {
 #' 
 #' @param experiment_traffic
 #' @param attribution_windows
-#' @param user_conversion_rates
-experiments__get_conversion_rates <- function(experiment_traffic, attribution_windows, user_conversion_rates) {
+#' @param user_conversion_events
+experiments__get_conversion_rates <- function(experiment_traffic, attribution_windows, user_conversion_events) {
 
     # dataset only contains users that converted
     # dataset is per user, per experment, per converted metric
-    user_conversion_rates <-  experiment_traffic %>% 
+    user_conversion_events <-  experiment_traffic %>% 
         # duplicates user-records when user has converted with multiple metrics
-        inner_join(user_conversion_rates, by='user_id') %>%
+        inner_join(user_conversion_events, by='user_id') %>%
         # now we need to get the attribution time windows to figure out if they converted within the
         # time-frame
         inner_join(attribution_windows, by=c('experiment_id', 'metric_id')) %>%
@@ -351,7 +351,7 @@ experiments__get_conversion_rates <- function(experiment_traffic, attribution_wi
         select(user_id, experiment_id, variation, first_joined_experiment, metric_id, conversion_date,
                attribution_window, days_from_experiment_to_conversion, converted_within_window)
     
-        return (user_conversion_rates)
+        return (user_conversion_events)
 }
 
 #' get p-values and corresponding confidence intervals
@@ -383,11 +383,11 @@ get_p_values_info <- function(baseline_successes, baseline_trials, variant_succe
 #' @param experiment_info
 #' @param experiment_traffic
 #' @param attribution_windows
-#' @param conversion_rates
+#' @param conversion_events
 experiments__get_base_summary <- function(experiment_info,
                                           experiment_traffic,
                                           attribution_windows,
-                                          conversion_rates) {
+                                          conversion_events) {
 
     experiment_start_end_dates <- experiment_traffic %>%
         group_by(experiment_id) %>%
@@ -472,8 +472,8 @@ experiments__get_base_summary <- function(experiment_info,
     # experiments__get_conversion_rates will exclude traffic based on first_joined_experiment &
     # attribution windows like we did above with
     experiment_conversion_rates <- experiments__get_conversion_rates(experiment_traffic,
-                                                                                attribution_windows,
-                                                                                conversion_rates) %>%
+                                                                     attribution_windows,
+                                                                     convrsion_events) %>%
         filter(converted_within_window) %>%
         count(experiment_id, variation, metric_id) %>%
         rename(successes=n) %>%
@@ -551,18 +551,18 @@ credible_interval_approx <- function(alpha_a, beta_a, alpha_b, beta_b) {
 #' @param experiment_info
 #' @param experiment_traffic
 #' @param attribution_windows
-#' @param conversion_rates
+#' @param conversion_events
 experiments__get_summary <- function(experiment_info,
                                      experiment_traffic,
                                      website_traffic,
                                      attribution_windows,
-                                     conversion_rates,
+                                     conversion_events,
                                      days_of_prior_data=15) {
 
     experiments_summary <- experiments__get_base_summary(experiment_info,
                                                          experiment_traffic,
                                                          attribution_windows,
-                                                         conversion_rates)
+                                                         conversion_events)
     
     ##########################################################################################################
     # Add P-Value Information
@@ -628,9 +628,9 @@ experiments__get_summary <- function(experiment_info,
     }
 
     prior_summary <- experiments__get_base_summary(experiment_info=experiment_info,
-                                          experiment_traffic=prior_data,
-                                          attribution_windows=attribution_windows,
-                                          conversion_rates=conversion_rates)
+                                                   experiment_traffic=prior_data,
+                                                   attribution_windows=attribution_windows,
+                                                   conversion_events=conversion_events)
 
     prior_summary <- prior_summary %>%
         mutate(prior_alpha=baseline_successes,
