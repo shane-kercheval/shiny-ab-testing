@@ -311,12 +311,20 @@ test_that("test_helpers: create", {
                                 experiment_traffic_3,
                                 experiment_traffic_4)
     
+    seconds_in_day <- 86400
+    # need to simulate time-stamps and convert first_joined_experiment from date to date/time
+    set.seed(42)
+    simulated_seconds <-round(runif(nrow(experiment_traffic), min = 0, max=seconds_in_day - 1))
+    experiment_traffic$first_joined_experiment <- as.POSIXct(experiment_traffic$first_joined_experiment + seconds(simulated_seconds))
+
+    temp <- experiment_traffic
     plot_object <- experiment_traffic %>%
+        mutate(first_joined_experiment = first_joined_experiment) %>%
         count(first_joined_experiment, experiment_id) %>%
         mutate(experiment_id = factor(experiment_id, levels=experiment_names)) %>%
         ggplot(aes(x=first_joined_experiment, y=experiment_id, color=experiment_id)) +
             geom_line(size=5) +
-            scale_x_date(date_labels="%y-%m-%d",date_breaks  ="10 days") +
+            scale_x_datetime(date_labels="%y-%m-%d",date_breaks  ="10 days") +
             theme(axis.text.x = element_text(angle = 30, hjust = 1, size=6),
                   legend.position="none")
     plot_object %>% test_save_plot(file='data/simulate_data/experiment_start_stop.png')
@@ -415,17 +423,25 @@ test_that("test_helpers: create", {
         ungroup()
     # View(distinct(user_metric_crs %>% select(-user_id)))
     expect_true(length(unique(user_metric_crs$user_id)) == length(unique(website_traffic$user_id)))
+    
     # now we will determine if each person convertes based on their simulated conversion rate using the binomial distribution
-    #rbinom(1000, 1, 0.08)
-    simulate_conversion <- function(user_id, conversion_rate) {
-        ##set.seed(user_id+10)
+    # if we set the seed based on user-id, i see some odd behavior, so let's try assigned someone a random number that we will use as a seed
+    set.seed(1)
+    random_seeds <- sample(1:(max(user_metric_crs$user_id) * 2), max(user_metric_crs$user_id), replace=F)
+    simulate_conversion <- function(seed, conversion_rate) {
+        set.seed(seed)
+        #rbinom(1000, 1, 0.08)
         return (rbinom(1, 1, conversion_rate))
     }
     
+    user_metric_crs <- user_metric_crs %>%
+        mutate(seed = random_seeds[user_id])
+    stopifnot(!any(is.na(user_metric_crs$seed)))
+    
     # now we simulating them converting or not by using their assigned conversion rates as a probability in a binom distribution
-    user_metric_crs$converted <- as.logical(map2_dbl(user_metric_crs$user_id,
-                        user_metric_crs$conversion_rate, 
-                        ~ simulate_conversion(.x, .y)))
+    user_metric_crs$converted <- as.logical(map2_dbl(user_metric_crs$seed,
+                                                     user_metric_crs$conversion_rate, 
+                                                     ~ simulate_conversion(.x, .y)))
     
     plot_object <- user_metric_crs %>%
         count(metric_id, converted) %>%
@@ -451,7 +467,7 @@ test_that("test_helpers: create", {
     
     temp <- inner_join(
         inner_join(experiment_traffic, conversion_data, by='user_id') %>%
-            mutate(converted=!is.na(first_joined_experiment)) %>%
+            #mutate(converted=!is.na(first_joined_experiment)) %>%
             count(experiment_id, variation, metric_id),
         experiment_traffic %>% count(experiment_id, variation),
         by=c('experiment_id', 'variation')) %>% 
@@ -489,7 +505,7 @@ test_that("test_helpers: create", {
                   vjust=-0.75) +
         theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
         labs(title="% Change in CR from the Baseline (A) variation to the Variant (B)")
-    plot_object %>% test_save_plot(file='data/simulate_data/conversion_rates_of_experiments_per_variation.png')
+    plot_object %>% test_save_plot(file='data/simulate_data/percent_change_in_cr_of_experiments_per_variation.png')
 
 ##############################################################################################################
 # For those who convert to a metric, generate the offset (number of days) from first-visit to conversion-date
@@ -504,26 +520,35 @@ test_that("test_helpers: create", {
     }
 
     names(attribution_windows_days) <- metrics_names
-    conversion_offsets <- map2_dbl(conversion_data$user_id, 
+    conversion_offsets_days <- map2_dbl(conversion_data$user_id, 
                                    conversion_data$metric_id,
                                    #~ rbinom(1, 30, attribution_windows_days[.y]/30))
                                    ~ generate_offset(.x, .y))
+    
+    # need to simulate time-stamps
+    set.seed(43)
+    conversion_offsets_seconds <- round(runif(length(conversion_offsets_days), min = 0, max=seconds_in_day - 1))
+    
+    conversion_data$offset_days <- conversion_offsets_days
+    conversion_data$conversion_date <- as.POSIXct(conversion_data$first_visit + days(conversion_offsets_days) + seconds(conversion_offsets_seconds))
+    
+    #conversion_data$conversion_date <= ymd_hms(paste(max(website_traffic$visit_date), '23:59:59'))
+    
     conversion_data <- conversion_data %>%
-        mutate(offset=conversion_offsets,
-               conversion_date = first_visit + offset) %>%
-        filter(conversion_date <= max(website_traffic$visit_date))  # we don't want to go past the last date of our simulated datasets
+        filter(conversion_date <= ymd_hms(paste(max(website_traffic$visit_date), '23:59:59')))  # we don't want to go past the last date of our simulated datasets
     
     plot_object <- conversion_data %>%
-        count(metric_id, offset) %>%
-        mutate(offset=factor(offset)) %>%
+        count(metric_id, offset_days) %>%
+        mutate(offset_days=factor(offset_days)) %>%
         mutate(metric_id=fct_reorder(metric_id, n, .desc = TRUE)) %>%
-        ggplot(aes(x=offset, y=n)) +
+        ggplot(aes(x=offset_days, y=n)) +
             geom_col() +
         facet_wrap( ~ metric_id, scales = 'free_y') +
         labs(title='Distribution of Days from First Visit to Event Conversion, for those that convert')
     plot_object %>% test_save_plot(file='data/simulate_data/distro_days_from_first_visit_to_conversion_per_metric.png')
 
     plot_object <- conversion_data %>%
+        mutate(conversion_date = as.Date(conversion_date)) %>%
         count(conversion_date, metric_id) %>%
         ggplot(aes(x=conversion_date, y=n)) +
             geom_line() +
