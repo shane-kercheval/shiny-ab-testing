@@ -185,12 +185,15 @@ plot_bayesian <- function(experiments_summary,
                            labels = percent_format()) +
         theme_light() +
         theme(axis.text.x = element_text(angle = 30, hjust = 1),
-              legend.text=element_text(size=rel(0.5))) +
+              legend.text=element_text(size=rel(0.5)),
+              plot.subtitle=element_text(size=rel(0.7))) +
         coord_cartesian(xlim=c(x_min, x_max)) +
         scale_fill_manual(values=custom_colors) +
         scale_color_manual(values=custom_colors) +
         labs(title='Posterior Probability Distributions of Control & Variant',
-             subtitle=paste0(paste0('The probability the variant is better is ', percent(prob_variant_is_better), "."),
+             subtitle=paste0(paste0('The probability the Variant is better is ', percent(prob_variant_is_better), ".\n"),
+                             paste0('\nExperiment: "', experiment, '"'),
+                             paste0('\nMetric: "', metric, '"'),
                              paste0('\nControl Name: "', control_name, '"'),
                              paste0('\nVariant Name: "', variant_name, '"')),
              x="Conversion Rates",
