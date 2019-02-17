@@ -60,10 +60,10 @@ check_data__experiment_info <- function(experiment_info) {
     info_summary <- experiment_info %>%
         group_by(experiment_id) %>%
         summarise(num_variations=n(),
-                  baseline_count=sum(is_control),
+                  control_count=sum(is_control),
                   variation_count=sum(!is_control))
     stopifnot(all(info_summary$num_variations == 2))
-    stopifnot(all(info_summary$baseline_count == 1))
+    stopifnot(all(info_summary$control_count == 1))
     stopifnot(all(info_summary$variation_count == 1))
 }
 
@@ -356,14 +356,14 @@ experiments__determine_conversions <- function(experiment_traffic, attribution_w
 
 #' get p-values and corresponding confidence intervals
 #' 
-#' @param baseline_successes
-#' @param baseline_trials
+#' @param control_successes
+#' @param control_trials
 #' @param variant_successes
 #' @param variant_trials
-get_p_values_info <- function(baseline_successes, baseline_trials, variant_successes, variant_trials) {
+get_p_values_info <- function(control_successes, control_trials, variant_successes, variant_trials) {
 
-    test_results <- prop.test(x=c(variant_successes, baseline_successes),
-                              n=c(variant_trials, baseline_trials))
+    test_results <- prop.test(x=c(variant_successes, control_successes),
+                              n=c(variant_trials, control_trials))
     return (c(p_value = test_results$p.value,
               cr_diff_estimate = as.numeric(test_results$estimate[1] - test_results$estimate[2]),
               conf.low = test_results$conf.int[1],
@@ -413,13 +413,13 @@ experiments__get_base_summary <- function(experiment_info,
     if("FALSE" %in% colnames(cache_experiment_variations)) {
 
         cache_experiment_variations <- cache_experiment_variations %>%
-            rename(baseline_name=`TRUE`,
+            rename(control_name=`TRUE`,
                    variant_name=`FALSE`)
 
     } else {
 
         cache_experiment_variations <- cache_experiment_variations %>%
-            rename(baseline_name=`TRUE`)
+            rename(control_name=`TRUE`)
     }
 
     stopifnot(nrow(cache_experiment_variations) == length(unique(experiment_info$experiment_id)))
@@ -444,15 +444,15 @@ experiments__get_base_summary <- function(experiment_info,
     if("FALSE" %in% colnames(experiments_summary)) {
 
         experiments_summary <- experiments_summary %>%
-            rename(baseline_trials=`TRUE`,
+            rename(control_trials=`TRUE`,
                    variant_trials=`FALSE`) %>%
-            select(experiment_id, last_join_date, metric_id, baseline_trials, variant_trials)
+            select(experiment_id, last_join_date, metric_id, control_trials, variant_trials)
 
     } else {
 
         experiments_summary <- experiments_summary %>%
-            rename(baseline_trials=`TRUE`) %>%
-            select(experiment_id, last_join_date, metric_id, baseline_trials)
+            rename(control_trials=`TRUE`) %>%
+            select(experiment_id, last_join_date, metric_id, control_trials)
     }
 
     experiments_summary <- inner_join(experiments_summary,
@@ -488,20 +488,20 @@ experiments__get_base_summary <- function(experiment_info,
         experiments_summary <- inner_join(experiments_summary,
                                          experiment_conversion_events,
                                          by=c('experiment_id', 'metric_id')) %>%
-            rename(baseline_successes=`TRUE`,
+            rename(control_successes=`TRUE`,
                    variant_successes=`FALSE`) %>% 
-            mutate(baseline_conversion_rate=baseline_successes / baseline_trials,
+            mutate(control_conversion_rate=control_successes / control_trials,
                    variant_conversion_rate=variant_successes / variant_trials,
-                   percent_change_from_baseline = (variant_conversion_rate - baseline_conversion_rate) / 
-                       baseline_conversion_rate)
+                   percent_change_from_baseline = (variant_conversion_rate - control_conversion_rate) / 
+                       control_conversion_rate)
 
     } else {
         
         experiments_summary <- inner_join(experiments_summary,
                                          experiment_conversion_events,
                                          by=c('experiment_id', 'metric_id')) %>%
-            rename(baseline_successes=`TRUE`) %>%
-            mutate(baseline_conversion_rate=baseline_successes / baseline_trials)
+            rename(control_successes=`TRUE`) %>%
+            mutate(control_conversion_rate=control_successes / control_trials)
     }
     
     experiments_summary <- inner_join(experiments_summary, cache_experiment_variations, by = 'experiment_id')
@@ -568,8 +568,8 @@ experiments__get_summary <- function(experiment_info,
     # Add P-Value Information
     ##########################################################################################################
     
-    p_values <- pmap(list(experiments_summary$baseline_successes,
-                          experiments_summary$baseline_trials,
+    p_values <- pmap(list(experiments_summary$control_successes,
+                          experiments_summary$control_trials,
                           experiments_summary$variant_successes,
                           experiments_summary$variant_trials),
                      function(bs, bt, vs, vt) get_p_values_info(bs, bt, vs, vt))
@@ -581,8 +581,8 @@ experiments__get_summary <- function(experiment_info,
     experiments_summary$p_value_conf_low <- map_dbl(p_values, ~ .['conf.low'])
     experiments_summary$p_value_conf_high <- map_dbl(p_values, ~ .['conf.high'])
 
-    # experiments_summary$p_value_conf_low / experiments_summary$baseline_conversion_rate
-    # experiments_summary$p_value_conf_high / experiments_summary$baseline_conversion_rate
+    # experiments_summary$p_value_conf_low / experiments_summary$control_conversion_rate
+    # experiments_summary$p_value_conf_high / experiments_summary$control_conversion_rate
 
     ##########################################################################################################
     # Add Bayesian Information
@@ -633,8 +633,8 @@ experiments__get_summary <- function(experiment_info,
                                                    conversion_events=conversion_events)
 
     prior_summary <- prior_summary %>%
-        mutate(prior_alpha=baseline_successes,
-               prior_beta=baseline_trials - baseline_successes) %>%
+        mutate(prior_alpha=control_successes,
+               prior_beta=control_trials - control_successes) %>%
         select(experiment_id, metric_id, prior_alpha, prior_beta)
 
     experiments_summary <- inner_join(experiments_summary,
@@ -642,13 +642,13 @@ experiments__get_summary <- function(experiment_info,
                                      by = c("experiment_id", "metric_id"))
 
     experiments_summary <- experiments_summary %>%
-        mutate(baseline_alpha = prior_alpha + baseline_successes,
-               baseline_beta = prior_beta + (baseline_trials - baseline_successes),
+        mutate(control_alpha = prior_alpha + control_successes,
+               control_beta = prior_beta + (control_trials - control_successes),
                variant_alpha = prior_alpha + variant_successes,
                variant_beta = prior_beta + (variant_trials - variant_successes))
 
     cia_list <- pmap(with(experiments_summary,
-                          list(baseline_alpha, baseline_beta, variant_alpha, variant_beta)),
+                          list(control_alpha, control_beta, variant_alpha, variant_beta)),
                      function(alpha_a, beta_a, alpha_b, beta_b){  
                          credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)
                      })
@@ -668,13 +668,13 @@ experiments__get_summary <- function(experiment_info,
                last_join_date,
                metric_id,
                # conversion rates
-               baseline_conversion_rate,
+               control_conversion_rate,
                variant_conversion_rate,
                percent_change_from_baseline,
                # baseline & variation raw numbers
-               baseline_name,
-               baseline_successes,
-               baseline_trials,
+               control_name,
+               control_successes,
+               control_trials,
                variant_name,
                variant_successes,
                variant_trials,
@@ -686,8 +686,8 @@ experiments__get_summary <- function(experiment_info,
                # bayesian
                prior_alpha,
                prior_beta,
-               baseline_alpha,
-               baseline_beta,
+               control_alpha,
+               control_beta,
                variant_alpha,
                variant_beta,
                prob_variant_is_better,

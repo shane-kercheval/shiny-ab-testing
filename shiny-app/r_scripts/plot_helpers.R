@@ -87,16 +87,16 @@ plot_bayesian <- function(experiments_summary,
     
     prior_alpha <- local_experiment$prior_alpha
     prior_beta <- local_experiment$prior_beta
-    baseline_alpha <- local_experiment$baseline_alpha
-    baseline_beta <- local_experiment$baseline_beta
+    control_alpha <- local_experiment$control_alpha
+    control_beta <- local_experiment$control_beta
     variant_alpha <- local_experiment$variant_alpha
     variant_beta <- local_experiment$variant_beta
     prob_variant_is_better <- local_experiment$prob_variant_is_better
-    baseline_name <- local_experiment$baseline_name
+    control_name <- local_experiment$control_name
     variant_name <- local_experiment$variant_name
 
-    alpha_vector <- c(baseline_alpha, variant_alpha, prior_alpha)
-    beta_vector <-  c(baseline_beta, variant_beta, prior_beta)
+    alpha_vector <- c(control_alpha, variant_alpha, prior_alpha)
+    beta_vector <-  c(control_beta, variant_beta, prior_beta)
 
     if(show_prior_distribution) {
 
@@ -152,20 +152,20 @@ plot_bayesian <- function(experiments_summary,
         custom_colors <- custom_colors[1:2]
     }
 
-    baseline_cred_low <- qbeta(0.025, baseline_alpha, baseline_beta)
-    baseline_cred_high <- qbeta(0.975, baseline_alpha, baseline_beta)
+    control_cred_low <- qbeta(0.025, control_alpha, control_beta)
+    control_cred_high <- qbeta(0.975, control_alpha, control_beta)
 
     variant_cred_low <- qbeta(0.025, variant_alpha, variant_beta)
     variant_cred_high <- qbeta(0.975, variant_alpha, variant_beta)
 
 
-    cia <- credible_interval_approx(alpha_a=baseline_alpha,
-                                    beta_a=baseline_beta,
+    cia <- credible_interval_approx(alpha_a=control_alpha,
+                                    beta_a=control_beta,
                                     alpha_b=variant_alpha,
                                     beta_b=variant_beta)
     percent_of_time_b_wins <- cia['posterior']
 
-    # a_cr_simulation <- rbeta(1e6, baseline_alpha, baseline_beta)
+    # a_cr_simulation <- rbeta(1e6, control_alpha, control_beta)
     # b_cr_simulation <- rbeta(1e6, variant_alpha, variant_beta)
     # percent_of_time_b_wins <- mean(b_cr_simulation > a_cr_simulation)
 
@@ -179,7 +179,7 @@ plot_bayesian <- function(experiments_summary,
     plot_object <- ggplot(data=distros, aes(x, y, color = Parameters)) +
         geom_line() +
         geom_area(aes(fill=Parameters, group=Parameters), alpha=0.3, position = 'identity') +
-        geom_errorbarh(aes(xmin = baseline_cred_low, xmax = baseline_cred_high, y = max_distros_20th * -1), height = max_distros_20th * 0.75, color = custom_colors[1], alpha=0.3) + 
+        geom_errorbarh(aes(xmin = control_cred_low, xmax = control_cred_high, y = max_distros_20th * -1), height = max_distros_20th * 0.75, color = custom_colors[1], alpha=0.3) + 
         geom_errorbarh(aes(xmin = variant_cred_low, xmax = variant_cred_high, y = max_distros_20th * -2), height = max_distros_20th * 0.75, color = custom_colors[2], alpha=0.3) + 
         scale_x_continuous(breaks = seq(0, 1, x_axis_break_steps),
                            labels = percent_format()) +
@@ -190,7 +190,7 @@ plot_bayesian <- function(experiments_summary,
         scale_color_manual(values=custom_colors) +
         labs(title='Posterior/Updated Probability Distributions of Baseline & Variant',
              subtitle=paste0(paste0('The probability the variant is better is ', percent(prob_variant_is_better), "."),
-                             paste0('\nBaseline name: "', baseline_name, '"'),
+                             paste0('\nBaseline name: "', control_name, '"'),
                              paste0('\nVariant Name: "', variant_name, '"')),
              x="Conversion Rates",
              y="Density of beta")
