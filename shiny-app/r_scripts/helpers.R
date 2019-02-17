@@ -323,7 +323,7 @@ prettify_numerics <- function(values) {
 #' @param experiment_traffic
 #' @param attribution_windows
 #' @param user_conversion_events
-experiments__get_conversion_rates <- function(experiment_traffic, attribution_windows, user_conversion_events) {
+experiments__determine_conversions <- function(experiment_traffic, attribution_windows, user_conversion_events) {
 
     # dataset only contains users that converted
     # dataset is per user, per experment, per converted metric
@@ -348,9 +348,9 @@ experiments__get_conversion_rates <- function(experiment_traffic, attribution_wi
                converted_within_window = days_from_experiment_to_conversion >= 0 & 
                    days_from_experiment_to_conversion <= attribution_window,
                metric_id = fct_reorder(metric_id, attribution_window)) %>%
-        select(user_id, experiment_id, variation, first_joined_experiment, metric_id, conversion_date,
-               attribution_window, days_from_experiment_to_conversion, converted_within_window)
-    
+        select(user_id, experiment_id, variation, metric_id, first_joined_experiment, conversion_date,
+               days_from_experiment_to_conversion, attribution_window, converted_within_window)
+
         return (user_conversion_events)
 }
 
@@ -469,11 +469,11 @@ experiments__get_base_summary <- function(experiment_info,
     # Add successes and conversion rates
     ##########################################################################################################
     
-    # experiments__get_conversion_rates will exclude traffic based on first_joined_experiment &
+    # experiments__determine_conversions will exclude traffic based on first_joined_experiment &
     # attribution windows like we did above with
-    experiment_conversion_rates <- experiments__get_conversion_rates(experiment_traffic,
-                                                                     attribution_windows,
-                                                                     convrsion_events) %>%
+    experiment_conversion_events <- experiments__determine_conversions(experiment_traffic,
+                                                                       attribution_windows,
+                                                                       conversion_events) %>%
         filter(converted_within_window) %>%
         count(experiment_id, variation, metric_id) %>%
         rename(successes=n) %>%
@@ -483,10 +483,10 @@ experiments__get_base_summary <- function(experiment_info,
     
     # now we need to rename `TRUE` and `FALSE` columns to baseline/variant
     # but, if this is "prior" experiment data, theren't won't be a `FALSE`, so we need to check
-    if("FALSE" %in% colnames(experiment_conversion_rates)) {
+    if("FALSE" %in% colnames(experiment_conversion_events)) {
         
         experiments_summary <- inner_join(experiments_summary,
-                                         experiment_conversion_rates,
+                                         experiment_conversion_events,
                                          by=c('experiment_id', 'metric_id')) %>%
             rename(baseline_successes=`TRUE`,
                    variant_successes=`FALSE`) %>% 
@@ -498,7 +498,7 @@ experiments__get_base_summary <- function(experiment_info,
     } else {
         
         experiments_summary <- inner_join(experiments_summary,
-                                         experiment_conversion_rates,
+                                         experiment_conversion_events,
                                          by=c('experiment_id', 'metric_id')) %>%
             rename(baseline_successes=`TRUE`) %>%
             mutate(baseline_conversion_rate=baseline_successes / baseline_trials)
@@ -601,8 +601,8 @@ experiments__get_summary <- function(experiment_info,
                    by = c('experiment_id', 'metric_id')) %>%
         group_by(experiment_id) %>%
         # well take the min calculated start date so we allow enough time for the largest attribution window
-        summarise(prior_start_date = min(start_date - days_of_prior_data - attribution_window - 1),
-                  prior_end_date = prior_start_date + days_of_prior_data)
+        summarise(prior_start_date = min(start_date - days(days_of_prior_data + attribution_window + 1)),
+                  prior_end_date = prior_start_date + days(days_of_prior_data))
 
     experiment_prior_paths <- distinct(experiment_traffic %>% select(experiment_id, path))
     prior_data <- data.frame(user_id=NULL, first_joined_experiment=NULL, experiment_id=NULL, variation=NULL)
