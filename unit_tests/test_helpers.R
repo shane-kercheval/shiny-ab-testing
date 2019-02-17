@@ -455,46 +455,46 @@ test_that("test_helpers: experiments__get_summary", {
     ##########################################################################################################
     # plots
     ##########################################################################################################
-    plot_object <- plot_bayesian(experiments_summary,
+    plot_object <- experiments_summary__plot_bayesian(experiments_summary,
                                  experiment=unique(experiments_summary$experiment_id)[1],
                                  metric='Sign Up')
 
-    plot_object %>% test_save_plot(file='data/plot_helpers/plot_bayesian/experiment_1_signup.png')
+    plot_object %>% test_save_plot(file='data/plot_helpers/experiments_summary__plot_bayesian/experiment_1_signup.png')
     
-    plot_object <- plot_bayesian(experiments_summary,
+    plot_object <- experiments_summary__plot_bayesian(experiments_summary,
                                  experiment=unique(experiments_summary$experiment_id)[1],
                                  metric='Sign Up',
                                  show_prior_distribution = FALSE)
     
-    plot_object %>% test_save_plot(file='data/plot_helpers/plot_bayesian/experiment_1_signup_no_prior.png')
+    plot_object %>% test_save_plot(file='data/plot_helpers/experiments_summary__plot_bayesian/experiment_1_signup_no_prior.png')
 
-    plot_object <- plot_bayesian(experiments_summary,
+    plot_object <- experiments_summary__plot_bayesian(experiments_summary,
                                  experiment="New Signup CTA Color",
                                  metric='Pay/Subscribe',
                                  show_prior_distribution = TRUE)
     
-    plot_object %>% test_save_plot(file='data/plot_helpers/plot_bayesian/signup_color_pay.png')
+    plot_object %>% test_save_plot(file='data/plot_helpers/experiments_summary__plot_bayesian/signup_color_pay.png')
     
-    plot_object <- plot_bayesian(experiments_summary,
+    plot_object <- experiments_summary__plot_bayesian(experiments_summary,
                                  experiment="New Signup CTA Color",
                                  metric='Pay/Subscribe',
                                  show_prior_distribution = FALSE)
     
-    plot_object %>% test_save_plot(file='data/plot_helpers/plot_bayesian/signup_color_pay_no_prior.png')
+    plot_object %>% test_save_plot(file='data/plot_helpers/experiments_summary__plot_bayesian/signup_color_pay_no_prior.png')
     
-    plot_object <- plot_bayesian(experiments_summary,
+    plot_object <- experiments_summary__plot_bayesian(experiments_summary,
                                  experiment="Redesign Website",
                                  metric='Pay/Subscribe',
                                  show_prior_distribution = TRUE)
     
-    plot_object %>% test_save_plot(file='data/plot_helpers/plot_bayesian/redesign_website_pay.png')
+    plot_object %>% test_save_plot(file='data/plot_helpers/experiments_summary__plot_bayesian/redesign_website_pay.png')
     
-    plot_object <- plot_bayesian(experiments_summary,
+    plot_object <- experiments_summary__plot_bayesian(experiments_summary,
                                  experiment="Redesign Website",
                                  metric='Pay/Subscribe',
                                  show_prior_distribution = FALSE)
     
-    plot_object %>% test_save_plot(file='data/plot_helpers/plot_bayesian/redesign_website_pay_no_prior.png')
+    plot_object %>% test_save_plot(file='data/plot_helpers/experiments_summary__plot_bayesian/redesign_website_pay_no_prior.png')
 })
 
 test_that("test_helpers: experiments__get_summary", {

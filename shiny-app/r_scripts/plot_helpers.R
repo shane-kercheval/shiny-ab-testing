@@ -77,10 +77,10 @@ website_traffic__plot_traffic <- function(website_traffic,
              caption = caption)
 }
 
-plot_bayesian <- function(experiments_summary,
-                          experiment,
-                          metric,
-                          show_prior_distribution=TRUE) {
+experiments_summary__plot_bayesian <- function(experiments_summary,
+                                               experiment,
+                                               metric,
+                                               show_prior_distribution=TRUE) {
     
     local_experiment <-  experiments_summary %>%
         filter(experiment_id  == experiment & metric_id == metric)
