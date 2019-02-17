@@ -113,7 +113,7 @@ plot_bayesian <- function(experiments_summary,
 
     # depending on the where we want to graph and how spread out the values are, we will want to get more/less granualar with our plot
 
-    distro_names <- c("Control", "Variant", "Prior")
+    distro_names <- c("Control", "Variant", "Prior")  # don't change order, controlled from above
     distros <- data_frame(alpha = alpha_vector,
                           beta = beta_vector,
                           group = distro_names) %>%
@@ -174,7 +174,7 @@ plot_bayesian <- function(experiments_summary,
     # re-level (re-order) the levels of Params so the order is Control->Variant->Prior
     param_levels <- levels(distros$Parameters)
     distros <- distros %>%
-        mutate(Parameters = fct_relevel(distros$Parameters, param_levels[2], after = 3))
+        mutate(Parameters = factor(distros$Parameters, levels = c(param_levels[3], param_levels[1], param_levels[2])))
     
     plot_object <- ggplot(data=distros, aes(x, y, color = Parameters)) +
         geom_line() +
@@ -184,11 +184,12 @@ plot_bayesian <- function(experiments_summary,
         scale_x_continuous(breaks = seq(0, 1, x_axis_break_steps),
                            labels = percent_format()) +
         theme_light() +
-        theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+        theme(axis.text.x = element_text(angle = 30, hjust = 1),
+              legend.text=element_text(size=rel(0.5))) +
         coord_cartesian(xlim=c(x_min, x_max)) +
         scale_fill_manual(values=custom_colors) +
         scale_color_manual(values=custom_colors) +
-        labs(title='Posterior/Updated Probability Distributions of Control & Variant',
+        labs(title='Posterior Probability Distributions of Control & Variant',
              subtitle=paste0(paste0('The probability the variant is better is ', percent(prob_variant_is_better), "."),
                              paste0('\nControl Name: "', control_name, '"'),
                              paste0('\nVariant Name: "', variant_name, '"')),
