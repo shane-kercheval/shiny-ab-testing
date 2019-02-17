@@ -1,107 +1,5 @@
-##############################################################################################################
-# CHECK DATASET ASSUMPTIONS
-##############################################################################################################
-
-#' Checks basic assumptions and data structure of website traffic dataset
-#'
-#' @param website_traffic dataframe containing website traffic data in the expected format
-check_data__website_traffic <- function(website_traffic) {
-    
-    stopifnot(!any(is.na(website_traffic)))
-
-    stopifnot(all(colnames(website_traffic) == c('user_id', 'visit_date', 'path')))
-    # ensure there are no duplicated rows i.e. unique user/date/path
-    stopifnot(nrow(website_traffic) == nrow(distinct(website_traffic)))
-}
-
-#' Checks basic assumptions and data structure of experiment traffic dataset
-#'
-#' @param experiment_traffic dataframe containing experiment traffic data in the expected format
-check_data__experiment_traffic <- function(experiment_traffic, experiment_info) {
-
-    stopifnot(!any(is.na(experiment_traffic)))
-
-    stopifnot(all(sort(colnames(experiment_traffic)) == 
-                      sort(c("user_id", "first_joined_experiment", "path", "experiment_id", "variation"))))
-    
-    # a user should only enter have one record for each experiment (which represents the date/path they
-    # entered the experiment and the variation they were assigned)
-    experiments_summary <- experiment_traffic %>%
-        group_by(experiment_id) %>%
-        summarise(duplicate_user_ids = any(duplicated(user_id)),
-                  variation_count = length(unique(variation)))
-    
-    stopifnot(!any(experiments_summary$duplicate_user_ids))
-    stopifnot(all(experiments_summary$variation_count == 2))
-
-    # ensure that there is a 1-1 relationship between the experiment_id/variation in experiment_info and 
-    # website_traffic
-    unique_experiment_variation_traffic <- distinct(experiment_traffic %>%
-        select(experiment_id, variation)) %>%
-        arrange(experiment_id, variation)
-    
-    unique_experiment_variation_info <- experiment_info %>%
-        select(-is_control) %>%
-        arrange(experiment_id, variation)
-    
-    stopifnot(all(unique_experiment_variation_traffic == unique_experiment_variation_info))
-}
-
-#' Checks basic assumptions and data structure of experiment info dataset
-#'
-#' @param experiment_info dataframe containing experiment info data in the expected format
-check_data__experiment_info <- function(experiment_info) {
-    
-    stopifnot(!any(is.na(experiment_info)))
-    
-    stopifnot(all(sort(colnames(experiment_info)) == 
-                      sort(c("experiment_id", "variation", "is_control"))))
-    
-    info_summary <- experiment_info %>%
-        group_by(experiment_id) %>%
-        summarise(num_variations=n(),
-                  control_count=sum(is_control),
-                  variation_count=sum(!is_control))
-    stopifnot(all(info_summary$num_variations == 2))
-    stopifnot(all(info_summary$control_count == 1))
-    stopifnot(all(info_summary$variation_count == 1))
-}
-
-#' Checks basic assumptions and data structure of attribution window dataset
-#'
-#' @param attribution_windows dataframe containing attribution window data in the expected format
-check_data__attribution_windows <- function(attribution_windows, experiment_info) {
-    
-    stopifnot(!any(is.na(attribution_windows)))
-    stopifnot(all(colnames(attribution_windows) == c('experiment_id', 'metric_id', 'attribution_window')))
-
-    # ensure that there is a 1-1 relationship between the experiment_id in experiment_info and
-    # attribution_windows
-    stopifnot(all(sort(unique(experiment_info$experiment_id)) == 
-                      sort(unique(attribution_windows$experiment_id))))
-}
-
-#' Checks basic assumptions and data structure of conversion rate dataset
-#'
-#' @param user_conversion_events dataframe containing conversion rate data in the expected format
-check_data__conversion_events <- function(user_conversion_events, attribution_windows) {
-    
-    stopifnot(!any(is.na(user_conversion_events)))
-
-    stopifnot(all(colnames(user_conversion_events) == c('user_id', 'metric_id', 'conversion_date')))
-
-    stopifnot(all(sort(unique(user_conversion_events$metric_id)) == 
-                      sort(unique(attribution_windows$metric_id))))
-
-    conversion_summary <- user_conversion_events %>%
-        group_by(metric_id) %>%
-        summarise(duplicate_user_ids = any(duplicated(user_id)))
-    stopifnot(all(conversion_summary$duplicate_user_ids == FALSE))
-}
-
-##############################################################################################################
-# WEBSITE TRAFFIC FUNCTIONS
-##############################################################################################################
+source('helpers_stats.R')
+source('helpers_misc.R')
 
 #' Gets the row of the first visit for each user-id
 #'
@@ -115,7 +13,7 @@ website_traffic__get_user_first_visit <- function(website_traffic) {
     
     return (website_traffic[!duplicated(website_traffic %>% select(user_id)), ])
 }
-    
+
 #' Counts UNIQUE users per day (and optionally per path).
 #' If only_first_time_visits is TRUE, the user is only counted the first date they appear in the dataset. In
 #'      this case, calls with `top_n_paths=NULL` and `top_n_paths=x` will sum to the same values.
@@ -200,118 +98,6 @@ website_traffic__to_cohort_num_users <- function(website_traffic,
 }
 
 ##############################################################################################################
-# Sample Size Functions
-##############################################################################################################
-
-#' Calculates the total sample size required (assumes 2 variations) to run an A/B test
-#' 
-#' @param original_conversion_rate the control/original conversion rate
-#' @param percent_increase the percent increase (relative to the `original_conversion_rate`) that you want to
-#'      be able to detect. Also known as "minimum detectable effect".
-#' @param power probability of a True Positive (i.e. you detect the effect if it exists)
-#' @param alpha probability of a False Positive (i.e. an effect is detected when it does not actually exist)
-calculate_total_sample_size <- function(original_conversion_rate,
-                                        percent_increase,
-                                        power=0.8,
-                                        alpha=0.05) {
-    if(original_conversion_rate == 0) {
-
-        return (Inf)
-    }
-
-    new_conversion_rate <- original_conversion_rate + (original_conversion_rate * percent_increase)
-    if(new_conversion_rate > 1) {
-
-        new_conversion_rate <- 1
-    }
-
-    return (ceiling(power.prop.test(p1=original_conversion_rate,
-                                    p2=new_conversion_rate,
-                                    power=power,
-                                    sig.level=alpha)$n*2))
-}
-
-#' Calculates the number of days required to run an A/B test
-#' 
-#' @param daily_traffic the epxected number of people that will enter into the experiment (e.g. see the test
-#'      on your web-page) per day
-#' @param conversion_rates a vector of control/original conversion rates
-#' @param percent_increase the percent increase (relative to the `original_conversion_rate`) that you want to
-#'      be able to detect. Also known as "minimum detectable effect".
-#' @param power probability of a True Positive (i.e. you detect the effect if it exists)
-#' @param alpha probability of a False Positive (i.e. an effect is detected when it does not actually exist)
-calculate_days_required <- function(daily_traffic,
-                                    conversion_rates,  # vector of conversion_rates
-                                    percent_increase,
-                                    power=0.8,
-                                    alpha=0.05) {
-    entities_required <- unlist(map(conversion_rates, ~ calculate_total_sample_size(
-            original_conversion_rate=.,
-            percent_increase=percent_increase,
-            power=power,
-            alpha=alpha)))
-
-    days_required <- ceiling(entities_required / daily_traffic)
-
-    return (ifelse(days_required > 365, Inf, days_required))
-    
-}
-
-##############################################################################################################
-# MISC FUNCTIONS
-##############################################################################################################
-#' Creates "cohorts" in the form of YYYY-xx where `xx` is based on the `cohort_format` supplied
-#' 
-#' @param date_vector a vector of dates from which the cohorts will be based on
-#' @param cohort_format the string format of the cohort (e.g. %W for week number, %m for month number)
-#'      defaults to `%W` (Week 00-53 with Monday as first day of the week)
-create_cohort <- function(date_vector, cohort_format='%W') {
-
-    return (format(date_vector, paste0('%Y-', cohort_format)))
-}
-
-#' Formats numeric values
-#'
-#' @param values a numeric vector
-prettify_numerics <- function(values) {
-
-    if(max(values) > 1000000) {
-
-        values <- paste0(round(values / 1000000, 2), 'M')
-
-    } else if(max(values) > 100000) {
-
-        values <- paste0(round(values / 1000, 1), 'K')
-
-    } else if(max(values) > 10000) {
-
-        values <- paste0(round(values / 1000, 1), 'K')
-
-    } else if(max(values) > 1000) {
-
-        values <- paste0(round(values / 1000, 2), 'K')
-
-    } else if(max(values) > 100) {
-
-        values <- round(values, 0)
-
-    } else if(max(values) > 1) {
-
-        values <- round(values, 1)
-
-    } else if(max(values) > 0.1) {
-
-        values <- round(values, 2)
-
-    } else {
-
-        values <- formatC(values, format = "e", digits = 2)
-    }
-
-    return (values)
-}
-
-##############################################################################################################
 # Experiment Summary Functions
 ##############################################################################################################
 
@@ -352,22 +138,6 @@ experiments__determine_conversions <- function(experiment_traffic, attribution_w
                days_from_experiment_to_conversion, attribution_window, converted_within_window)
 
         return (user_conversion_events)
-}
-
-#' get p-values and corresponding confidence intervals
-#' 
-#' @param control_successes
-#' @param control_trials
-#' @param variant_successes
-#' @param variant_trials
-get_p_values_info <- function(control_successes, control_trials, variant_successes, variant_trials) {
-
-    test_results <- prop.test(x=c(variant_successes, control_successes),
-                              n=c(variant_trials, control_trials))
-    return (c(p_value = test_results$p.value,
-              cr_diff_estimate = as.numeric(test_results$estimate[1] - test_results$estimate[2]),
-              conf.low = test_results$conf.int[1],
-              conf.high = test_results$conf.int[2]))
 }
 
 #' Gets the "base" summary ror each experiment/metric.
@@ -508,35 +278,6 @@ experiments__get_base_summary <- function(experiment_info,
 
     return (experiments_summary)
 }
-
-#' Returns a credible interval approximations using the normal distribution, according to the methods in the
-#' link below.
-#' 
-#' code modified from https://github.com/dgrtwo/empirical-bayes-book/blob/master/bayesian-ab.Rmd
-#' 
-#' @param alpha_a the alpha value for the "A" group
-#' @param beta_a the beta value for the "A" group
-#' @param alpha_b the alpha value for the "B" group
-#' @param beta_b the beta value for the "B" group
-credible_interval_approx <- function(alpha_a, beta_a, alpha_b, beta_b) {
-    # https://github.com/dgrtwo/empirical-bayes-book/blob/master/bayesian-ab.Rmd
-    u1 <- alpha_a / (alpha_a + beta_a)
-    u2 <- alpha_b / (alpha_b + beta_b)
-    var1 <- as.double(alpha_a) * beta_a / ((alpha_a + beta_a) ^ 2 * (alpha_a + beta_a + 1))
-    var2 <- as.double(alpha_b) * beta_b / ((alpha_b + beta_b) ^ 2 * (alpha_b + beta_b + 1))
-    mu_diff <- u2 - u1
-    sd_diff <- sqrt(var1 + var2)
-    
-    # in D.R.'s code, the first player had a higher probability but a negative estimate (i.e. negative
-    # difference in conversion rate, mu_diff). This doesn't make sense, so we'll 1) use the first player as
-    # the A group and the second as the B group), so B-A which gives the expected intervals (but flips the
-    # posterior probability), and 2) use 1-pnorm(...) to get the correct posterior probability
-    return (c(posterior = 1 - pnorm(0, mu_diff, sd_diff),
-              cr_diff_estimate = mu_diff,
-              conf.low = qnorm(.025, mu_diff, sd_diff),
-              conf.high = qnorm(.975, mu_diff, sd_diff)))
-}
-
 
 #' Gets the summary ror each experiment/metric.
 #' 

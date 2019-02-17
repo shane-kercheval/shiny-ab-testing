@@ -1,3 +1,5 @@
+source('helpers_misc.R')
+
 #' Plots Website Traffic over time
 #' 
 #' @param website_traffic dataframe containing website traffic data in the expected format
