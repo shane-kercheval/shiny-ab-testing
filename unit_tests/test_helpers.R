@@ -335,7 +335,54 @@ test_that("test_helpers: experiments__determine_conversions", {
 
     # make sure the data is unique by experiment/metric/user
     expect_true(all((user_conversion_events %>% count(experiment_id, metric_id, user_id))$n == 1))
+    
+    # check attribution windows
+    check_attribution_windows <- left_join(attribution_windows,
+              user_conversion_events %>%
+                  mutate(metric_id = as.character(metric_id)) %>%
+                  group_by(experiment_id, metric_id) %>%
+                  summarise(single_window = length(unique(attribution_window)) == 1,
+                            attribution_window_used = min(attribution_window)),
+              by=c("experiment_id", "metric_id")) %>%
+        mutate(windows_match = attribution_window == attribution_window_used)
+    expect_false(any(is.na(check_attribution_windows$single_window)))
+    expect_true(all(check_attribution_windows$windows_match))
 
+    # check days_from_experiment_to_conversion
+    expect_true(all(user_conversion_events$days_from_experiment_to_conversion == 
+                        difftime(user_conversion_events$conversion_date, 
+                                 user_conversion_events$first_joined_experiment,
+                                 units='days')))
+    
+    # check converted_within_window
+    check_converted_within_window <- user_conversion_events %>%
+        mutate(is_valid = ifelse(days_from_experiment_to_conversion >= 0 & 
+                                     days_from_experiment_to_conversion <= attribution_window,
+                                 converted_within_window == TRUE,
+                                 converted_within_window == FALSE))
+    
+    expect_true(all(check_converted_within_window$is_valid))
+    
+    # check that everyone that has converted is in the dataset in the correct experiment
+
+    # create dataset that contains all users for each metric they converted & each experiment they were
+    # apart of. This dataset should exactly match the dataset returned from experiments__determine_conversions
+    # in terms of user/experiment/metric
+    expected_user_experiment_metric_combos <- inner_join(
+        experiment_traffic %>% 
+        select(user_id, experiment_id, first_joined_experiment),
+               conversion_events %>% select(user_id, metric_id),
+               by='user_id') %>%
+        inner_join(attribution_windows, by=c('experiment_id', 'metric_id')) %>%
+        filter(first_joined_experiment < Sys.Date() - attribution_window) %>%
+        select(user_id, experiment_id, metric_id) %>%
+        arrange(user_id, experiment_id, metric_id)
+    
+    found_user_experiment_metric_combos <- user_conversion_events %>% 
+        mutate(metric_id = as.character(metric_id)) %>% # need to convert to character because arrange will sort by level, not name
+        select(user_id, experiment_id, metric_id) %>% 
+        arrange(user_id, experiment_id, metric_id)
+    expect_true(all(expected_user_experiment_metric_combos == found_user_experiment_metric_combos))
 })
 
 test_that("test_helpers: private__filter_experiment_traffic_via_attribution", {
@@ -425,6 +472,27 @@ test_that("test_helpers: experiments__get_summary", {
     expect_true(all(ensure_same_dates_per_experiment$all_same_end_dates))
     expect_true(all(sort(unique(experiment_info$experiment_id)) == sort(ensure_same_dates_per_experiment$experiment_id)))
 
+    # for the experiments that are finished, check that the number of trials equals the number of people
+    # expected in the experiment
+    check_trial_numbers <-  experiments_summary %>%
+        group_by(experiment_id) %>%  # need to group by expueriment to make sure that all the metrics within the experiment are finished collecting data
+        mutate(experiment_finished = all(last_join_date == end_date)) %>%
+        ungroup() %>%
+        filter(experiment_finished) %>%  # experiment finished
+        group_by(experiment_id) %>%
+        summarise(distinct_control_trials = length(unique(control_trials)) == 1,
+                  distinct_variant_trials = length(unique(variant_trials)) == 1,
+                  actual_trials = min(control_trials) + min(variant_trials)) %>%
+        inner_join(experiment_traffic %>%
+                       group_by(experiment_id) %>%
+                       summarise(expected_trials = n()),
+                   by='experiment_id') %>%
+        mutate(expected_actual_match = expected_trials == actual_trials)
+    expect_equal(nrow(check_trial_numbers), 2)
+    expect_true(all(check_trial_numbers$distinct_control_trials))
+    expect_true(all(check_trial_numbers$distinct_variant_trials))
+    expect_true(all(check_trial_numbers$expected_actual_match))
+
     # for the first experiment, these should equal the attribution window plus 1 day padding the end-date is Today
     expect_true(all(round(difftime(experiments_summary$end_date , experiments_summary$last_join_date, units = c('days'))) == c(3, 4, 6, 8, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0)))
     expect_true(all(distinct(experiments_summary %>% select(experiment_id, metric_id)) %>% arrange(experiment_id) == attribution_windows %>% select(-attribution_window)))
@@ -432,7 +500,6 @@ test_that("test_helpers: experiments__get_summary", {
     expect_true(all(experiments_summary$control_conversion_rate == experiments_summary$control_successes / experiments_summary$control_trials))
     expect_true(all(experiments_summary$variant_conversion_rate == experiments_summary$variant_successes / experiments_summary$variant_trials))
     expect_true(all(experiments_summary$percent_change_from_control == (experiments_summary$variant_conversion_rate - experiments_summary$control_conversion_rate) / experiments_summary$control_conversion_rate))
-
 
     expect_true(all(with(experiments_summary, control_alpha == prior_alpha + control_successes)))
     expect_true(all(with(experiments_summary, control_beta == prior_beta + control_trials - control_successes)))
@@ -599,30 +666,3 @@ test_that("test_helpers: experiments__get_summary", {
     # simulated data so this is a good gut-check.
     expect_true(abs(mean(prior_vs_control_cr$percent_diff)) < 0.02)
 })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
