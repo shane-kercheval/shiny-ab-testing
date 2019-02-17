@@ -7,8 +7,8 @@ source('unit_test_helpers.R')
 # library('testthat')
 # test_file("test_helpers_stats.R")
 
-test_that("Misc Helpers: calculate_total_sample_size", {
-
+test_that("calculate_total_sample_size", {
+    context("helpers_stats::calculate_total_sample_size")
     # test pre-calculated examples
     result <- calculate_total_sample_size(original_conversion_rate=0.30,
                                           percent_increase=0.1,
@@ -81,7 +81,8 @@ test_that("Misc Helpers: calculate_total_sample_size", {
     expect_true(is.infinite(result))
 })
 
-test_that("Misc Helpers: calculate_days_required", {
+test_that("calculate_days_required", {
+    context("helpers_stats::calculate_days_required")
 
     daily_traffic <- 10000
     total_sample_size_required <- c(29711, 51165, 115526)  # from calculate_total_sample_size unit test
@@ -96,6 +97,7 @@ test_that("Misc Helpers: calculate_days_required", {
 })
 
 test_that("credible_interval_approx", {
+    context("helpers_stats::credible_interval_approx")
 
     # this is an alternative way of calculating the probability that b > a, simulation of random draws
     simulate_b_wins <- function(alpha_a, beta_a, alpha_b, beta_b, number_of_draws=1e6) {

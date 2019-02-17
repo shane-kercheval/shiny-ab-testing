@@ -13,8 +13,8 @@ source('unit_test_helpers.R')
 # library('testthat')
 # test_file("test_helpers_processing.R")
 
-test_that("test_helpers: website_traffic__get_user_first_visit", {
-    context("String processing")
+test_that("website_traffic__get_user_first_visit", {
+    context("helpers_processing::website_traffic__get_user_first_visit")
 
     website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
 
@@ -30,8 +30,8 @@ test_that("test_helpers: website_traffic__get_user_first_visit", {
     expect_true(all(users_first_visit %>% arrange(user_id) == expected_first_visits %>% arrange(user_id)))
 })
 
-test_that("test_helpers: website_traffic__to_xxx_num_users", {
-    context("String processing2")
+test_that("website_traffic__to_xxx_num_users", {
+    context("helpers_processing::website_traffic__to_xxx_num_users")
 
     website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
 
@@ -76,8 +76,8 @@ test_that("test_helpers: website_traffic__to_xxx_num_users", {
     expect_equal(sum(cohort_first_time_path_num_users$num_users), length(unique(website_traffic$user_id)))
 })
 
-test_that("test_helpers: website_traffic__plot_traffic", {
-    context("String processing3")
+test_that("website_traffic__plot_traffic", {
+    context("helpers_processing::website_traffic__plot_traffic")
     
     website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
 
@@ -103,8 +103,8 @@ test_that("test_helpers: website_traffic__plot_traffic", {
     plot_object %>% test_save_plot(file='data/plot_helpers/website_traffic__plot_traffic/first-visits-weekly-filter_top_3_paths.png')
 })
 
-test_that("test_helpers: experiments__determine_conversions", {
-    context("String processing3")
+test_that("experiments__determine_conversions", {
+    context("helpers_processing::experiments__determine_conversions")
 
     experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
     experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
@@ -202,8 +202,8 @@ test_that("test_helpers: experiments__determine_conversions", {
     expect_true(all(expected_user_experiment_metric_combos == found_user_experiment_metric_combos))
 })
 
-test_that("test_helpers: private__filter_experiment_traffic_via_attribution", {
-    context("String processing4")
+test_that("private__filter_experiment_traffic_via_attribution", {
+    context("helpers_processing::private__filter_experiment_traffic_via_attribution")
 
     experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
     experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
@@ -249,8 +249,8 @@ test_that("test_helpers: private__filter_experiment_traffic_via_attribution", {
     expect_true(all(start_end_dates == start_end_dates_filtered))
 })
 
-test_that("test_helpers: experiments__get_summary", {
-    context("String processing5")
+test_that("experiments__get_summary", {
+    context("helpers_processing::experiments__get_summary")
 
     experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
     experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
@@ -383,8 +383,8 @@ test_that("test_helpers: experiments__get_summary", {
     plot_object %>% test_save_plot(file='data/plot_helpers/experiments_summary__plot_bayesian/redesign_website_pay_no_prior.png')
 })
 
-test_that("test_helpers: experiments__get_summary", {
-    context("String processing6")
+test_that("experiments__get_summary", {
+    context("helpers_processing::experiments__get_summary")
 
     experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
     experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))

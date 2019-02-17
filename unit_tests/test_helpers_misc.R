@@ -7,7 +7,9 @@ source('unit_test_helpers.R')
 # library('testthat')
 # test_file("test_helpers_misc.R")
 
-test_that("Misc Helpers: create_cohort", {
+test_that("create_cohort", {
+    context("helpers_misc::create_cohort")
+
     base_date <- ymd('2019-01-01')
     dates <- base_date + 1:500
 
@@ -16,6 +18,7 @@ test_that("Misc Helpers: create_cohort", {
 })
 
 test_that('prettify_numerics', {
+    context("helpers_misc::prettify_numerics")
 
     set.seed(42)
     expect_equal(prettify_numerics(rnorm(n=10, mean=0, sd=0.001)),
