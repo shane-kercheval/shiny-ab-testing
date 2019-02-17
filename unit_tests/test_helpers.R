@@ -167,7 +167,7 @@ test_that("credible_interval_approx", {
     prob_b_better_cia <- as.numeric(credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)['posterior'])
     prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
     
-    expect_equal(round(prob_b_better_cia, 2) , round( prob_b_better_sim, 2))
+    expect_equal(round(prob_b_better_cia, 2) , round(prob_b_better_sim, 2))
     
     alpha_a <- 5111
     beta_a <- 272055
@@ -176,7 +176,7 @@ test_that("credible_interval_approx", {
     prob_b_better_cia <- as.numeric(credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)['posterior'])
     prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
     
-   # expect_equal(round(prob_b_better_cia, 3) , round( prob_b_better_sim, 3))
+    expect_equal(round(prob_b_better_cia, 2) , round(prob_b_better_sim, 2))
     
     alpha_a <- 2724
     beta_a <- 144083
@@ -185,7 +185,7 @@ test_that("credible_interval_approx", {
     prob_b_better_cia <- as.numeric(credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)['posterior'])
     prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
     
-    expect_equal(round(prob_b_better_cia, 2) , round( prob_b_better_sim, 2))
+    expect_equal(round(prob_b_better_cia, 2) , round(prob_b_better_sim, 2))
     
     alpha_a <- 22973
     beta_a <- 341979
@@ -194,7 +194,7 @@ test_that("credible_interval_approx", {
     prob_b_better_cia <- as.numeric(credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)['posterior'])
     prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
     
-    expect_equal(round(prob_b_better_cia, 4) , round( prob_b_better_sim, 4))
+    expect_equal(round(prob_b_better_cia, 4) , round(prob_b_better_sim, 4))
 })
 
 ##############################################################################################################
@@ -424,7 +424,7 @@ test_that("test_helpers: experiments__get_summary", {
 
     expect_true(all(experiments_summary$control_conversion_rate == experiments_summary$control_successes / experiments_summary$control_trials))
     expect_true(all(experiments_summary$variant_conversion_rate == experiments_summary$variant_successes / experiments_summary$variant_trials))
-    expect_true(all(experiments_summary$percent_change_from_baseline == (experiments_summary$variant_conversion_rate - experiments_summary$control_conversion_rate) / experiments_summary$control_conversion_rate))
+    expect_true(all(experiments_summary$percent_change_from_control == (experiments_summary$variant_conversion_rate - experiments_summary$control_conversion_rate) / experiments_summary$control_conversion_rate))
 
 
     expect_true(all(with(experiments_summary, control_alpha == prior_alpha + control_successes)))

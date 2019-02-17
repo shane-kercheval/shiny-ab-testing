@@ -113,7 +113,7 @@ plot_bayesian <- function(experiments_summary,
 
     # depending on the where we want to graph and how spread out the values are, we will want to get more/less granualar with our plot
 
-    distro_names <- c("Baseline", "Variant", "Prior")
+    distro_names <- c("Control", "Variant", "Prior")
     distros <- data_frame(alpha = alpha_vector,
                           beta = beta_vector,
                           group = distro_names) %>%
@@ -171,7 +171,7 @@ plot_bayesian <- function(experiments_summary,
 
     max_distros_20th <- max(distros$y) / 20
     
-    # re-level (re-order) the levels of Params so the order is Baseline->Variant->Prior
+    # re-level (re-order) the levels of Params so the order is Control->Variant->Prior
     param_levels <- levels(distros$Parameters)
     distros <- distros %>%
         mutate(Parameters = fct_relevel(distros$Parameters, param_levels[2], after = 3))
@@ -188,9 +188,9 @@ plot_bayesian <- function(experiments_summary,
         coord_cartesian(xlim=c(x_min, x_max)) +
         scale_fill_manual(values=custom_colors) +
         scale_color_manual(values=custom_colors) +
-        labs(title='Posterior/Updated Probability Distributions of Baseline & Variant',
+        labs(title='Posterior/Updated Probability Distributions of Control & Variant',
              subtitle=paste0(paste0('The probability the variant is better is ', percent(prob_variant_is_better), "."),
-                             paste0('\nBaseline name: "', control_name, '"'),
+                             paste0('\nControl Name: "', control_name, '"'),
                              paste0('\nVariant Name: "', variant_name, '"')),
              x="Conversion Rates",
              y="Density of beta")

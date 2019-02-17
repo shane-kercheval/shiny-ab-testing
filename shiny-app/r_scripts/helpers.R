@@ -205,7 +205,7 @@ website_traffic__to_cohort_num_users <- function(website_traffic,
 
 #' Calculates the total sample size required (assumes 2 variations) to run an A/B test
 #' 
-#' @param original_conversion_rate the baseline/original conversion rate
+#' @param original_conversion_rate the control/original conversion rate
 #' @param percent_increase the percent increase (relative to the `original_conversion_rate`) that you want to
 #'      be able to detect. Also known as "minimum detectable effect".
 #' @param power probability of a True Positive (i.e. you detect the effect if it exists)
@@ -235,7 +235,7 @@ calculate_total_sample_size <- function(original_conversion_rate,
 #' 
 #' @param daily_traffic the epxected number of people that will enter into the experiment (e.g. see the test
 #'      on your web-page) per day
-#' @param conversion_rates a vector of baseline/original conversion rates
+#' @param conversion_rates a vector of control/original conversion rates
 #' @param percent_increase the percent increase (relative to the `original_conversion_rate`) that you want to
 #'      be able to detect. Also known as "minimum detectable effect".
 #' @param power probability of a True Positive (i.e. you detect the effect if it exists)
@@ -373,7 +373,7 @@ get_p_values_info <- function(control_successes, control_trials, variant_success
 #' Gets the "base" summary ror each experiment/metric.
 #' 
 #' Includes the start/end/last-event dates, the number of successes and trials (and conversion rate) of the
-#' baseline and variant groups, etc.
+#' control and variant groups, etc.
 #' 
 #' The difference between `end_date` and `last_join_date` comes from the fact that we exclude users who have
 #' joined the experiment in the last x days where x is the attribution window for that given
@@ -401,14 +401,14 @@ experiments__get_base_summary <- function(experiment_info,
                                                                                       attribution_windows)
     
     # i want to cache the is_control/variation-name here so in know i'm joining the actual variation used for
-    # the baseline; i could join on the variation names after the fact but there's an increase risk because
-    # e.g. i could have messed up the baseline/variation combos but joining after the fact wouldn't illuminate
+    # the control; i could join on the variation names after the fact but there's an increase risk because
+    # e.g. i could have messed up the control/variation combos but joining after the fact wouldn't illuminate
     # this
     cache_experiment_variations <- distinct(filtered_experiment_traffic %>% 
                                                 select(experiment_id, variation, is_control)) %>% 
         spread(is_control, variation)
 
-    # now we need to rename `TRUE` and `FALSE` columns to baseline/variant
+    # now we need to rename `TRUE` and `FALSE` columns to control/variant
     # but, if this is "prior" experiment data, theren't won't be a `FALSE`, so we need to check
     if("FALSE" %in% colnames(cache_experiment_variations)) {
 
@@ -429,8 +429,8 @@ experiments__get_base_summary <- function(experiment_info,
         summarise(last_join_date = max(first_joined_experiment),
                   trials = n()) %>%
         ungroup() %>%
-        # on the offchance the start dates (or end dates) are different between the baseline/metric/variation 
-        # (e.g. started the experiment at ~midnight and 1 person went into the baseline on day x and the next
+        # on the offchance the start dates (or end dates) are different between the control/metric/variation 
+        # (e.g. started the experiment at ~midnight and 1 person went into the control on day x and the next
         # went
         # into the variation on day x+1)
         group_by(experiment_id, metric_id) %>%
@@ -439,7 +439,7 @@ experiments__get_base_summary <- function(experiment_info,
         # now format so there is 1 row per experiment
         spread(is_control, trials)
     
-    # now we need to rename `TRUE` and `FALSE` columns to baseline/variant
+    # now we need to rename `TRUE` and `FALSE` columns to control/variant
     # but, if this is "prior" experiment data, theren't won't be a `FALSE`, so we need to check
     if("FALSE" %in% colnames(experiments_summary)) {
 
@@ -481,7 +481,7 @@ experiments__get_base_summary <- function(experiment_info,
         select(-variation) %>%
         spread(is_control, successes)
     
-    # now we need to rename `TRUE` and `FALSE` columns to baseline/variant
+    # now we need to rename `TRUE` and `FALSE` columns to control/variant
     # but, if this is "prior" experiment data, theren't won't be a `FALSE`, so we need to check
     if("FALSE" %in% colnames(experiment_conversion_events)) {
         
@@ -492,7 +492,7 @@ experiments__get_base_summary <- function(experiment_info,
                    variant_successes=`FALSE`) %>% 
             mutate(control_conversion_rate=control_successes / control_trials,
                    variant_conversion_rate=variant_successes / variant_trials,
-                   percent_change_from_baseline = (variant_conversion_rate - control_conversion_rate) / 
+                   percent_change_from_control = (variant_conversion_rate - control_conversion_rate) / 
                        control_conversion_rate)
 
     } else {
@@ -541,7 +541,7 @@ credible_interval_approx <- function(alpha_a, beta_a, alpha_b, beta_b) {
 #' Gets the summary ror each experiment/metric.
 #' 
 #' Includes the start/end/last-event dates, the number of successes and trials (and conversion rate) of the
-#' baseline and variant groups, frequentist stats (e.g. p-value), bayesian stats, etc.
+#' control and variant groups, frequentist stats (e.g. p-value), bayesian stats, etc.
 #' 
 #' The difference between `end_date` and `last_join_date` comes from the fact that we exclude users who have
 #' joined the experiment in the last x days where x is the attribution window for that given
@@ -670,8 +670,8 @@ experiments__get_summary <- function(experiment_info,
                # conversion rates
                control_conversion_rate,
                variant_conversion_rate,
-               percent_change_from_baseline,
-               # baseline & variation raw numbers
+               percent_change_from_control,
+               # control & variation raw numbers
                control_name,
                control_successes,
                control_trials,
