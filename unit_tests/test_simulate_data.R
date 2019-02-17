@@ -18,11 +18,11 @@ test_that("test_helpers: create", {
 # SIMULATE EXPERIMENT INFO
 ##########################################################################################################
 
-    # NOTE: is_baseline can be a setting within the shiny app; but we'll set it here becuase that 
+    # NOTE: is_control can be a setting within the shiny app; but we'll set it here becuase that 
     # functionality is more suited towards a v2 than a v1
     # We could also include a description, etc., in this dataset.
     experiment_info <- as.data.frame(tribble(
-        ~experiment_id,                             ~variation,      ~is_baseline,
+        ~experiment_id,                             ~variation,      ~is_control,
         #------------------------------------------|--------------------|----
         "Redesign Website",                         "Original",          TRUE,
         "Redesign Website",                         "Site Redesign",     FALSE,
@@ -140,6 +140,12 @@ test_that("test_helpers: create", {
     filter(visit_date > Sys.Date() - round(simulate_num_days * 0.55),
            visit_date <= Sys.Date() - 7)
 
+    seconds_in_day <- 86400
+    # need to simulate time-stamps and convert visit_date from date to date/time
+    set.seed(42)
+    simulated_seconds <-round(runif(nrow(website_traffic), min = 0, max=seconds_in_day - 1))
+    website_traffic$visit_date <- as.POSIXct(website_traffic$visit_date + seconds(simulated_seconds))
+
     ########
     # plot various characteristics of our simulated website traffic
     ########
@@ -149,7 +155,7 @@ test_that("test_helpers: create", {
         geom_line() +
         expand_limits(y=0) +
         labs(title='Simulated Daily website_traffic') +
-        scale_x_date(date_labels="%y-%m-%d",date_breaks  ="1 day") + 
+        scale_x_date(date_labels="%y-%m-%d",date_breaks  ="5 days") +
         theme(axis.text.x = element_text(angle = 30, hjust = 1))
     plot_object %>% test_save_plot(file='data/simulate_data/simulated_daily_website_traffic.png')
     
@@ -178,7 +184,7 @@ test_that("test_helpers: create", {
     plot_object <- website_traffic %>%
         group_by(user_id) %>%
         filter(n() > 1) %>%
-        summarise(t=round(sd(as.numeric(visit_date)))) %>%
+        summarise(t=floor(sd(as.numeric(visit_date) / 24 / 60 / 60))) %>%
         ggplot(aes(x=t)) +
             geom_histogram() +
             labs(title='Distribution of Number of Days between Website Traffic')
@@ -188,10 +194,12 @@ test_that("test_helpers: create", {
         website_traffic %>% 
             group_by(user_id) %>%
             summarise(first_visit_date=min(visit_date)) %>%
+            mutate(first_visit_date = floor_date(first_visit_date, unit = 'days')) %>%
             count(first_visit_date) %>%
             rename(date=first_visit_date,
                    new_visits=n),
         website_traffic %>%
+            mutate(visit_date = floor_date(visit_date, unit = 'days')) %>%
             group_by(visit_date) %>%
             summarise(all_visits=n()) %>%
             rename(date=visit_date),
@@ -204,7 +212,6 @@ test_that("test_helpers: create", {
             labs(title='New vs. All Visits Over time')
     plot_object %>% test_save_plot(file='data/simulate_data/new_vs_all_visits_over_time.png')
     
-    
     plot_object <- temp %>%
         mutate(percent_new_visits = new_visits / all_visits) %>%
         ggplot(aes(x=date, y=percent_new_visits)) +
@@ -214,6 +221,7 @@ test_that("test_helpers: create", {
     plot_object %>% test_save_plot(file='data/simulate_data/percent_new_visits_over_time.png')
     
     plot_object <- website_traffic %>%
+        mutate(visit_date = floor_date(visit_date, unit = 'days')) %>%
         count(visit_date, path) %>%
         ggplot(aes(x=visit_date, y=n, color=path)) +
         geom_line() +
@@ -230,7 +238,7 @@ test_that("test_helpers: create", {
 ##########################################################################################################
 
     experiment_names <- unique(experiment_info$experiment_id)
-    min_traffic_date <- min(website_traffic$visit_date)
+    min_traffic_date <- floor_date(min(website_traffic$visit_date), unit='days')
     #  max(website_traffic$visit_date) - min_traffic_date
     
     ##########################################################################################################
@@ -239,8 +247,8 @@ test_that("test_helpers: create", {
     # let's start the experiment 1 month after our visits dataset, and run it for a month
     min_traffic_date_offset <- 30
     experiment_duration <- 30
-    start_date <- min_traffic_date + min_traffic_date_offset + 1
-    end_date <- start_date + experiment_duration
+    start_date <- min_traffic_date + days(min_traffic_date_offset) + days(1)
+    end_date <- start_date + days(experiment_duration)
     # all paths
     experiment_paths <- unique(paths)
     # experiment 1
@@ -256,8 +264,8 @@ test_that("test_helpers: create", {
     ##########################################################################################################
     min_traffic_date_offset <- 40
     experiment_duration <- 30
-    start_date <- min_traffic_date + min_traffic_date_offset
-    end_date <- start_date + experiment_duration
+    start_date <- min_traffic_date + days(min_traffic_date_offset)
+    end_date <- start_date + days(experiment_duration)
     experiment_paths <- c(#'example.com',
                           'example.com/features', 
                           #'example.com/pricing', 
@@ -269,14 +277,13 @@ test_that("test_helpers: create", {
                                                      current_experiment_id, variation_names,
                                                      baseline_conversion_rates=baseline_conversion_rates)
 
-    
     ##########################################################################################################
     # Experiment 3
     ##########################################################################################################
     min_traffic_date_offset <- 60
     experiment_duration <- 25
-    start_date <- min_traffic_date + min_traffic_date_offset
-    end_date <- start_date + experiment_duration
+    start_date <- min_traffic_date + days(min_traffic_date_offset)
+    end_date <- start_date + days(experiment_duration)
     experiment_paths <- c(#'example.com',
                           #'example.com/features',
                           'example.com/pricing',
@@ -293,8 +300,8 @@ test_that("test_helpers: create", {
     ##########################################################################################################
     min_traffic_date_offset <- 75
     experiment_duration <- 30
-    start_date <- min_traffic_date + min_traffic_date_offset
-    end_date <- start_date + experiment_duration
+    start_date <- min_traffic_date + days(min_traffic_date_offset)
+    end_date <- start_date + days(experiment_duration)
     experiment_paths <- c('example.com',
                           'example.com/features', 
                           'example.com/pricing', 
@@ -311,12 +318,6 @@ test_that("test_helpers: create", {
                                 experiment_traffic_3,
                                 experiment_traffic_4)
     
-    seconds_in_day <- 86400
-    # need to simulate time-stamps and convert first_joined_experiment from date to date/time
-    set.seed(42)
-    simulated_seconds <-round(runif(nrow(experiment_traffic), min = 0, max=seconds_in_day - 1))
-    experiment_traffic$first_joined_experiment <- as.POSIXct(experiment_traffic$first_joined_experiment + seconds(simulated_seconds))
-
     temp <- experiment_traffic
     plot_object <- experiment_traffic %>%
         mutate(first_joined_experiment = first_joined_experiment) %>%
@@ -332,7 +333,6 @@ test_that("test_helpers: create", {
     check_data__experiment_traffic(experiment_traffic, experiment_info)
     write.csv(experiment_traffic, file='../shiny-app/simulated_data/experiment_traffic.csv', row.names = FALSE)
 
-    
 ##########################################################################################################
 # Create Conversion Rates
 # We'll have historical baseline conversion rates for each metric, but we'll want to adjust them up
@@ -355,7 +355,7 @@ test_that("test_helpers: create", {
     adjusted_conversion_rates$adjusted_conversion_rate <- adjusted_conversion_rates$baseline_conversion_rates
     
     percent_change_adjustments <- c(
-               #                            experiment_id   variation      is_baseline     metric_id
+               #                            experiment_id   variation      is_control     metric_id
         NA,    #                       Redesign Website         Original        TRUE       Sign Up
         NA,    #                       Redesign Website         Original        TRUE Use Feature 1
         NA,    #                       Redesign Website         Original        TRUE Talk to Sales
@@ -475,9 +475,9 @@ test_that("test_helpers: create", {
     
     plot_object <- temp %>%
         mutate(cr=n.x/n.y) %>%
-        arrange(experiment_id, metric_id, is_baseline) %>%
+        arrange(experiment_id, metric_id, is_control) %>%
         mutate(metric_id=factor(metric_id, levels=metrics_names)) %>%
-        ggplot(aes(x=metric_id, y=cr, group=is_baseline, fill=is_baseline)) +
+        ggplot(aes(x=metric_id, y=cr, group=is_control, fill=is_control)) +
         geom_col(position='dodge') +
         facet_wrap(~ experiment_id) +
         geom_text(aes(label=round(cr, 3)),
@@ -489,8 +489,8 @@ test_that("test_helpers: create", {
 
     plot_object <- temp %>%
         group_by(experiment_id, metric_id) %>%
-        summarise(baseline_cr = n.x[is_baseline == TRUE] / n.y[is_baseline == TRUE],
-                  variant_cr= n.x[is_baseline == FALSE] / n.y[is_baseline == FALSE],
+        summarise(baseline_cr = n.x[is_control == TRUE] / n.y[is_control == TRUE],
+                  variant_cr= n.x[is_control == FALSE] / n.y[is_control == FALSE],
                   percent_change_over_baseline= (variant_cr - baseline_cr) / baseline_cr) %>%
         ungroup() %>%
         mutate(experiment_id = factor(experiment_id, levels=experiment_names),
@@ -499,6 +499,7 @@ test_that("test_helpers: create", {
         geom_col(position='dodge') +
         geom_hline(yintercept = 0, color='red') +
         facet_wrap(~ experiment_id) +
+        coord_cartesian(ylim = c(-0.15, 0.15)) +
         geom_text(aes(label=percent(percent_change_over_baseline)),
                   position = position_dodge(width = 1), 
                   size=3,
@@ -532,11 +533,6 @@ test_that("test_helpers: create", {
     conversion_data$offset_days <- conversion_offsets_days
     conversion_data$conversion_date <- as.POSIXct(conversion_data$first_visit + days(conversion_offsets_days) + seconds(conversion_offsets_seconds))
     
-    #conversion_data$conversion_date <= ymd_hms(paste(max(website_traffic$visit_date), '23:59:59'))
-    
-    conversion_data <- conversion_data %>%
-        filter(conversion_date <= ymd_hms(paste(max(website_traffic$visit_date), '23:59:59')))  # we don't want to go past the last date of our simulated datasets
-    
     plot_object <- conversion_data %>%
         count(metric_id, offset_days) %>%
         mutate(offset_days=factor(offset_days)) %>%
@@ -560,6 +556,6 @@ test_that("test_helpers: create", {
         select(user_id, metric_id, conversion_date) %>%
         arrange(user_id, conversion_date)
 
-    check_data__conversion_rates(conversion_data, attribution_windows)
+    check_data__conversion_events(conversion_data, attribution_windows)
     write.csv(conversion_data, file='../shiny-app/simulated_data/conversion_events.csv', row.names = FALSE)
 })

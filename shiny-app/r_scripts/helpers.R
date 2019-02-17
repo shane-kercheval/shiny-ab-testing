@@ -18,7 +18,7 @@ check_data__website_traffic <- function(website_traffic) {
 #'
 #' @param experiment_traffic dataframe containing experiment traffic data in the expected format
 check_data__experiment_traffic <- function(experiment_traffic, experiment_info) {
-    
+
     stopifnot(!any(is.na(experiment_traffic)))
 
     stopifnot(all(sort(colnames(experiment_traffic)) == 
@@ -41,7 +41,7 @@ check_data__experiment_traffic <- function(experiment_traffic, experiment_info) 
         arrange(experiment_id, variation)
     
     unique_experiment_variation_info <- experiment_info %>%
-        select(-is_baseline) %>%
+        select(-is_control) %>%
         arrange(experiment_id, variation)
     
     stopifnot(all(unique_experiment_variation_traffic == unique_experiment_variation_info))
@@ -55,13 +55,13 @@ check_data__experiment_info <- function(experiment_info) {
     stopifnot(!any(is.na(experiment_info)))
     
     stopifnot(all(sort(colnames(experiment_info)) == 
-                      sort(c("experiment_id", "variation", "is_baseline"))))
+                      sort(c("experiment_id", "variation", "is_control"))))
     
     info_summary <- experiment_info %>%
         group_by(experiment_id) %>%
         summarise(num_variations=n(),
-                  baseline_count=sum(is_baseline),
-                  variation_count=sum(!is_baseline))
+                  baseline_count=sum(is_control),
+                  variation_count=sum(!is_control))
     stopifnot(all(info_summary$num_variations == 2))
     stopifnot(all(info_summary$baseline_count == 1))
     stopifnot(all(info_summary$variation_count == 1))
@@ -400,13 +400,13 @@ experiments__get_base_summary <- function(experiment_info,
                                                                                       experiment_traffic,
                                                                                       attribution_windows)
     
-    # i want to cache the is_baseline/variation-name here so in know i'm joining the actual variation used for
+    # i want to cache the is_control/variation-name here so in know i'm joining the actual variation used for
     # the baseline; i could join on the variation names after the fact but there's an increase risk because
     # e.g. i could have messed up the baseline/variation combos but joining after the fact wouldn't illuminate
     # this
     cache_experiment_variations <- distinct(filtered_experiment_traffic %>% 
-                                                select(experiment_id, variation, is_baseline)) %>% 
-        spread(is_baseline, variation)
+                                                select(experiment_id, variation, is_control)) %>% 
+        spread(is_control, variation)
 
     # now we need to rename `TRUE` and `FALSE` columns to baseline/variant
     # but, if this is "prior" experiment data, theren't won't be a `FALSE`, so we need to check
@@ -425,7 +425,7 @@ experiments__get_base_summary <- function(experiment_info,
     stopifnot(nrow(cache_experiment_variations) == length(unique(experiment_info$experiment_id)))
     
     experiments_summary <- filtered_experiment_traffic %>%
-        group_by(experiment_id, metric_id, is_baseline) %>%
+        group_by(experiment_id, metric_id, is_control) %>%
         summarise(last_join_date = max(first_joined_experiment),
                   trials = n()) %>%
         ungroup() %>%
@@ -437,7 +437,7 @@ experiments__get_base_summary <- function(experiment_info,
         mutate(last_join_date = max(last_join_date)) %>%
         ungroup() %>%
         # now format so there is 1 row per experiment
-        spread(is_baseline, trials)
+        spread(is_control, trials)
     
     # now we need to rename `TRUE` and `FALSE` columns to baseline/variant
     # but, if this is "prior" experiment data, theren't won't be a `FALSE`, so we need to check
@@ -479,7 +479,7 @@ experiments__get_base_summary <- function(experiment_info,
         rename(successes=n) %>%
         inner_join(experiment_info, by=c('experiment_id', 'variation')) %>%
         select(-variation) %>%
-        spread(is_baseline, successes)
+        spread(is_control, successes)
     
     # now we need to rename `TRUE` and `FALSE` columns to baseline/variant
     # but, if this is "prior" experiment data, theren't won't be a `FALSE`, so we need to check
@@ -615,7 +615,7 @@ experiments__get_summary <- function(experiment_info,
         prior_paths <- experiment_prior_paths %>% filter(experiment_id == experiment)
         variation_name <- (experiment_info %>% 
             filter(experiment_id == experiment,
-                   is_baseline))$variation
+                   is_control))$variation
         
         prior_data <- rbind(prior_data,
                             website_traffic %>% 

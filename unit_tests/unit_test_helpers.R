@@ -5,8 +5,7 @@ scale_a_b <- function(x, a, b) {
 }
 
 get_random_variation <- function(variation_names, user_id) {
-    #set.seed(user_id)
-    # rbinom will return random 0/1's, i need random 1/2's for the index
+    set.seed(user_id)
     return (variation_names[rbinom(1, 1, 0.5) + 1])
 }
 
@@ -16,41 +15,24 @@ create_experiment_visits <- function(website_traffic, start_date, end_date, expe
                                      # has been acheived over time, say at a 5% increase
                                      baseline_conversion_rates=c(0.03, 0.05, 0.07, 0.10)) {
 
+
+    # this will get the first visit record (so i can retain the correct path) for the user between the
+    # start/end dates for the relevant paths, it does not ensure the user is new to the site
     experiment_visits <- website_traffic %>%
-        # i want to simulate data only including new users into the experiment
-        # So, I have to determine new vs. returning before i filter on start date,
-        # but to speed up the process, i can filter on end date first (then get the index and determine new)
-        # note: the order in which i'm filtering means that even if the person hasn't been to any of the pages
-        # in the particular experiment, they are still being filtered out.. They may or may not be the policy
-        # implemented by the ab test team, but it's good enough for the simulation.
-        filter(visit_date <= end_date) %>%
+        # get all records between the valid dates and for the paths the experiment is on
+        filter(visit_date >= start_date & visit_date <= end_date,
+               path %in% experiment_paths) %>%
         group_by(user_id) %>%
+        # get the first visit for that user (again, for the valid dates/paths)
         mutate(visit_index=rank(visit_date, ties.method = "first")) %>%
         ungroup() %>%
         filter(visit_index == 1) %>%
-        filter(visit_date >= start_date,
-               path %in% experiment_paths) %>%
-        select(-visit_index)
-    
-    stopifnot(min(experiment_visits$visit_date) == start_date)
-    if(end_date <= max(website_traffic$visit_date)) {
-
-        stopifnot(max(experiment_visits$visit_date) == end_date)
-    }
-    stopifnot(all(sort(unique(experiment_visits$path)) == sort(experiment_paths)))
-    
-    expected_num_users <- length(unique(experiment_visits$user_id))
-    
-    # NOTE: because of the way we ranked/filtered, experiment_visits (at this point) is unique per user_id
-    # and the visit_date is there first time to the site and by definition the first_joined_experiment date
-    stopifnot(expected_num_users == nrow(experiment_visits))  # make sure num user-ids is number of rows
-
-    experiment_visits <- experiment_visits %>%
+        select(-visit_index) %>%
         rename(first_joined_experiment=visit_date) %>%
         mutate(experiment_id=current_experiment_id)
+        
     experiment_visits$variation <- map_chr(experiment_visits$user_id, ~ get_random_variation(variation_names, .))
     
-    stopifnot(nrow(experiment_visits) == expected_num_users)
     # make sure no duplicated user_ids
     stopifnot(nrow(experiment_visits) == length(unique(experiment_visits$user_id)))
     
@@ -74,6 +56,7 @@ create_experiment_visits <- function(website_traffic, start_date, end_date, expe
     names(sample_sizes_required) <- paste0('baseline_', baseline_conversion_rates)
         
     experiment_count <- experiment_visits %>%
+        mutate(first_joined_experiment = floor_date(first_joined_experiment, unit = 'days')) %>%
         count(first_joined_experiment) %>%
         rename(daily_traffic=n) %>%
         arrange(first_joined_experiment) %>%
@@ -92,21 +75,20 @@ create_experiment_visits <- function(website_traffic, start_date, end_date, expe
         geom_point() +
         geom_text(aes(label=daily_traffic), check_overlap = TRUE, vjust=-0.5) +
         expand_limits(y=0)+
-        labs(title='Number of People Entering Experiment',
-             subtitle='All visitors in experiment are new to the site (i.e. first visit >= experiment start date)')
+        labs(title='Number of People Entering Experiment')
     plot_object %>% test_save_plot(file=paste0('data/simulate_data/create_', 
                                                current_experiment_id,
                                                '_experiment_trials_over_time.png'))
     
     plot_object <- experiment_visits %>%
+        mutate(first_joined_experiment = floor_date(first_joined_experiment, unit = 'days')) %>%
         count(first_joined_experiment, variation) %>%
         ggplot(aes(x=first_joined_experiment, y=n, color=variation)) +
         geom_line() +
         geom_point() +
         geom_text(aes(label=n), check_overlap = TRUE, vjust=-0.5) +
         expand_limits(y=0)+
-        labs(title='Number of People Entering Experiment - By Variation',
-             subtitle='All visitors in experiment are new to the site (i.e. first visit >= experiment start date)')
+        labs(title='Number of People Entering Experiment - By Variation')
     plot_object %>% test_save_plot(file=paste0('data/simulate_data/create_', 
                                                current_experiment_id,
                                                '_experiment_trials_over_time_variation.png'))
