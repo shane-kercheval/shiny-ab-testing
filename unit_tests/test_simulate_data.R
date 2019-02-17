@@ -319,7 +319,8 @@ test_that("test_helpers: create", {
                                 experiment_traffic_3,
                                 experiment_traffic_4)
     
-    temp <- experiment_traffic
+    stopifnot(max(experiment_traffic$first_joined_experiment) <= max(website_traffic$visit_date))
+    
     plot_object <- experiment_traffic %>%
         mutate(first_joined_experiment = first_joined_experiment) %>%
         count(first_joined_experiment, experiment_id) %>%
