@@ -3,7 +3,8 @@ library(tidyverse)
 library(lubridate)
 library(scales)
 
-source('../shiny-app/r_scripts/helpers.R', chdir=TRUE)
+source('../shiny-app/r_scripts/helpers_check_data_integrity.R', chdir=TRUE)
+source('../shiny-app/r_scripts/helpers_processing.R', chdir=TRUE)
 source('unit_test_helpers.R')
 
 # to run from command line, use:
@@ -515,7 +516,7 @@ test_that("test_helpers: create", {
     generate_offset <- function(user_id, metric) {
  
         # NOTE setting the seed is messing up the distribution   
-        ##  set.seed(user_id)
+        set.seed(user_id)
         # convert from 0-30 days, acnored by the attribution window
         rbinom(1, 30, attribution_windows_days[metric]/30)
     }
@@ -532,6 +533,9 @@ test_that("test_helpers: create", {
     
     conversion_data$offset_days <- conversion_offsets_days
     conversion_data$conversion_date <- as.POSIXct(conversion_data$first_visit + days(conversion_offsets_days) + seconds(conversion_offsets_seconds))
+    
+    conversion_data <- conversion_data %>%
+        filter(conversion_date <= max(website_traffic$visit_date))
     
     plot_object <- conversion_data %>%
         count(metric_id, offset_days) %>%
