@@ -1,4 +1,4 @@
-"experiment_id","variation","is_baseline"
+"experiment_id","variation","is_control"
 "Redesign Website","Original",TRUE
 "Redesign Website","Site Redesign",FALSE
 "New Signup CTA Color","Green Signup CTA",TRUE
