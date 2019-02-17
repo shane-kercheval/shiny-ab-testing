@@ -413,12 +413,19 @@ test_that("test_helpers: experiments__get_summary", {
                                                     conversion_events,
                                                     days_of_prior_data=15)
 
-    expect_equal(nrow(distinct(experiments_summary %>% select(experiment_id, start_date, end_date))),
-                 length(unique(experiment_info$experiment_id)))
-
     expect_false(any(is.na(experiments_summary)))
-    # for the first experiment, these should equal the attribution window plus 1 day padding the end-date is Today
+    
+    # ensure, for each metric within the same experiment, all start/end dates are the same
+    ensure_same_dates_per_experiment <- experiments_summary %>%
+        group_by(experiment_id) %>%
+        summarise(all_same_start_dates = length(unique(start_date)) == 1,
+                  all_same_end_dates = length(unique(end_date)) == 1)
 
+    expect_true(all(ensure_same_dates_per_experiment$all_same_start_dates))
+    expect_true(all(ensure_same_dates_per_experiment$all_same_end_dates))
+    expect_true(all(sort(unique(experiment_info$experiment_id)) == sort(ensure_same_dates_per_experiment$experiment_id)))
+
+    # for the first experiment, these should equal the attribution window plus 1 day padding the end-date is Today
     expect_true(all(round(difftime(experiments_summary$end_date , experiments_summary$last_join_date, units = c('days'))) == c(3, 4, 6, 8, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0)))
     expect_true(all(distinct(experiments_summary %>% select(experiment_id, metric_id)) %>% arrange(experiment_id) == attribution_windows %>% select(-attribution_window)))
 
@@ -489,3 +496,133 @@ test_that("test_helpers: experiments__get_summary", {
     
     plot_object %>% test_save_plot(file='data/plot_helpers/plot_bayesian/redesign_website_pay_no_prior.png')
 })
+
+test_that("test_helpers: experiments__get_summary", {
+
+    experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
+    experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
+    attribution_windows <- as.data.frame(read_csv('data/cached_simulated_data/attribution_windows.csv'))
+    website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
+    conversion_events <- as.data.frame(read_csv('data/cached_simulated_data/conversion_events.csv'))
+
+    ###############
+    # shift all dates relative to today so we can test excluding people (who recently entered into the
+    # experiment) based on the attribution window
+    ###############
+    max_date <- max(max(experiment_traffic$first_joined_experiment),
+                    #max(conversion_events$conversion_date),
+                    max(website_traffic$visit_date))
+
+    days_offset <- Sys.Date() - as.Date(max_date)
+
+    experiment_traffic$first_joined_experiment <- experiment_traffic$first_joined_experiment + days_offset
+    website_traffic$visit_date <- website_traffic$visit_date + days_offset
+    conversion_events$conversion_date <- conversion_events$conversion_date + days_offset
+
+    # get base summary, required for private__create_prior_experiment_traffic
+    experiments_base_summary <- experiments__get_base_summary(experiment_info,
+                                                         experiment_traffic,
+                                                         attribution_windows,
+                                                         conversion_events)
+    
+    # ensure, for each metric within the same experiment, all start/end dates are the same
+    ensure_same_dates_per_experiment <- experiments_base_summary %>%
+        group_by(experiment_id) %>%
+        summarise(all_same_start_dates = length(unique(start_date)) == 1,
+                  all_same_end_dates = length(unique(end_date)) == 1,
+                  # dates should be the same, so just get min
+                  start_date=min(start_date),
+                  end_date=min(end_date))
+    
+    expect_true(all(ensure_same_dates_per_experiment$all_same_start_dates))
+    expect_true(all(ensure_same_dates_per_experiment$all_same_end_dates))
+    expect_true(all(sort(unique(experiment_info$experiment_id)) == sort(ensure_same_dates_per_experiment$experiment_id)))
+
+    days_of_prior_data=15
+    prior_data <- private__create_prior_experiment_traffic(website_traffic=website_traffic,
+                                                           experiments_summary=experiments_base_summary,
+                                                           experiment_traffic=experiment_traffic,
+                                                           experiment_info=experiment_info,
+                                                           attribution_windows=attribution_windows,
+                                                           days_of_prior_data=days_of_prior_data)
+    
+    # make sure all experiments are accounted for
+    expect_true(all(sort(unique(prior_data$experiment_id)) == sort(ensure_same_dates_per_experiment$experiment_id)))
+    
+    # ensure min/max first_joined_experiment dates are within the experiment summary dates
+    ensure_joined_dates <- experiments_base_summary %>% 
+        select(experiment_id, start_date) %>%
+        distinct() %>%  # works because each start date should be the same, verified above
+        inner_join(attribution_windows %>%
+                       group_by(experiment_id) %>%
+                       summarise(max_attribution_window=max(attribution_window)),
+                   by=c('experiment_id')) %>%
+        mutate(prior_start_date = start_date - days(days_of_prior_data + max_attribution_window + 1),
+               prior_end_date = prior_start_date + days(days_of_prior_data)) %>%
+        select(experiment_id, contains('prior')) %>%
+        inner_join(prior_data %>%
+                       group_by(experiment_id) %>%
+                       summarise(min_first_joined=min(first_joined_experiment),
+                                 max_first_joined=max(first_joined_experiment)),
+                   by='experiment_id') %>%
+        mutate(valid_min = min_first_joined >= prior_start_date,
+               valid_max = max_first_joined <= prior_end_date) %>%
+        select(valid_min, valid_max)
+    
+    expect_true(all(ensure_joined_dates$valid_min))
+    expect_true(all(ensure_joined_dates$valid_max))
+
+    # make sure variation is set correctly (it actually doens't need to be the original, but it has to be
+    # something, and it will cause some headaches if it isn't)
+    x <- distinct(prior_data %>% select(experiment_id, variation)) %>% arrange(experiment_id)
+    y <- experiment_info %>% filter(is_control) %>% arrange(experiment_id)
+    expect_true(all(x$variation == y$variation))
+
+    # get the experiments summary, but based on the prior data (i.e. mocked to look like an experiment)
+    prior_summary <- experiments__get_base_summary(experiment_info=experiment_info,
+                                                   experiment_traffic=prior_data,
+                                                   attribution_windows=attribution_windows,
+                                                   conversion_events=conversion_events)
+    
+    expect_true(all(prior_summary$control_successes / prior_summary$control_trials == prior_summary$control_conversion_rate))
+    
+    prior_vs_control_cr <- prior_summary %>% 
+        select(experiment_id, metric_id, control_conversion_rate) %>%
+        rename(prior_conversion_rate = control_conversion_rate) %>%
+        inner_join(experiments_base_summary %>% select(experiment_id, metric_id, control_conversion_rate),
+                   by=c('experiment_id', 'metric_id')) %>%
+        mutate(percent_diff = (prior_conversion_rate - control_conversion_rate) / control_conversion_rate)
+    
+    # ensure that the PERCENT CHANGE from prior vs control (i.e. not the absolute difference, which will be
+    # much smaller) averages at max +- 2%. This is subjective, and based on random variation of the simualted
+    # data it might be above. But our case, the baseline conversion rates don't change over time in our 
+    # simulated data so this is a good gut-check.
+    expect_true(abs(mean(prior_vs_control_cr$percent_diff)) < 0.02)
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

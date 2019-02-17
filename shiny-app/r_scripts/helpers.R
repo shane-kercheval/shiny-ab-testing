@@ -581,52 +581,16 @@ experiments__get_summary <- function(experiment_info,
     experiments_summary$p_value_conf_low <- map_dbl(p_values, ~ .['conf.low'])
     experiments_summary$p_value_conf_high <- map_dbl(p_values, ~ .['conf.high'])
 
-    # experiments_summary$p_value_conf_low / experiments_summary$control_conversion_rate
-    # experiments_summary$p_value_conf_high / experiments_summary$control_conversion_rate
-
     ##########################################################################################################
     # Add Bayesian Information
     ##########################################################################################################
-    
-    # we need to modify website_traffic to mock experiment_traffic in order to genearate a PRIOR dataset for
-    # bayesian calculations.
-    # specifically, based on how many days of prior data we want, we'll transform website_traffic
-    # to look like experiment_traffic, but based on the prior dates.
-    # NOTE: Well only want to use the paths that the experiments where in
-    experiment_prior_dates <- experiments_summary %>%
-        select(experiment_id, start_date, metric_id) %>%
-        inner_join(attribution_windows %>%
-                       mutate(metric_id = factor(metric_id,
-                                                 levels=levels(experiments_summary$metric_id))),
-                   by = c('experiment_id', 'metric_id')) %>%
-        group_by(experiment_id) %>%
-        # well take the min calculated start date so we allow enough time for the largest attribution window
-        summarise(prior_start_date = min(start_date - days(days_of_prior_data + attribution_window + 1)),
-                  prior_end_date = prior_start_date + days(days_of_prior_data))
-
-    experiment_prior_paths <- distinct(experiment_traffic %>% select(experiment_id, path))
-    prior_data <- data.frame(user_id=NULL, first_joined_experiment=NULL, experiment_id=NULL, variation=NULL)
-
-    for(experiment in unique(experiment_info$experiment_id)) {
-        
-        prior_start_date <- (experiment_prior_dates %>% filter(experiment_id == experiment))$prior_start_date
-        prior_end_date <- (experiment_prior_dates %>% filter(experiment_id == experiment))$prior_end_date
-        
-        prior_paths <- experiment_prior_paths %>% filter(experiment_id == experiment)
-        variation_name <- (experiment_info %>% 
-            filter(experiment_id == experiment,
-                   is_control))$variation
-        
-        prior_data <- rbind(prior_data,
-                            website_traffic %>% 
-                                filter(visit_date >= prior_start_date & visit_date <= prior_end_date,
-                                       path %in% prior_paths$path) %>%
-                                group_by(user_id) %>%
-                                summarise(first_joined_experiment = min(visit_date)) %>%
-                                mutate(experiment_id = experiment,
-                                       variation = variation_name))
-    }
-
+    prior_data <- private__create_prior_experiment_traffic(website_traffic,
+                                                           experiments_summary,
+                                                           experiment_traffic,
+                                                           experiment_info,
+                                                           attribution_windows,
+                                                           days_of_prior_data)
+    # get the experiments summary, but based on the prior data (i.e. mocked to look like an experiment)
     prior_summary <- experiments__get_base_summary(experiment_info=experiment_info,
                                                    experiment_traffic=prior_data,
                                                    attribution_windows=attribution_windows,
@@ -719,4 +683,54 @@ private__filter_experiment_traffic_via_attribution <- function(experiment_info,
         mutate(metric_id = fct_reorder(metric_id, attribution_window)) %>%
         inner_join(experiment_info,
                    by=c('experiment_id', 'variation'))
+}
+
+
+private__create_prior_experiment_traffic <- function(website_traffic,
+                                                     experiments_summary,
+                                                     experiment_traffic,
+                                                     experiment_info,
+                                                     attribution_windows,
+                                                     days_of_prior_data=15) {
+
+    # we need to modify website_traffic to mock experiment_traffic in order to genearate a PRIOR dataset for
+    # bayesian calculations.
+    # specifically, based on how many days of prior data we want, we'll transform/mock the website_traffic
+    # to look like experiment_traffic, but based on the prior dates.
+    # NOTE: Well only want to use the paths that the experiments where in
+    experiment_prior_dates <- experiments_summary %>%
+        select(experiment_id, start_date, metric_id) %>%
+        inner_join(attribution_windows %>%
+                       mutate(metric_id = factor(metric_id,
+                                                 levels=levels(experiments_summary$metric_id))),
+                   by = c('experiment_id', 'metric_id')) %>%
+        group_by(experiment_id) %>%
+        # well take the min calculated start date so we allow enough time for the largest attribution window
+        summarise(prior_start_date = min(start_date - days(days_of_prior_data + attribution_window + 1)),
+                  prior_end_date = prior_start_date + days(days_of_prior_data))
+
+    experiment_prior_paths <- distinct(experiment_traffic %>% select(experiment_id, path))
+    prior_data <- data.frame(user_id=NULL, first_joined_experiment=NULL, experiment_id=NULL, variation=NULL)
+
+    for(experiment in unique(experiment_info$experiment_id)) {
+
+        prior_start_date <- (experiment_prior_dates %>% filter(experiment_id == experiment))$prior_start_date
+        prior_end_date <- (experiment_prior_dates %>% filter(experiment_id == experiment))$prior_end_date
+        
+        prior_paths <- experiment_prior_paths %>% filter(experiment_id == experiment)
+        variation_name <- (experiment_info %>% 
+            filter(experiment_id == experiment,
+                   is_control))$variation
+        
+        prior_data <- rbind(prior_data,
+                            website_traffic %>% 
+                                filter(visit_date >= prior_start_date & visit_date <= prior_end_date,
+                                       path %in% prior_paths$path) %>%
+                                group_by(user_id) %>%
+                                summarise(first_joined_experiment = min(visit_date)) %>%
+                                mutate(experiment_id = experiment,
+                                       variation = variation_name))
+    }
+
+    return (prior_data)
 }
