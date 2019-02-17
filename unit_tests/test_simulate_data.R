@@ -43,7 +43,7 @@ test_that("test_helpers: create", {
 
     # names of the metrics/conversions to track
     metrics_names <- c('Sign Up', 'Use Feature 1', 'Talk to Sales', 'Pay/Subscribe')
-    
+
     # allowed number of days between seeing the experiment and giving credit for a conversion
     # e.g. signup should happen quick, but we may want to give people more time to subscribe/pay for the service,
     # since people want to try out the features before they decide to pay (e.g. if the service offers a trial or freemium)
@@ -514,16 +514,21 @@ test_that("test_helpers: create", {
 # For those who convert to a metric, generate the offset (number of days) from first-visit to conversion-date
 ##############################################################################################################
 
-    generate_offset <- function(user_id, metric) {
+    # if we set the seed based on user-id, i see some odd behavior, so let's try assigned someone a random number that we will use as a seed
+    num_seeds_needed <- max(conversion_data$user_id)
+    set.seed(2)
+    random_seeds <- sample(1:(num_seeds_needed * 2), num_seeds_needed, replace=F)
+    user_seeds <- random_seeds[conversion_data$user_id]
+    generate_offset <- function(user_seed, metric) {
  
         # NOTE setting the seed is messing up the distribution   
-        set.seed(user_id)
+        set.seed(user_seed)
         # convert from 0-30 days, acnored by the attribution window
         rbinom(1, 30, attribution_windows_days[metric]/30)
     }
 
     names(attribution_windows_days) <- metrics_names
-    conversion_offsets_days <- map2_dbl(conversion_data$user_id, 
+    conversion_offsets_days <- map2_dbl(user_seeds, 
                                    conversion_data$metric_id,
                                    #~ rbinom(1, 30, attribution_windows_days[.y]/30))
                                    ~ generate_offset(.x, .y))

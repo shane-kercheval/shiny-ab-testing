@@ -14,6 +14,7 @@ source('unit_test_helpers.R')
 # test_file("test_helpers_processing.R")
 
 test_that("test_helpers: website_traffic__get_user_first_visit", {
+    context("String processing")
 
     website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
 
@@ -30,6 +31,7 @@ test_that("test_helpers: website_traffic__get_user_first_visit", {
 })
 
 test_that("test_helpers: website_traffic__to_xxx_num_users", {
+    context("String processing2")
 
     website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
 
@@ -75,7 +77,8 @@ test_that("test_helpers: website_traffic__to_xxx_num_users", {
 })
 
 test_that("test_helpers: website_traffic__plot_traffic", {
-
+    context("String processing3")
+    
     website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
 
     plot_object <- website_traffic__plot_traffic(website_traffic,
@@ -101,6 +104,7 @@ test_that("test_helpers: website_traffic__plot_traffic", {
 })
 
 test_that("test_helpers: experiments__determine_conversions", {
+    context("String processing3")
 
     experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
     experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
@@ -199,6 +203,7 @@ test_that("test_helpers: experiments__determine_conversions", {
 })
 
 test_that("test_helpers: private__filter_experiment_traffic_via_attribution", {
+    context("String processing4")
 
     experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
     experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
@@ -245,6 +250,7 @@ test_that("test_helpers: private__filter_experiment_traffic_via_attribution", {
 })
 
 test_that("test_helpers: experiments__get_summary", {
+    context("String processing5")
 
     experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
     experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
@@ -378,6 +384,7 @@ test_that("test_helpers: experiments__get_summary", {
 })
 
 test_that("test_helpers: experiments__get_summary", {
+    context("String processing6")
 
     experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
     experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
@@ -474,8 +481,8 @@ test_that("test_helpers: experiments__get_summary", {
         mutate(percent_diff = (prior_conversion_rate - control_conversion_rate) / control_conversion_rate)
     
     # ensure that the PERCENT CHANGE from prior vs control (i.e. not the absolute difference, which will be
-    # much smaller) averages at max +- 2%. This is subjective, and based on random variation of the simualted
+    # much smaller) averages at max +- 3%. This is subjective, and based on random variation of the simualted
     # data it might be above. But our case, the baseline conversion rates don't change over time in our 
     # simulated data so this is a good gut-check.
-    expect_true(abs(mean(prior_vs_control_cr$percent_diff)) < 0.02)
+    expect_true(abs(mean(prior_vs_control_cr$percent_diff)) < 0.03)
 })
