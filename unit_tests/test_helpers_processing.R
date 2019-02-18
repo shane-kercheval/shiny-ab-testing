@@ -40,10 +40,8 @@ test_that("website_traffic__to_xxx_num_users", {
     daily_first_time_path_num_users <- website_traffic__to_daily_num_users(website_traffic, top_n_paths = 10, only_first_time_visits=TRUE)
     write.csv(daily_first_time_path_num_users, file='data/helpers/website_traffic__to_xxx_num_users/daily_first_time_path_num_users.csv', row.names = FALSE)
 
-
     daily_first_time_2paths_num_users <- website_traffic__to_daily_num_users(website_traffic, top_n_paths = 2, only_first_time_visits=TRUE)
     write.csv(daily_first_time_2paths_num_users, file='data/helpers/website_traffic__to_xxx_num_users/daily_first_time_2paths_num_users.csv', row.names = FALSE)
-
 
     cohort_first_time_num_users <- website_traffic__to_cohort_num_users(website_traffic, only_first_time_visits=TRUE)
     write.csv(cohort_first_time_num_users, file='data/helpers/website_traffic__to_xxx_num_users/cohort_first_time_num_users.csv', row.names = FALSE)
