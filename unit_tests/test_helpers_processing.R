@@ -16,7 +16,7 @@ source('unit_test_helpers.R')
 test_that("website_traffic__get_user_first_visit", {
     context("helpers_processing::website_traffic__get_user_first_visit")
 
-    website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
+    website_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/website_traffic.csv'))
 
     users_first_visit <- website_traffic__get_user_first_visit(website_traffic)
 
@@ -33,7 +33,7 @@ test_that("website_traffic__get_user_first_visit", {
 test_that("website_traffic__to_xxx_num_users", {
     context("helpers_processing::website_traffic__to_xxx_num_users")
 
-    website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
+    website_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/website_traffic.csv'))
 
     daily_first_time_num_users <- website_traffic__to_daily_num_users(website_traffic, only_first_time_visits=TRUE)
     write.csv(daily_first_time_num_users, file='data/helpers/website_traffic__to_xxx_num_users/daily_first_time_num_users.csv', row.names = FALSE)
@@ -79,7 +79,7 @@ test_that("website_traffic__to_xxx_num_users", {
 test_that("website_traffic__plot_traffic", {
     context("helpers_processing::website_traffic__plot_traffic")
     
-    website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
+    website_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/website_traffic.csv'))
 
     plot_object <- website_traffic__plot_traffic(website_traffic,
                                                  only_first_time_visits=TRUE,
@@ -106,11 +106,11 @@ test_that("website_traffic__plot_traffic", {
 test_that("experiments__determine_conversions", {
     context("helpers_processing::experiments__determine_conversions")
 
-    experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
-    experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
-    attribution_windows <- as.data.frame(read_csv('data/cached_simulated_data/attribution_windows.csv'))
-    website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
-    conversion_events <- as.data.frame(read_csv('data/cached_simulated_data/conversion_events.csv'))
+    experiment_info <- as.data.frame(read_csv('../shiny-app/simulated_data/experiment_info.csv'))
+    experiment_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/experiment_traffic.csv'))
+    attribution_windows <- as.data.frame(read_csv('../shiny-app/simulated_data/attribution_windows.csv'))
+    website_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/website_traffic.csv'))
+    conversion_events <- as.data.frame(read_csv('../shiny-app/simulated_data/conversion_events.csv'))
 
     check_data__experiment_info(experiment_info)
     check_data__experiment_traffic(experiment_traffic, experiment_info)
@@ -205,9 +205,9 @@ test_that("experiments__determine_conversions", {
 test_that("private__filter_experiment_traffic_via_attribution", {
     context("helpers_processing::private__filter_experiment_traffic_via_attribution")
 
-    experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
-    experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
-    attribution_windows <- as.data.frame(read_csv('data/cached_simulated_data/attribution_windows.csv'))
+    experiment_info <- as.data.frame(read_csv('../shiny-app/simulated_data/experiment_info.csv'))
+    experiment_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/experiment_traffic.csv'))
+    attribution_windows <- as.data.frame(read_csv('../shiny-app/simulated_data/attribution_windows.csv'))
 
     ###############
     # shift all dates relative to today so we can test excluding people (who recently entered into the
@@ -252,11 +252,11 @@ test_that("private__filter_experiment_traffic_via_attribution", {
 test_that("experiments__get_summary", {
     context("helpers_processing::experiments__get_summary")
 
-    experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
-    experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
-    attribution_windows <- as.data.frame(read_csv('data/cached_simulated_data/attribution_windows.csv'))
-    website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
-    conversion_events <- as.data.frame(read_csv('data/cached_simulated_data/conversion_events.csv'))
+    experiment_info <- as.data.frame(read_csv('../shiny-app/simulated_data/experiment_info.csv'))
+    experiment_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/experiment_traffic.csv'))
+    attribution_windows <- as.data.frame(read_csv('../shiny-app/simulated_data/attribution_windows.csv'))
+    website_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/website_traffic.csv'))
+    conversion_events <- as.data.frame(read_csv('../shiny-app/simulated_data/conversion_events.csv'))
 
     ###############
     # shift all dates relative to today so we can test excluding people (who recently entered into the
@@ -386,11 +386,11 @@ test_that("experiments__get_summary", {
 test_that("experiments__get_summary", {
     context("helpers_processing::experiments__get_summary")
 
-    experiment_info <- as.data.frame(read_csv('data/cached_simulated_data/experiment_info.csv'))
-    experiment_traffic <- as.data.frame(read_csv('data/cached_simulated_data/experiment_traffic.csv'))
-    attribution_windows <- as.data.frame(read_csv('data/cached_simulated_data/attribution_windows.csv'))
-    website_traffic <- as.data.frame(read_csv('data/cached_simulated_data/website_traffic.csv'))
-    conversion_events <- as.data.frame(read_csv('data/cached_simulated_data/conversion_events.csv'))
+    experiment_info <- as.data.frame(read_csv('../shiny-app/simulated_data/experiment_info.csv'))
+    experiment_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/experiment_traffic.csv'))
+    attribution_windows <- as.data.frame(read_csv('../shiny-app/simulated_data/attribution_windows.csv'))
+    website_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/website_traffic.csv'))
+    conversion_events <- as.data.frame(read_csv('../shiny-app/simulated_data/conversion_events.csv'))
 
     ###############
     # shift all dates relative to today so we can test excluding people (who recently entered into the
