@@ -51,3 +51,68 @@ prettify_numerics <- function(values) {
 
     return (values)
 }
+
+#' returns a dataframe's column as a vector
+#'
+#' @param df a data.frame
+#' @param column the column to return as a vector
+#' @param return_unique if TRUE, return unique values
+get_vector <- function(df, column, return_unique=FALSE) {
+
+    if(return_unique) {
+
+        return (unique(df[[column]]))
+    
+    } else {
+
+        return (df[[column]])
+    }
+}
+
+#' returns the vector (`vec`) without the specified value (`val`). If `val` doesn't exist in `vec`, `vec` is
+#' returned unchanged.
+#'
+#' @param vec the vector
+#' @param val the value to remove
+remove_val <- function(vec, val) {
+
+    return (vec[!vec %in% val])
+}
+
+#' Returnes the ceiling of the **absolute value** of `y`, rounded to the nearest_x.
+#'
+#' @param y the value
+#' @param nearest_x the decimal value to round the ceiling to
+ceiling_nearest_x <- function(y, nearest_x) {
+
+    y_trans <- ceiling(abs(y)/nearest_x)*nearest_x
+    if(y < 0) {
+        y_trans <- y_trans * -1
+    }
+    # round to nearest 10 because computers can't handle decimals
+    return (round(y_trans, 10))
+}
+
+#' Like `stopifnot`, but stop `stopifnot` stops if the expression is not true, and `stopif` stops if the
+#' expression is true. Avoids the unintuitive double-negative e.g. (`stopifnot(!espression)`) which becomes
+#' `stopif(espression)`.
+#'
+#' @param exprs the expression
+stopif <- function(exprs) {
+
+    stopifnot(!exprs)
+}
+
+
+#' compares two dataframes and returns TRUE if they are both equal
+#'
+#' @param dataframe1 a dataframe to compare
+#' @param dataframe2 a dataframe to compare
+are_dataframes_equal <- function(dataframe1, dataframe2) {
+    return (all(rownames(dataframe1) == rownames(dataframe2)) &&
+                all(colnames(dataframe1) == colnames(dataframe2)) &&
+                # if either df1 or df2 is NA, then both should be NA
+                all(ifelse(is.na(dataframe1) | is.na(dataframe2),
+                       is.na(dataframe1) & is.na(dataframe2),
+                       dataframe1 == dataframe2)))
+}

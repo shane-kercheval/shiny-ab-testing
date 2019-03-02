@@ -16,16 +16,16 @@ website_traffic__plot_traffic <- function(website_traffic,
                                           filter_year_end_beginning_weeks = TRUE,
                                           top_n_paths = NULL) {
     if(is_weekly) {
-        
+
         cohort_format <- '%W'
         cohort_name <- "Week"
-        
+
     } else {
-        
+
         cohort_format <- '%m'
         cohort_name <- "Month"
     }
-    
+
     caption <- ""
     if(only_first_time_visits) {
         
@@ -41,7 +41,7 @@ website_traffic__plot_traffic <- function(website_traffic,
                            tolower(cohort_name), ".")
         y_label <- paste0("Unique User Visits (per ", cohort_name, ")")
     }
-    
+
     num_users_data <- website_traffic__to_cohort_num_users(website_traffic,
                                                            cohort_format = cohort_format,
                                                            top_n_paths = top_n_paths,

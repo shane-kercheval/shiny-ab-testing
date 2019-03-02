@@ -1,10 +1,43 @@
 source('helpers_stats.R')
 source('helpers_misc.R')
 
+#' loads the datasets, returns them as a named list
+#'
+load_data <- function() {
+
+    get_list <- function() {
+
+        experiment_info <- as.data.frame(read_csv(data_path__experiment_info))
+        experiment_traffic <- as.data.frame(read_csv(data_path__experiment_traffic))
+        attribution_windows <- as.data.frame(read_csv(data_path__attribution_windows))
+        website_traffic <- as.data.frame(read_csv(data_path__website_traffic))
+        conversion_events <- as.data.frame(read_csv(data_path__conversion_events))
+
+        return (list(
+            experiment_info=experiment_info,
+            experiment_traffic=experiment_traffic,
+            attribution_windows=attribution_windows,
+            website_traffic=website_traffic,
+            conversion_events=conversion_events
+        ))
+    }
+
+    dataset_list <- suppressMessages(get_list())
+
+    check_data__experiment_info(dataset_list$experiment_info)
+    check_data__experiment_traffic(dataset_list$experiment_traffic, dataset_list$experiment_info)
+    check_data__attribution_windows(dataset_list$attribution_windows, dataset_list$experiment_info)
+    check_data__website_traffic(dataset_list$website_traffic)
+    check_data__conversion_events(dataset_list$conversion_events, dataset_list$attribution_windows)
+
+    return (dataset_list)
+}
+
+
 #' Gets the row of the first visit for each user-id
 #'
-#' @param website_traffic dataframe containing website traffic data in the expected format
-website_traffic__get_user_first_visit <- function(website_traffic) {
+#' @param experiment_data list of data-frames from load_data
+website_traffic__get_user_first_visit <- function(experiment_data) {
     
     # we're going to get the first occurance; i initially did this by grouping by user-id and dplyr:rank based
     # on visit_date, but this was sloooowwwwww. So I'm going to user by user & date, then remove duplicates
@@ -27,12 +60,12 @@ website_traffic__get_user_first_visit <- function(website_traffic) {
 #'      and sum) because `website_traffic__to_cohort_num_users` will only count the user-id once in the
 #'      cohorted period where the user-id may have had visits across multiple days
 #' 
-#' @param website_traffic dataframe containing website traffic data in the expected format
+#' @param experiment_data list of data-frames from load_data
 #' @param top_n_paths if specified, count by the top (i.e. highest traffic) paths, grouping the remaining
 #'      paths into an 'Other' category. 
 #' @param only_first_time_visits only count the first time the user appears in the dataset (i.e. first time to
 #'      website)
-website_traffic__to_daily_num_users <- function(website_traffic,
+website_traffic__to_daily_num_users <- function(experiment_data,
                                                 top_n_paths=NULL,
                                                 only_first_time_visits=FALSE) {
     
@@ -163,7 +196,7 @@ experiments__get_base_summary <- function(experiment_info,
         group_by(experiment_id) %>%
         summarise(start_date = min(first_joined_experiment),
                   end_date = max(first_joined_experiment))
-    
+
     # filter the traffic by attribution windows;
     # this will duplicate each row in experiment_traffic for each metric; since attribution is based on metric
     filtered_experiment_traffic <- private__filter_experiment_traffic_via_attribution(experiment_info,
@@ -233,7 +266,7 @@ experiments__get_base_summary <- function(experiment_info,
         # there are multiple experiments that are still running, sort by the most recent started
         arrange(desc(end_date), desc(start_date), metric_id)
 
-    stopifnot(!any(duplicated(experiments_summary %>% select(experiment_id, metric_id))))
+    stopif(any(duplicated(experiments_summary %>% select(experiment_id, metric_id))))
 
     ##########################################################################################################
     # Add successes and conversion rates
@@ -416,7 +449,7 @@ experiments__get_summary <- function(experiment_info,
 private__filter_experiment_traffic_via_attribution <- function(experiment_info,
                                                                experiment_traffic,
                                                                attribution_windows){
-    
+
     inner_join(experiment_traffic, attribution_windows, by='experiment_id') %>%
         # we only want the people who have had enough time to convert, given the attribution window for a
         # given metric (i.e. exclude people who join within the attribution window relative to today)
@@ -425,7 +458,6 @@ private__filter_experiment_traffic_via_attribution <- function(experiment_info,
         inner_join(experiment_info,
                    by=c('experiment_id', 'variation'))
 }
-
 
 private__create_prior_experiment_traffic <- function(website_traffic,
                                                      experiments_summary,

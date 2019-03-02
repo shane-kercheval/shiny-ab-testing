@@ -1,4 +1,5 @@
 library('testthat')
+library(lubridate)
 
 source('../shiny-app/r_scripts/helpers_misc.R', chdir=TRUE)
 source('unit_test_helpers.R')

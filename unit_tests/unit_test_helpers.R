@@ -1,3 +1,12 @@
+##############################################################################################################
+# File Paths
+##############################################################################################################
+data_path__experiment_info <- '../shiny-app/simulated_data/experiment_info.csv'
+data_path__experiment_traffic <- '../shiny-app/simulated_data/experiment_traffic.csv'
+data_path__attribution_windows <- '../shiny-app/simulated_data/attribution_windows.csv'
+data_path__website_traffic <- '../shiny-app/simulated_data/website_traffic.csv'
+data_path__conversion_events <- '../shiny-app/simulated_data/conversion_events.csv'
+
 # need to scale the output of the log(exponential) distribution to the number of days we are simulating
 scale_a_b <- function(x, a, b) {
 

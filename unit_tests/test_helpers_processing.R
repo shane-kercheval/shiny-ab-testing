@@ -16,13 +16,13 @@ source('unit_test_helpers.R')
 test_that("website_traffic__get_user_first_visit", {
     context("helpers_processing::website_traffic__get_user_first_visit")
 
-    website_traffic <- as.data.frame(read_csv('../shiny-app/simulated_data/website_traffic.csv'))
+    experiment_data <- load_data()
 
-    users_first_visit <- website_traffic__get_user_first_visit(website_traffic)
+    users_first_visit <- website_traffic__get_user_first_visit(experiment_data)
 
     # this is another way of creating the data, although it is MUCH slower (almost too slow for a unit test)
     # could speed it up if we don't want to test path
-    expected_first_visits <- website_traffic %>%
+    expected_first_visits <- experiment_data$website_traffic %>%
         group_by(user_id) %>%
         summarise(first_visit = min(visit_date),
                   path = path[visit_date == first_visit])
@@ -149,7 +149,10 @@ test_that("experiments__determine_conversions", {
                  0)
 
     # make sure the data is unique by experiment/metric/user
-    expect_true(all((user_conversion_events %>% count(experiment_id, metric_id, user_id))$n == 1))
+    expect_true(setequal(user_conversion_events %>%
+                             count(experiment_id, metric_id, user_id) %>% 
+                             get_vector('n'),
+                         1))
     
     # check attribution windows
     check_attribution_windows <- left_join(attribution_windows,
@@ -164,10 +167,10 @@ test_that("experiments__determine_conversions", {
     expect_true(all(check_attribution_windows$windows_match))
 
     # check days_from_experiment_to_conversion
-    expect_true(all(user_conversion_events$days_from_experiment_to_conversion == 
-                        difftime(user_conversion_events$conversion_date, 
-                                 user_conversion_events$first_joined_experiment,
-                                 units='days')))
+    expect_identical(user_conversion_events$days_from_experiment_to_conversion,
+                     as.numeric(difftime(user_conversion_events$conversion_date, 
+                                         user_conversion_events$first_joined_experiment,
+                                         units='days')))
     
     # check converted_within_window
     check_converted_within_window <- user_conversion_events %>%
@@ -197,7 +200,7 @@ test_that("experiments__determine_conversions", {
         mutate(metric_id = as.character(metric_id)) %>% # need to convert to character because arrange will sort by level, not name
         select(user_id, experiment_id, metric_id) %>% 
         arrange(user_id, experiment_id, metric_id)
-    expect_true(all(expected_user_experiment_metric_combos == found_user_experiment_metric_combos))
+    expect_identical(expected_user_experiment_metric_combos, found_user_experiment_metric_combos)
 })
 
 test_that("private__filter_experiment_traffic_via_attribution", {
@@ -244,7 +247,7 @@ test_that("private__filter_experiment_traffic_via_attribution", {
                   end_date = max(first_joined_experiment)) %>%
         filter(experiment_id %in% start_end_dates$experiment_id)
 
-    expect_true(all(start_end_dates == start_end_dates_filtered))
+    expect_true(are_dataframes_equal(start_end_dates, start_end_dates_filtered))
 })
 
 test_that("experiments__get_summary", {
