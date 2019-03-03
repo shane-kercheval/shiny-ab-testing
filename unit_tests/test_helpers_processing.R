@@ -80,34 +80,34 @@ test_that("website_traffic__to_xxx_num_users", {
                  length(unique(experiment_data$website_traffic$user_id)))
 })
 
-test_that("website_traffic__plot_traffic", {
-    context("helpers_processing::website_traffic__plot_traffic")
+test_that("plot__website_traffic", {
+    context("helpers_processing::plot__website_traffic")
     
     experiment_data <- load_data()
 
-    plot_object <- website_traffic__plot_traffic(experiment_data,
+    plot_object <- plot__website_traffic(experiment_data,
                                                  only_first_time_visits=TRUE,
                                                  is_weekly=TRUE,
                                                  filter_year_end_beginning_weeks=TRUE,
                                                  top_n_paths=NULL)
     expect_false(is.null(plot_object))
-    plot_object %>% test_save_plot(file='data/plot_helpers/website_traffic__plot_traffic/first-visits-weekly-filter.png')
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot__website_traffic/first-visits-weekly-filter.png')
 
-    plot_object <- website_traffic__plot_traffic(experiment_data,
+    plot_object <- plot__website_traffic(experiment_data,
                                                  only_first_time_visits=TRUE,
                                                  is_weekly=TRUE,
                                                  filter_year_end_beginning_weeks=TRUE,
                                                  top_n_paths=10)  # too high, but should still work.
     expect_false(is.null(plot_object))
-    plot_object %>% test_save_plot(file='data/plot_helpers/website_traffic__plot_traffic/first-visits-weekly-filter_top_10_paths.png')
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot__website_traffic/first-visits-weekly-filter_top_10_paths.png')
 
-    plot_object <- website_traffic__plot_traffic(experiment_data,
+    plot_object <- plot__website_traffic(experiment_data,
                                                  only_first_time_visits=TRUE,
                                                  is_weekly=TRUE,
                                                  filter_year_end_beginning_weeks=TRUE,
                                                  top_n_paths=3)
     expect_false(is.null(plot_object))
-    plot_object %>% test_save_plot(file='data/plot_helpers/website_traffic__plot_traffic/first-visits-weekly-filter_top_3_paths.png')
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot__website_traffic/first-visits-weekly-filter_top_3_paths.png')
 })
 
 test_that("experiments__determine_conversions", {
@@ -337,46 +337,46 @@ test_that("experiments__get_summary", {
     ##########################################################################################################
     # plots
     ##########################################################################################################
-    plot_object <- experiments_summary__plot_bayesian(experiments_summary,
-                                 experiment=unique(experiments_summary$experiment_id)[1],
-                                 metric='Sign Up')
+    plot_object <- plot__bayesian_posterior(experiments_summary,
+                                             experiment=unique(experiments_summary$experiment_id)[1],
+                                             metric='Sign Up')
 
-    plot_object %>% test_save_plot(file='data/plot_helpers/experiments_summary__plot_bayesian/experiment_1_signup.png')
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot__bayesian_posterior/experiment_1_signup.png')
     
-    plot_object <- experiments_summary__plot_bayesian(experiments_summary,
-                                 experiment=unique(experiments_summary$experiment_id)[1],
-                                 metric='Sign Up',
-                                 show_prior_distribution = FALSE)
+    plot_object <- plot__bayesian_posterior(experiments_summary,
+                                             experiment=unique(experiments_summary$experiment_id)[1],
+                                             metric='Sign Up',
+                                             show_prior_distribution = FALSE)
     
-    plot_object %>% test_save_plot(file='data/plot_helpers/experiments_summary__plot_bayesian/experiment_1_signup_no_prior.png')
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot__bayesian_posterior/experiment_1_signup_no_prior.png')
 
-    plot_object <- experiments_summary__plot_bayesian(experiments_summary,
-                                 experiment="New Signup CTA Color",
-                                 metric='Pay/Subscribe',
-                                 show_prior_distribution = TRUE)
+    plot_object <- plot__bayesian_posterior(experiments_summary,
+                                             experiment="New Signup CTA Color",
+                                             metric='Pay/Subscribe',
+                                             show_prior_distribution = TRUE)
     
-    plot_object %>% test_save_plot(file='data/plot_helpers/experiments_summary__plot_bayesian/signup_color_pay.png')
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot__bayesian_posterior/signup_color_pay.png')
     
-    plot_object <- experiments_summary__plot_bayesian(experiments_summary,
-                                 experiment="New Signup CTA Color",
-                                 metric='Pay/Subscribe',
-                                 show_prior_distribution = FALSE)
+    plot_object <- plot__bayesian_posterior(experiments_summary,
+                                             experiment="New Signup CTA Color",
+                                             metric='Pay/Subscribe',
+                                             show_prior_distribution = FALSE)
     
-    plot_object %>% test_save_plot(file='data/plot_helpers/experiments_summary__plot_bayesian/signup_color_pay_no_prior.png')
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot__bayesian_posterior/signup_color_pay_no_prior.png')
     
-    plot_object <- experiments_summary__plot_bayesian(experiments_summary,
-                                 experiment="Redesign Website",
-                                 metric='Pay/Subscribe',
-                                 show_prior_distribution = TRUE)
+    plot_object <- plot__bayesian_posterior(experiments_summary,
+                                             experiment="Redesign Website",
+                                             metric='Pay/Subscribe',
+                                             show_prior_distribution = TRUE)
     
-    plot_object %>% test_save_plot(file='data/plot_helpers/experiments_summary__plot_bayesian/redesign_website_pay.png')
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot__bayesian_posterior/redesign_website_pay.png')
     
-    plot_object <- experiments_summary__plot_bayesian(experiments_summary,
-                                 experiment="Redesign Website",
-                                 metric='Pay/Subscribe',
-                                 show_prior_distribution = FALSE)
+    plot_object <- plot__bayesian_posterior(experiments_summary,
+                                             experiment="Redesign Website",
+                                             metric='Pay/Subscribe',
+                                             show_prior_distribution = FALSE)
     
-    plot_object %>% test_save_plot(file='data/plot_helpers/experiments_summary__plot_bayesian/redesign_website_pay_no_prior.png')
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot__bayesian_posterior/redesign_website_pay_no_prior.png')
 })
 
 test_that("experiments__get_base_summary_priors", {
@@ -470,4 +470,89 @@ test_that("experiments__get_base_summary_priors", {
     # data it might be above. But our case, the baseline conversion rates don't change over time in our 
     # simulated data so this is a good gut-check.
     expect_true(abs(mean(prior_vs_control_cr$percent_diff)) < 0.03)
+})
+
+test_that("plot__conversion_rates", {
+    context("helpers_processing::plot__conversion_rates")
+    
+    experiment_data <- load_data()
+    experiment_names <- sort(unique(experiment_data$experiment_info$experiment_id))
+    experiments_summary <- experiments__get_summary(experiment_data, days_of_prior_data=15)
+
+    for(experiment in experiment_names) {
+        
+        plot_object <- plot__conversion_rates(experiments_summary, experiment=experiment)
+        expect_false(is.null(plot_object))
+        plot_object %>% test_save_plot(file=paste0('data/plot_helpers/plot__conversion_rates/',
+                                                    experiment,'.png'),
+                                       size_inches=c(8,12))
+    }
+})
+
+test_that("plot__percent_change_frequentist", {
+    context("helpers_processing::plot__percent_change_frequentist")
+    
+    experiment_data <- load_data()
+    experiment_names <- sort(unique(experiment_data$experiment_info$experiment_id))
+    experiments_summary <- experiments__get_summary(experiment_data, days_of_prior_data=15)
+    
+    for(experiment in experiment_names) {
+        
+        plot_object <- plot__percent_change_frequentist(experiments_summary, experiment=experiment)
+        expect_false(is.null(plot_object))
+        plot_object %>% test_save_plot(file=paste0('data/plot_helpers/plot__percent_change_frequentist/',
+                                                   experiment,'.png'),
+                                       size_inches=c(8,12))
+    }
+})
+
+test_that("plot__percent_change_bayesian", {
+    context("helpers_processing::plot__percent_change_bayesian")
+    
+    experiment_data <- load_data()
+    experiment_names <- sort(unique(experiment_data$experiment_info$experiment_id))
+    experiments_summary <- experiments__get_summary(experiment_data, days_of_prior_data=15)
+    
+    for(experiment in experiment_names) {
+        
+        plot_object <- plot__percent_change_bayesian(experiments_summary, experiment=experiment)
+        expect_false(is.null(plot_object))
+        plot_object %>% test_save_plot(file=paste0('data/plot_helpers/plot__percent_change_bayesian/',
+                                                   experiment,'.png'),
+                                       size_inches=c(8,12))
+    }
+})
+
+test_that("plot__percent_change_conf_frequentist", {
+    context("helpers_processing::plot__percent_change_conf_frequentist")
+    
+    experiment_data <- load_data()
+    experiment_names <- sort(unique(experiment_data$experiment_info$experiment_id))
+    experiments_summary <- experiments__get_summary(experiment_data, days_of_prior_data=15)
+    
+    for(experiment in experiment_names) {
+        
+        plot_object <- plot__percent_change_conf_frequentist(experiments_summary, experiment=experiment)
+        expect_false(is.null(plot_object))
+        plot_object %>% test_save_plot(file=paste0('data/plot_helpers/plot__percent_change_conf_frequentist/',
+                                                   experiment,'.png'),
+                                       size_inches=c(8,12))
+    }
+})
+
+test_that("plot__percent_change_conf_bayesian", {
+    context("helpers_processing::plot__percent_change_conf_bayesian")
+    
+    experiment_data <- load_data()
+    experiment_names <- sort(unique(experiment_data$experiment_info$experiment_id))
+    experiments_summary <- experiments__get_summary(experiment_data, days_of_prior_data=15)
+    
+    for(experiment in experiment_names) {
+        
+        plot_object <- plot__percent_change_conf_bayesian(experiments_summary, experiment=experiment)
+        expect_false(is.null(plot_object))
+        plot_object %>% test_save_plot(file=paste0('data/plot_helpers/plot__percent_change_conf_bayesian/',
+                                                   experiment,'.png'),
+                                       size_inches=c(8,12))
+    }
 })
