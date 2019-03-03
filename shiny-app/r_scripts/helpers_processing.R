@@ -1,8 +1,11 @@
 source('helpers_stats.R')
 source('helpers_misc.R')
 
-#' loads the datasets, returns them as a named list
-#'
+#' loads the datasets, returns them as a named list (the goal is to encapsulate the undelying datasets and
+#' pass the various functions a consistent object)
+#' 
+#' must ensure that the `data_path__` fields below are defined in the environment. e.g. the paths
+#' could differ between production/development/unit-test environments.
 load_data <- function() {
 
     get_list <- function() {
@@ -32,7 +35,6 @@ load_data <- function() {
 
     return (dataset_list)
 }
-
 
 #' Gets the row of the first visit for each user-id
 #'

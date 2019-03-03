@@ -53,7 +53,6 @@ calculate_days_required <- function(daily_traffic,
     days_required <- ceiling(entities_required / daily_traffic)
 
     return (ifelse(days_required > 365, Inf, days_required))
-    
 }
 
 #' Returns a credible interval approximations using the normal distribution, according to the methods in the

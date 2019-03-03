@@ -90,6 +90,7 @@ test_that("website_traffic__plot_traffic", {
                                                  is_weekly=TRUE,
                                                  filter_year_end_beginning_weeks=TRUE,
                                                  top_n_paths=NULL)
+    expect_false(is.null(plot_object))
     plot_object %>% test_save_plot(file='data/plot_helpers/website_traffic__plot_traffic/first-visits-weekly-filter.png')
 
     plot_object <- website_traffic__plot_traffic(experiment_data,
@@ -97,6 +98,7 @@ test_that("website_traffic__plot_traffic", {
                                                  is_weekly=TRUE,
                                                  filter_year_end_beginning_weeks=TRUE,
                                                  top_n_paths=10)  # too high, but should still work.
+    expect_false(is.null(plot_object))
     plot_object %>% test_save_plot(file='data/plot_helpers/website_traffic__plot_traffic/first-visits-weekly-filter_top_10_paths.png')
 
     plot_object <- website_traffic__plot_traffic(experiment_data,
@@ -104,6 +106,7 @@ test_that("website_traffic__plot_traffic", {
                                                  is_weekly=TRUE,
                                                  filter_year_end_beginning_weeks=TRUE,
                                                  top_n_paths=3)
+    expect_false(is.null(plot_object))
     plot_object %>% test_save_plot(file='data/plot_helpers/website_traffic__plot_traffic/first-visits-weekly-filter_top_3_paths.png')
 })
 
@@ -181,9 +184,9 @@ test_that("experiments__determine_conversions", {
     # apart of. This dataset should exactly match the dataset returned from experiments__determine_conversions
     # in terms of user/experiment/metric
     expected_user_experiment_metric_combos <- inner_join(
-        experiment_traffic %>% 
+        experiment_data$experiment_traffic %>% 
         select(user_id, experiment_id, first_joined_experiment),
-               conversion_events %>% select(user_id, metric_id),
+        experiment_data$conversion_events %>% select(user_id, metric_id),
                by='user_id') %>%
         inner_join(experiment_data$attribution_windows, by=c('experiment_id', 'metric_id')) %>%
         filter(first_joined_experiment < Sys.Date() - attribution_window) %>%
