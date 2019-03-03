@@ -42,3 +42,8 @@ test_save_plot <- function(plot, file_name, size_inches=c(5, 8)) {
     ggsave(filename=file_name, plot=plot, height=size_inches[1], width=size_inches[2], units='in')
     stopifnot(file.exists(file_name))
 }
+
+expect_dataframes_equal <- function(dataframe1, dataframe2){
+
+    expect_true(are_dataframes_equal(dataframe1, dataframe2))
+}

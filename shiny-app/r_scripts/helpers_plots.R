@@ -2,7 +2,7 @@ source('helpers_misc.R')
 
 #' Plots Website Traffic over time
 #' 
-#' @param website_traffic dataframe containing website traffic data in the expected format
+#' @param experiment_data list of data-frames from load_data
 #' @param only_first_time_visits only count the first time the user appears in the dataset (i.e. first time to website)
 #' @param is_weekly if TRUE, groups/cohorts data by week, if FALSE then groups by month
 #' @param filter_year_end_beginning_weeks if TRUE (and if is_weekly is TRUE) then it excludes weeks 0 (first
@@ -10,7 +10,7 @@ source('helpers_misc.R')
 #'      will make the traffic appear to drop during those weeks.
 #' @param top_n_paths if specified, the graph color the lines by path, and count by the top (i.e. highest 
 #'      traffic) paths, grouping the remaining paths into an 'Other' category.
-website_traffic__plot_traffic <- function(website_traffic,
+website_traffic__plot_traffic <- function(experiment_data,
                                           only_first_time_visits = FALSE,
                                           is_weekly = TRUE,
                                           filter_year_end_beginning_weeks = TRUE,
@@ -42,7 +42,7 @@ website_traffic__plot_traffic <- function(website_traffic,
         y_label <- paste0("Unique User Visits (per ", cohort_name, ")")
     }
 
-    num_users_data <- website_traffic__to_cohort_num_users(website_traffic,
+    num_users_data <- website_traffic__to_cohort_num_users(experiment_data,
                                                            cohort_format = cohort_format,
                                                            top_n_paths = top_n_paths,
                                                            only_first_time_visits = only_first_time_visits)
@@ -116,7 +116,7 @@ experiments_summary__plot_bayesian <- function(experiments_summary,
     # depending on the where we want to graph and how spread out the values are, we will want to get more/less granualar with our plot
 
     distro_names <- c("Control", "Variant", "Prior")  # don't change order, controlled from above
-    distros <- data_frame(alpha = alpha_vector,
+    distros <- data.frame(alpha = alpha_vector,
                           beta = beta_vector,
                           group = distro_names) %>%
         group_by(alpha, beta, group) %>%
@@ -144,6 +144,7 @@ experiments_summary__plot_bayesian <- function(experiments_summary,
     }
 
     #custom_colors <- rev(hue_pal()(3))
+    # Variant, Control, Prior
     custom_colors <- c('#19A6FF', '#FF9500', '#C396E8')
     
     if(!show_prior_distribution) {
@@ -181,8 +182,8 @@ experiments_summary__plot_bayesian <- function(experiments_summary,
     plot_object <- ggplot(data=distros, aes(x, y, color = Parameters)) +
         geom_line() +
         geom_area(aes(fill=Parameters, group=Parameters), alpha=0.3, position = 'identity') +
-        geom_errorbarh(aes(xmin = control_cred_low, xmax = control_cred_high, y = max_distros_20th * -1), height = max_distros_20th * 0.75, color = custom_colors[1], alpha=0.3) + 
-        geom_errorbarh(aes(xmin = variant_cred_low, xmax = variant_cred_high, y = max_distros_20th * -2), height = max_distros_20th * 0.75, color = custom_colors[2], alpha=0.3) + 
+        geom_errorbarh(aes(xmin = control_cred_low, xmax = control_cred_high, y = max_distros_20th * -1), height = max_distros_20th * 0.75, color = custom_colors[2], alpha=0.3) + 
+        geom_errorbarh(aes(xmin = variant_cred_low, xmax = variant_cred_high, y = max_distros_20th * -2), height = max_distros_20th * 0.75, color = custom_colors[1], alpha=0.3) + 
         scale_x_continuous(breaks = seq(0, 1, x_axis_break_steps),
                            labels = percent_format()) +
         theme_light() +

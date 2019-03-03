@@ -42,7 +42,7 @@ website_traffic__get_user_first_visit <- function(experiment_data) {
     # we're going to get the first occurance; i initially did this by grouping by user-id and dplyr:rank based
     # on visit_date, but this was sloooowwwwww. So I'm going to user by user & date, then remove duplicates
     # which is fast; i've verified they produce identical results
-    website_traffic <- website_traffic %>% arrange(user_id, visit_date)
+    website_traffic <- experiment_data$website_traffic %>% arrange(user_id, visit_date)
     
     return (website_traffic[!duplicated(website_traffic %>% select(user_id)), ])
 }
@@ -71,7 +71,11 @@ website_traffic__to_daily_num_users <- function(experiment_data,
     
     if(only_first_time_visits) {
 
-        website_traffic <- website_traffic__get_user_first_visit(website_traffic)
+        website_traffic <- website_traffic__get_user_first_visit(experiment_data)
+
+    } else {
+
+        website_traffic <- experiment_data$website_traffic
     }
     
     if(!is.null(top_n_paths)) {
@@ -97,19 +101,23 @@ website_traffic__to_daily_num_users <- function(experiment_data,
 #'      represented in >=1 rows for a single cohorted period when top_n_paths is not NULL, but will only be
 #'      count once in a cohorted period when top_n_paths is NULL
 #' 
-#' @param website_traffic dataframe containing website traffic data in the expected format
+#' @param experiment_data list of data-frames from load_data
 #' @param top_n_paths if specified, count by the top (i.e. highest traffic) paths, grouping the remaining
 #'      paths into an 'Other' category.
 #' @param only_first_time_visits only count the first time the user appears in the dataset (i.e. first time to
 #'      website)
-website_traffic__to_cohort_num_users <- function(website_traffic,
+website_traffic__to_cohort_num_users <- function(experiment_data,
                                                  cohort_format='%W',
                                                  top_n_paths=NULL,
                                                  only_first_time_visits=FALSE) {
 
     if(only_first_time_visits) {
 
-        website_traffic <- website_traffic__get_user_first_visit(website_traffic)
+        website_traffic <- website_traffic__get_user_first_visit(experiment_data)
+
+    } else {
+
+        website_traffic <- experiment_data$website_traffic
     }
     
     website_traffic <- website_traffic %>%
@@ -139,19 +147,17 @@ website_traffic__to_cohort_num_users <- function(website_traffic,
 #'      they joined the experiment, or after the attribution window for that metric, then the conversion is
 #'      not attributed to the experiment and will not be counted (for that experiment)
 #' 
-#' @param experiment_traffic
-#' @param attribution_windows
-#' @param user_conversion_events
-experiments__determine_conversions <- function(experiment_traffic, attribution_windows, user_conversion_events) {
+#' @param experiment_data list of data-frames from load_data
+experiments__determine_conversions <- function(experiment_data) {
 
     # dataset only contains users that converted
     # dataset is per user, per experment, per converted metric
-    user_conversion_events <-  experiment_traffic %>% 
+    conversion_events <- experiment_data$experiment_traffic %>% 
         # duplicates user-records when user has converted with multiple metrics
-        inner_join(user_conversion_events, by='user_id') %>%
+        inner_join(experiment_data$conversion_events, by='user_id') %>%
         # now we need to get the attribution time windows to figure out if they converted within the
         # time-frame
-        inner_join(attribution_windows, by=c('experiment_id', 'metric_id')) %>%
+        inner_join(experiment_data$attribution_windows, by=c('experiment_id', 'metric_id')) %>%
         # but, we have to filter out anyone who first joined the experiment in the last x days, where x is
         # less than the attribution window for that metric, because they haven't been given the full amount
         # of time to convert. And even though (by definition of being in this dataset) they have already
@@ -170,7 +176,7 @@ experiments__determine_conversions <- function(experiment_traffic, attribution_w
         select(user_id, experiment_id, variation, metric_id, first_joined_experiment, conversion_date,
                days_from_experiment_to_conversion, attribution_window, converted_within_window)
 
-        return (user_conversion_events)
+        return (conversion_events)
 }
 
 #' Gets the "base" summary ror each experiment/metric.
@@ -183,25 +189,17 @@ experiments__determine_conversions <- function(experiment_traffic, attribution_w
 #' experiment/metric. Otherwise (if we included those users) it would distort (likely over-state) the future
 #' conversion rate. 
 #' 
-#' @param experiment_info
-#' @param experiment_traffic
-#' @param attribution_windows
-#' @param conversion_events
-experiments__get_base_summary <- function(experiment_info,
-                                          experiment_traffic,
-                                          attribution_windows,
-                                          conversion_events) {
+#' @param experiment_data list of data-frames from load_data
+experiments__get_base_summary <- function(experiment_data) {
 
-    experiment_start_end_dates <- experiment_traffic %>%
+    experiment_start_end_dates <- experiment_data$experiment_traffic %>%
         group_by(experiment_id) %>%
         summarise(start_date = min(first_joined_experiment),
                   end_date = max(first_joined_experiment))
 
     # filter the traffic by attribution windows;
     # this will duplicate each row in experiment_traffic for each metric; since attribution is based on metric
-    filtered_experiment_traffic <- private__filter_experiment_traffic_via_attribution(experiment_info,
-                                                                                      experiment_traffic,
-                                                                                      attribution_windows)
+    filtered_experiment_traffic <- private__filter_experiment_traffic_via_attribution(experiment_data)
     
     # i want to cache the is_control/variation-name here so in know i'm joining the actual variation used for
     # the control; i could join on the variation names after the fact but there's an increase risk because
@@ -225,7 +223,7 @@ experiments__get_base_summary <- function(experiment_info,
             rename(control_name=`TRUE`)
     }
 
-    stopifnot(nrow(cache_experiment_variations) == length(unique(experiment_info$experiment_id)))
+    stopifnot(nrow(cache_experiment_variations) == length(unique(experiment_data$experiment_info$experiment_id)))
     
     experiments_summary <- filtered_experiment_traffic %>%
         group_by(experiment_id, metric_id, is_control) %>%
@@ -274,13 +272,11 @@ experiments__get_base_summary <- function(experiment_info,
     
     # experiments__determine_conversions will exclude traffic based on first_joined_experiment &
     # attribution windows like we did above with
-    experiment_conversion_events <- experiments__determine_conversions(experiment_traffic,
-                                                                       attribution_windows,
-                                                                       conversion_events) %>%
+    experiment_conversion_events <- experiments__determine_conversions(experiment_data) %>%
         filter(converted_within_window) %>%
         count(experiment_id, variation, metric_id) %>%
         rename(successes=n) %>%
-        inner_join(experiment_info, by=c('experiment_id', 'variation')) %>%
+        inner_join(experiment_data$experiment_info, by=c('experiment_id', 'variation')) %>%
         select(-variation) %>%
         spread(is_control, successes)
     
@@ -289,8 +285,8 @@ experiments__get_base_summary <- function(experiment_info,
     if("FALSE" %in% colnames(experiment_conversion_events)) {
         
         experiments_summary <- inner_join(experiments_summary,
-                                         experiment_conversion_events,
-                                         by=c('experiment_id', 'metric_id')) %>%
+                                          experiment_conversion_events,
+                                          by=c('experiment_id', 'metric_id')) %>%
             rename(control_successes=`TRUE`,
                    variant_successes=`FALSE`) %>% 
             mutate(control_conversion_rate=control_successes / control_trials,
@@ -301,8 +297,8 @@ experiments__get_base_summary <- function(experiment_info,
     } else {
         
         experiments_summary <- inner_join(experiments_summary,
-                                         experiment_conversion_events,
-                                         by=c('experiment_id', 'metric_id')) %>%
+                                          experiment_conversion_events,
+                                          by=c('experiment_id', 'metric_id')) %>%
             rename(control_successes=`TRUE`) %>%
             mutate(control_conversion_rate=control_successes / control_trials)
     }
@@ -322,21 +318,11 @@ experiments__get_base_summary <- function(experiment_info,
 #' experiment/metric. Otherwise (if we included those users) it would distort (likely over-state) the future
 #' conversion rate. 
 #' 
-#' @param experiment_info
-#' @param experiment_traffic
-#' @param attribution_windows
-#' @param conversion_events
-experiments__get_summary <- function(experiment_info,
-                                     experiment_traffic,
-                                     website_traffic,
-                                     attribution_windows,
-                                     conversion_events,
+#' @param experiment_data list of data-frames from load_data
+experiments__get_summary <- function(experiment_data,
                                      days_of_prior_data=15) {
 
-    experiments_summary <- experiments__get_base_summary(experiment_info,
-                                                         experiment_traffic,
-                                                         attribution_windows,
-                                                         conversion_events)
+    experiments_summary <- experiments__get_base_summary(experiment_data)
     
     ##########################################################################################################
     # Add P-Value Information
@@ -358,17 +344,18 @@ experiments__get_summary <- function(experiment_info,
     ##########################################################################################################
     # Add Bayesian Information
     ##########################################################################################################
-    prior_data <- private__create_prior_experiment_traffic(website_traffic,
+    prior_data <- private__create_prior_experiment_traffic(experiment_data,
                                                            experiments_summary,
-                                                           experiment_traffic,
-                                                           experiment_info,
-                                                           attribution_windows,
                                                            days_of_prior_data)
     # get the experiments summary, but based on the prior data (i.e. mocked to look like an experiment)
-    prior_summary <- experiments__get_base_summary(experiment_info=experiment_info,
-                                                   experiment_traffic=prior_data,
-                                                   attribution_windows=attribution_windows,
-                                                   conversion_events=conversion_events)
+    mock_prior_data <- list(
+        experiment_info=experiment_data$experiment_info,
+        experiment_traffic=prior_data,  # use "mocked" prior traffic/data rather than actual traffic
+        attribution_windows=experiment_data$attribution_windows,
+        website_traffic=experiment_data$website_traffic,
+        conversion_events=experiment_data$conversion_events
+    )
+    prior_summary <- experiments__get_base_summary(experiment_data=mock_prior_data)
 
     prior_summary <- prior_summary %>%
         mutate(prior_alpha=control_successes,
@@ -444,26 +431,23 @@ experiments__get_summary <- function(experiment_info,
 #' x is the attribution window for that given experiment/metric. Otherwise (if we included those users) it 
 #' would distort (likely over-state) the future conversion rate. 
 #' 
-#' @param experiment_traffic
-#' @param attribution_windows
-private__filter_experiment_traffic_via_attribution <- function(experiment_info,
-                                                               experiment_traffic,
-                                                               attribution_windows){
+#' @param experiment_data list of data-frames from load_data
+private__filter_experiment_traffic_via_attribution <- function(experiment_data){
 
-    inner_join(experiment_traffic, attribution_windows, by='experiment_id') %>%
+    inner_join(experiment_data$experiment_traffic,
+               experiment_data$attribution_windows,
+               by='experiment_id') %>%
         # we only want the people who have had enough time to convert, given the attribution window for a
         # given metric (i.e. exclude people who join within the attribution window relative to today)
         filter(first_joined_experiment < Sys.Date() - attribution_window) %>%
         mutate(metric_id = fct_reorder(metric_id, attribution_window)) %>%
-        inner_join(experiment_info,
+        inner_join(experiment_data$experiment_info,
                    by=c('experiment_id', 'variation'))
 }
 
-private__create_prior_experiment_traffic <- function(website_traffic,
+#' @param experiment_data list of data-frames from load_data
+private__create_prior_experiment_traffic <- function(experiment_data,
                                                      experiments_summary,
-                                                     experiment_traffic,
-                                                     experiment_info,
-                                                     attribution_windows,
                                                      days_of_prior_data=15) {
 
     # we need to modify website_traffic to mock experiment_traffic in order to genearate a PRIOR dataset for
@@ -473,7 +457,7 @@ private__create_prior_experiment_traffic <- function(website_traffic,
     # NOTE: Well only want to use the paths that the experiments where in
     experiment_prior_dates <- experiments_summary %>%
         select(experiment_id, start_date, metric_id) %>%
-        inner_join(attribution_windows %>%
+        inner_join(experiment_data$attribution_windows %>%
                        mutate(metric_id = factor(metric_id,
                                                  levels=levels(experiments_summary$metric_id))),
                    by = c('experiment_id', 'metric_id')) %>%
@@ -482,21 +466,22 @@ private__create_prior_experiment_traffic <- function(website_traffic,
         summarise(prior_start_date = min(start_date - days(days_of_prior_data + attribution_window + 1)),
                   prior_end_date = prior_start_date + days(days_of_prior_data))
 
-    experiment_prior_paths <- distinct(experiment_traffic %>% select(experiment_id, path))
+    experiment_prior_paths <- distinct(experiment_data$experiment_traffic %>% select(experiment_id, path))
     prior_data <- data.frame(user_id=NULL, first_joined_experiment=NULL, experiment_id=NULL, variation=NULL)
 
-    for(experiment in unique(experiment_info$experiment_id)) {
+    for(experiment in unique(experiment_data$experiment_info$experiment_id)) {
 
         prior_start_date <- (experiment_prior_dates %>% filter(experiment_id == experiment))$prior_start_date
         prior_end_date <- (experiment_prior_dates %>% filter(experiment_id == experiment))$prior_end_date
         
         prior_paths <- experiment_prior_paths %>% filter(experiment_id == experiment)
-        variation_name <- (experiment_info %>% 
+        variation_name <- experiment_data$experiment_info %>%
             filter(experiment_id == experiment,
-                   is_control))$variation
+                   is_control) %>%
+            get_vector('variation')
         
         prior_data <- rbind(prior_data,
-                            website_traffic %>% 
+                            experiment_data$website_traffic %>% 
                                 filter(visit_date >= prior_start_date & visit_date <= prior_end_date,
                                        path %in% prior_paths$path) %>%
                                 group_by(user_id) %>%
