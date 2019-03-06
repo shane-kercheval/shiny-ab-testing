@@ -321,9 +321,10 @@ test_that("experiments__get_summary", {
 
     with(experiments_summary, expect_identical(variant_alpha, prior_alpha + variant_successes))
     with(experiments_summary, expect_identical(variant_beta, prior_beta + variant_trials - variant_successes))
-    with(experiments_summary, expect_true(all(bayesian_conf.low < bayesian_cr_diff_estimate & bayesian_cr_diff_estimate < bayesian_conf.high)))
+    with(experiments_summary, expect_identical(bayesian_cr_difference, bayesian_variant_cr - bayesian_control_cr))
+    with(experiments_summary, expect_true(all(bayesian_conf_low < bayesian_cr_difference & bayesian_cr_difference < bayesian_conf_high)))
 
-    with(experiments_summary, expect_identical(cr_diff_estimate, variant_conversion_rate - control_conversion_rate))
+    with(experiments_summary, expect_identical(frequentist_cr_difference, variant_conversion_rate - control_conversion_rate))
 
     p_values <- with(experiments_summary, pmap_dbl(list(control_successes, control_trials, variant_successes, variant_trials),
         function(bs, bt, vs, vt) {
@@ -442,7 +443,7 @@ test_that("experiments__get_base_summary_priors", {
         mutate(valid_min = min_first_joined >= prior_start_date,
                valid_max = max_first_joined <= prior_end_date) %>%
         select(valid_min, valid_max)
-    
+
     expect_true(all(ensure_joined_dates$valid_min))
     expect_true(all(ensure_joined_dates$valid_max))
 
@@ -472,6 +473,101 @@ test_that("experiments__get_base_summary_priors", {
     expect_true(abs(mean(prior_vs_control_cr$percent_diff)) < 0.03)
 })
 
+test_that("...", {
+    context("helpers_processing::...")
+    
+    experiment_data <- load_data()
+    
+    ###############
+    # shift all dates relative to today so we can test excluding people (who recently entered into the
+    # experiment) based on the attribution window
+    ###############
+    max_date <- max(max(experiment_data$experiment_traffic$first_joined_experiment),
+                    #max(conversion_events$conversion_date),
+                    max(experiment_data$website_traffic$visit_date))
+    
+    days_offset <- Sys.Date() - as.Date(max_date)
+    
+    experiment_data$experiment_traffic$first_joined_experiment <- experiment_data$experiment_traffic$first_joined_experiment + days_offset
+    experiment_data$website_traffic$visit_date <- experiment_data$website_traffic$visit_date + days_offset
+    experiment_data$conversion_events$conversion_date <- experiment_data$conversion_events$conversion_date + days_offset
+    
+    # get base summary, required for private__create_prior_experiment_traffic
+    experiments_summary <- experiments__get_summary(experiment_data)
+    
+    experiments_daily_summary <- experiments__get_daily_summary(experiment_data, experiments_summary)
+    
+    # the last/final days of the daily cumulative summary should equal the results from the 
+    # experiments__get_summary
+    last_days_daily_summary <- experiments_daily_summary %>%
+        group_by(experiment_id, metric_id) %>%
+        mutate(r = rank(-as.numeric(day_expired_attribution))) %>%
+        ungroup() %>%
+        filter(r == 1) %>%
+        select(-day_expired_attribution) %>%
+        rename(control_successes = control_cumulative_successes,
+               control_trials = control_cumulative_trials,
+               variant_successes = variant_cumulative_successes,
+               variant_trials = variant_cumulative_trials) %>%
+        arrange(experiment_id, metric_id)
+    
+    expected_summary <- experiments_summary %>% 
+        select(-contains('date'),
+               -percent_change_from_control,
+               -control_name,
+               -variant_name) %>%
+        arrange(experiment_id, metric_id)
+                             
+    last_days_daily_summary <- last_days_daily_summary %>%
+        select_(.dots=colnames(expected_summary))
+    
+    expect_dataframes_equal(expected_summary, last_days_daily_summary)
+    
+    for(experiment in unique(experiments_summary$experiment_id)) {
+        for(metric in unique(experiments_summary$metric_id)) {
+            # experiment <- "Ask Additional Questions During Signup"
+            # metric <- "Use Feature 1"
+            print(experiment)
+            print(metric)
+            
+            plot_object <- plot__daily_p_value(experiments_daily_summary, experiment, metric)
+            expect_false(is.null(plot_object))
+            plot_object %>% test_save_plot(file=paste0('data/plot_helpers/plot__daily_p_value/',
+                                                       experiment, '_',
+                                                       str_remove_all(metric, '/'),
+                                                       '.png'),
+                                           size_inches=c(8,12))
+
+
+            plot_object <- plot__daily_percent_change_frequentist(experiments_daily_summary, experiment, metric)
+            expect_false(is.null(plot_object))
+            plot_object %>% test_save_plot(file=paste0('data/plot_helpers/plot__daily_percent_change_frequentist/',
+                                                       experiment, '_',
+                                                       str_remove_all(metric, '/'),
+                                                       '.png'),
+                                           size_inches=c(8,12))
+
+
+            plot_object <- plot__daily_prob_variant_gt_control(experiments_daily_summary, experiment, metric)
+            expect_false(is.null(plot_object))
+            plot_object %>% test_save_plot(file=paste0('data/plot_helpers/plot__daily_prob_variant_gt_control/',
+                                                       experiment, '_',
+                                                       str_remove_all(metric, '/'),
+                                                       '.png'),
+                                           size_inches=c(8,12))
+
+
+            plot_object <- plot__daily_percent_change_bayesian(experiments_daily_summary, experiment, metric)
+            expect_false(is.null(plot_object))
+            plot_object %>% test_save_plot(file=paste0('data/plot_helpers/plot__daily_percent_change_bayesian/',
+                                                       experiment, '_',
+                                                       str_remove_all(metric, '/'),
+                                                       '.png'),
+                                           size_inches=c(8,12))
+        }
+    }
+})
+
 test_that("plot__conversion_rates", {
     context("helpers_processing::plot__conversion_rates")
     
@@ -485,6 +581,23 @@ test_that("plot__conversion_rates", {
         expect_false(is.null(plot_object))
         plot_object %>% test_save_plot(file=paste0('data/plot_helpers/plot__conversion_rates/',
                                                     experiment,'.png'),
+                                       size_inches=c(8,12))
+    }
+})
+
+test_that("plot__conversion_rates_bayesian", {
+    context("helpers_processing::plot__conversion_rates_bayesian")
+    
+    experiment_data <- load_data()
+    experiment_names <- sort(unique(experiment_data$experiment_info$experiment_id))
+    experiments_summary <- experiments__get_summary(experiment_data, days_of_prior_data=15)
+    
+    for(experiment in experiment_names) {
+        
+        plot_object <- plot__conversion_rates_bayesian(experiments_summary, experiment=experiment)
+        expect_false(is.null(plot_object))
+        plot_object %>% test_save_plot(file=paste0('data/plot_helpers/plot__conversion_rates_bayesian/',
+                                                   experiment,'.png'),
                                        size_inches=c(8,12))
     }
 })

@@ -223,7 +223,7 @@ plot__bayesian_posterior <- function(experiments_summary,
     return (plot_object)
 }
 
-#' Plots the control vs variant conversion rates for all 
+#' Plots the control vs variant conversion rates for all metrics
 #' 
 #' @param experiment_data list of data-frames from load_data
 #' @param experiment
@@ -268,6 +268,63 @@ plot__conversion_rates <- function(experiments_summary, experiment) {
             geom_text(aes(label= comma_format()(trials)),
                       position=position_dodge(width=.8), check_overlap=TRUE, vjust=-0.5,
                       size=rel(global__text_size)) + 
+            #facet_wrap(~ track_field_name, ncol=1, scales='free_x') +
+            scale_fill_manual(values=c(global__colors_control, global__colors_variant)) +
+            theme_light(base_size=global__theme_base_size) +
+            theme(axis.text.x=element_text(angle=35, hjust=1)) +
+            labs(caption="",
+                 x="Metric",
+                 y="Conversion Rate",
+                 fill="Variation")
+}
+
+#' Plots the control vs variant conversion rates based on the bayesian methodology, for all metrics
+#' 
+#' @param experiment_data list of data-frames from load_data
+#' @param experiment
+plot__conversion_rates_bayesian <- function(experiments_summary, experiment) {
+    get_type <- function(type) {
+        
+        if(type == 'bayesian_prob_variant_gt_control') {
+            return (type)
+        }
+        
+        return (str_split(type, '_', simplify=TRUE)[2])
+    }
+
+    modified_summary <- experiments_summary %>%
+        filter(experiment_id == experiment) %>%
+        select(metric_id, 
+               control_alpha, control_beta, bayesian_control_cr, 
+               variant_alpha, variant_beta, bayesian_variant_cr,
+               bayesian_prob_variant_gt_control) %>%
+        gather(type, value, -metric_id) %>%
+        mutate(variation=ifelse(type != 'bayesian_prob_variant_gt_control' & str_detect(type, 'control'), 'Control', 'Variant')) %>%
+        mutate(actual_type=map_chr(type, ~ get_type(.))) %>%
+        mutate(actual_type=ifelse(actual_type == 'control' | actual_type == 'variant',
+                                  'conversion_rate',
+                                  actual_type)) %>%
+        select(-type) %>%
+        spread(actual_type, value) %>%
+        group_by(metric_id) %>%
+        mutate(bayesian_prob_variant_gt_control=min(bayesian_prob_variant_gt_control, na.rm=TRUE)) %>%
+        ungroup()
+
+    modified_summary %>%
+        ggplot(aes(x=metric_id, y=conversion_rate, group=variation, fill=variation)) +
+            #geom_col(position='dodge') +
+            geom_bar(stat="identity", position=position_dodge(width=0.8), width=0.75) +
+            scale_y_continuous(labels=percent_format()) +
+            coord_cartesian(ylim=c(0, max(modified_summary$conversion_rate) + 0.05)) +
+            geom_text(aes(label= percent_format()(conversion_rate)),
+                      position=position_dodge(width=.8), check_overlap=TRUE, vjust=-3, 
+                      size=rel(global__text_size)) + 
+            geom_text(aes(label=paste('a:', comma_format()(alpha))),
+                      position=position_dodge(width=.8), check_overlap=TRUE, vjust=-1.75,
+                      size=rel(global__text_size - 0.5)) + 
+            geom_text(aes(label=paste('b:', comma_format()(beta))),
+                      position=position_dodge(width=.8), check_overlap=TRUE, vjust=-0.5,
+                      size=rel(global__text_size - 0.5)) + 
             #facet_wrap(~ track_field_name, ncol=1, scales='free_x') +
             scale_fill_manual(values=c(global__colors_control, global__colors_variant)) +
             theme_light(base_size=global__theme_base_size) +
@@ -511,3 +568,134 @@ plot__percent_change_conf_bayesian <- function(experiments_summary, experiment) 
              y="Percent Change from Control to Variant",
              color="Probability Variant is Better")
 }
+
+plot__daily_p_value <- function(experiments_daily_summary,
+                                experiment,
+                                mettric) {
+
+    experiments_daily_summary %>%
+        filter(experiment_id == experiment,
+               metric_id == metric) %>%
+        mutate(day_expired_attribution = as.Date(day_expired_attribution)) %>%
+        ggplot(aes(x=day_expired_attribution, y=p_value)) +
+        geom_line() +
+        geom_point() +
+        geom_text(aes(label=round(p_value, 3)), vjust=-0.5, check_overlap = TRUE) +
+        geom_hline(yintercept = 0.05, color ='red', alpha=0.5, size=1.5) +
+        scale_x_date(date_breaks = '1 days') + 
+        #scale_y_continuous(breaks = seq(0, 1, 0.05)) +
+        expand_limits(y=0) +
+        labs(title='P-value over time',
+             y='P-Value',
+             x='Day of Experiment (and days after)') +
+        theme_light() +
+        theme(axis.text.x = element_text(angle = 30, hjust = 1))
+}
+
+plot__daily_percent_change_frequentist <- function(experiments_daily_summary,
+                                                   experiment,
+                                                   mettric) {
+
+    current_daily_summary <-  experiments_daily_summary %>%
+        filter(experiment_id == experiment,
+               metric_id == metric) %>%
+        mutate(day_expired_attribution = as.Date(day_expired_attribution)) %>%
+        mutate(perc_change = frequentist_cr_difference / control_conversion_rate,
+               perc_change_conf_low = frequentist_conf_low / control_conversion_rate,
+               perc_change_conf_high = frequentist_conf_high / control_conversion_rate)
+
+    plot_object <- current_daily_summary %>%
+        ggplot(aes(x=day_expired_attribution, y=perc_change)) +
+        geom_line() +
+        #coord_cartesian(ylim=c(-0.10, 0.3)) +
+        scale_y_continuous(labels = percent_format()) +
+        scale_x_date(date_breaks = '1 days') + 
+        geom_ribbon(aes(ymin = perc_change_conf_low, ymax = perc_change_conf_high), fill = 'green', alpha=0.15)
+
+    if(any(current_daily_summary$p_value > 0.05)) {
+    
+        plot_object <- plot_object +
+            geom_ribbon(aes(ymin = ifelse(p_value > 0.05, perc_change_conf_low, NA), ymax = ifelse(p_value > 0.05, perc_change_conf_high, NA)), fill = 'red', alpha=0.45)
+    }
+
+    if(any(current_daily_summary$p_value <= 0.05)) {
+    
+        plot_object <- plot_object +
+            geom_ribbon(aes(ymin = ifelse(p_value <= 0.05, perc_change_conf_low, NA), ymax = ifelse(p_value <= 0.05, perc_change_conf_high, NA)), fill = 'green', alpha=0.2)
+
+    }
+        
+    plot_object +
+        geom_hline(yintercept = 0, color='red', alpha=0.5, size=1.5) +
+        geom_text(aes(label=percent(perc_change)), vjust=-1, check_overlap = TRUE) +
+        labs(#title='Difference in Conversion Rate of `B` - `A`, with Frequentist Confidence Interval - \nWith Attribution Window',
+             y='Lift (i.e. Percent change from Control to Variant)',
+             x='Day of Experiment') +
+        theme_light() +
+        theme(axis.text.x = element_text(angle = 30, hjust = 1))
+}
+
+plot__daily_prob_variant_gt_control <- function(experiments_daily_summary, experiment, metric) {
+    experiments_daily_summary %>%
+            filter(experiment_id == experiment,
+                   metric_id == metric) %>%
+            mutate(day_expired_attribution = as.Date(day_expired_attribution)) %>%
+            ggplot(aes(x=day_expired_attribution, y=bayesian_prob_variant_gt_control)) +
+            geom_line() +
+            geom_point() +
+            geom_text(aes(label=percent(bayesian_prob_variant_gt_control)), vjust=-0.5, check_overlap = TRUE) +
+            geom_hline(yintercept = 0.5, color ='red', alpha=0.5, size=1.5) +
+            scale_x_date(date_breaks = '1 days') + 
+            #scale_y_continuous(breaks = seq(0, 1, 0.05)) +
+            expand_limits(y=c(0, 1)) +
+            labs(title='Probability Variant is Better',
+                 y='Probability Variant is Better',
+                 x='Day of Experiment (and days after)') +
+            theme_light() +
+            theme(axis.text.x = element_text(angle = 30, hjust = 1))
+}
+
+plot__daily_percent_change_bayesian <- function(experiments_daily_summary, experiment, metric) {
+
+    current_daily_summary <- experiments_daily_summary %>%
+        filter(experiment_id == experiment,
+               metric_id == metric) %>%
+        mutate(day_expired_attribution = as.Date(day_expired_attribution)) %>%
+        mutate(perc_change = bayesian_percent_change,
+               perc_change_conf_low = bayesian_conf_low / bayesian_control_cr,
+               perc_change_conf_high = bayesian_conf_high / bayesian_control_cr,
+               # it is "statistically significant" if the confidence interval is completely above or below 0
+               is_stat_sig=(perc_change_conf_low < 0 & perc_change_conf_high < 0) | (perc_change_conf_low > 0 & perc_change_conf_high > 0))
+
+    plot_object <- current_daily_summary %>%
+        ggplot(aes(x=day_expired_attribution, y=perc_change)) +
+        geom_line() +
+        #coord_cartesian(ylim=c(-0.10, 0.3)) +
+        scale_y_continuous(labels = percent_format()) +
+        scale_x_date(date_breaks = '1 days') + 
+        geom_ribbon(aes(ymin = perc_change_conf_low, ymax = perc_change_conf_high), fill = 'green', alpha=0.15)
+
+    if(any(!current_daily_summary$is_stat_sig)) {
+    
+        plot_object <- plot_object +
+            geom_ribbon(aes(ymin = ifelse(!is_stat_sig, perc_change_conf_low, NA), ymax = ifelse(!is_stat_sig, perc_change_conf_high, NA)), fill = 'red', alpha=0.45)
+    }
+
+    if(any(current_daily_summary$is_stat_sig)) {
+    
+        plot_object <- plot_object +
+            geom_ribbon(aes(ymin = ifelse(is_stat_sig, perc_change_conf_low, NA), ymax = ifelse(is_stat_sig, perc_change_conf_high, NA)), fill = 'green', alpha=0.2)
+
+    }
+
+    plot_object +
+        geom_hline(yintercept = 0, color='red', alpha=0.5, size=1.5) +
+        geom_text(aes(label=percent(perc_change)), vjust=-1, check_overlap = TRUE) +
+        labs(#title='Difference in Conversion Rate of `B` - `A`, with Frequentist Confidence Interval - \nWith Attribution Window',
+            y='Lift (i.e. Percent change from Control to Variant)',
+            x='Day of Experiment') +
+        theme_light() +
+        theme(axis.text.x = element_text(angle = 30, hjust = 1))
+}
+
+

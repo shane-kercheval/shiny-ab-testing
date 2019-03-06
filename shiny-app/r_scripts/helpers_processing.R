@@ -508,3 +508,105 @@ private__create_prior_experiment_traffic <- function(experiment_data,
 
     return (prior_data)
 }
+
+experiments__get_daily_summary <- function(experiment_data, experiments_summary) {
+
+    # per metric, since it is based on attribution windows
+    # for each day of the experiment, get the total number of trials (i.e. denominator); must allow enough
+    # days corresponding to the attribution window
+    t <- private__filter_experiment_traffic_via_attribution(experiment_data)
+    
+    t <- t %>%
+        # gets the day where the attribution window has expired (i.e. day we can count the particular person
+        # as a success/trial)
+        mutate(day_expired_attribution = ceiling_date(first_joined_experiment + days(attribution_window),
+                                                      unit='day')) 
+  
+    # for each day of the experiment, get the total number of successes (i.e. numerator); must allow enough
+    # days corresponding to the attribution window
+    conversion_events <- experiments__determine_conversions(experiment_data) %>%
+        filter(converted_within_window) %>%
+        select(user_id, experiment_id, variation, metric_id, converted_within_window)
+
+
+    t <- left_join(t, conversion_events, by = c("user_id", "experiment_id", "variation", "metric_id"))
+
+    cumulative_traffic <- t %>%
+        mutate(converted_within_window = ifelse(is.na(converted_within_window),
+                                                FALSE,
+                                                converted_within_window)) %>%
+        group_by(experiment_id, variation, metric_id, day_expired_attribution) %>%
+        summarise(is_control = any(is_control),
+                  trials = n_distinct(user_id),
+                  trials_verify = n(),
+                  successes = sum(converted_within_window)) %>%
+        ungroup() %>%
+        arrange(experiment_id, is_control, metric_id, day_expired_attribution) %>%
+        group_by(experiment_id, variation, metric_id) %>%
+        mutate(cumulative_trials=cumsum(trials),
+               cumulative_successes=cumsum(successes)) %>%
+        ungroup()
+    
+    stopifnot(identical(cumulative_traffic$trials, cumulative_traffic$trials_verify))
+    
+    cumulative_traffic <- cumulative_traffic %>%
+        select(-trials, -trials_verify, -successes)
+    
+    # convert is_control column to wide version (e.g controL_cumulative_success, variant_cumulative_success)
+    cumulative_traffic <- cumulative_traffic %>%
+        select(-variation) %>%
+        mutate(conversion_rate = cumulative_successes / cumulative_trials) %>%
+        gather(variable, value, -c(experiment_id, metric_id, day_expired_attribution, is_control)) %>%
+        mutate(variation = ifelse(is_control, 'control', 'variant')) %>%
+        select(-is_control) %>%
+        unite(temp, variation, variable) %>%
+        spread(temp, value)
+    colnames(cumulative_traffic)
+
+    # add frequentist data to cumulative traffic
+    p_values <- pmap(list(cumulative_traffic$control_cumulative_successes,
+                          cumulative_traffic$control_cumulative_trials,
+                          cumulative_traffic$variant_cumulative_successes,
+                          cumulative_traffic$variant_cumulative_trials),
+                     function(bs, bt, vs, vt) get_p_values_info(bs, bt, vs, vt))
+
+    cumulative_traffic$p_value <- map_dbl(p_values, ~ .['p_value'])
+    cumulative_traffic$frequentist_cr_difference <- map_dbl(p_values, ~ .['cr_diff_estimate'])
+    cumulative_traffic$frequentist_conf_low <- map_dbl(p_values, ~ .['conf.low'])
+    cumulative_traffic$frequentist_conf_high <- map_dbl(p_values, ~ .['conf.high'])
+    
+    # add bayesian data to cumulative traffic based on the prior alpha/beta from the experiments_summary data
+    # per experiment/metric
+    cumulative_traffic <- inner_join(cumulative_traffic,
+                                     experiments_summary %>% 
+                                         select(experiment_id, metric_id, prior_alpha, prior_beta),
+                                     by = c("experiment_id", "metric_id"))
+    cumulative_traffic <- cumulative_traffic %>%
+        mutate(control_alpha = prior_alpha + control_cumulative_successes,
+               control_beta = prior_beta + (control_cumulative_trials - control_cumulative_successes),
+               variant_alpha = prior_alpha + variant_cumulative_successes,
+               variant_beta = prior_beta + (variant_cumulative_trials - variant_cumulative_successes))
+    
+    cia_list <- pmap(with(cumulative_traffic,
+                          list(control_alpha, control_beta, variant_alpha, variant_beta)),
+                     function(alpha_a, beta_a, alpha_b, beta_b){  
+                         credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)
+                     })
+    
+    cumulative_traffic <- cumulative_traffic %>%                 
+        mutate(bayesian_prob_variant_gt_control=map_dbl(cia_list, ~.['posterior']),
+               bayesian_cr_difference=map_dbl(cia_list, ~.['cr_diff_estimate']),
+               bayesian_conf_low=map_dbl(cia_list, ~.['conf.low']),
+               bayesian_conf_high=map_dbl(cia_list, ~.['conf.high']))
+    
+    #################### NOTE:
+    # I need to do the same thing for the percent change bayesian graphs
+    cumulative_traffic <- cumulative_traffic %>%
+        mutate(bayesian_control_cr = control_alpha / (control_alpha + control_beta),
+               bayesian_variant_cr = variant_alpha / (variant_alpha + variant_beta),
+               # NOTE::::::: ADD THIS TEST TO experiment_summary unit test
+               t = bayesian_cr_difference - (bayesian_variant_cr - bayesian_control_cr),
+               bayesian_percent_change = (bayesian_variant_cr - bayesian_control_cr) /  bayesian_control_cr)
+    
+    return (cumulative_traffic)
+}
