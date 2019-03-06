@@ -273,7 +273,7 @@ experiments__get_base_summary <- function(experiment_data) {
     ##########################################################################################################
     
     # experiments__determine_conversions will exclude traffic based on first_joined_experiment &
-    # attribution windows like we did above with
+    # attribution windows like we did above with private__filter_experiment_traffic_via_attribution
     experiment_conversion_events <- experiments__determine_conversions(experiment_data) %>%
         filter(converted_within_window) %>%
         count(experiment_id, variation, metric_id) %>%
@@ -336,12 +336,10 @@ experiments__get_summary <- function(experiment_data,
                           experiments_summary$variant_trials),
                      function(bs, bt, vs, vt) get_p_values_info(bs, bt, vs, vt))
  
-    experiments_summary_pvalues <- experiments_summary
-    
     experiments_summary$p_value <- map_dbl(p_values, ~ .['p_value'])
-    experiments_summary$cr_diff_estimate <- map_dbl(p_values, ~ .['cr_diff_estimate'])
-    experiments_summary$p_value_conf_low <- map_dbl(p_values, ~ .['conf.low'])
-    experiments_summary$p_value_conf_high <- map_dbl(p_values, ~ .['conf.high'])
+    experiments_summary$frequentist_cr_difference <- map_dbl(p_values, ~ .['cr_diff_estimate'])
+    experiments_summary$frequentist_conf_low <- map_dbl(p_values, ~ .['conf.low'])
+    experiments_summary$frequentist_conf_high <- map_dbl(p_values, ~ .['conf.high'])
 
     ##########################################################################################################
     # Add Bayesian Information
@@ -381,11 +379,17 @@ experiments__get_summary <- function(experiment_data,
                      })
 
     experiments_summary <- experiments_summary %>%                 
-        mutate(prob_variant_is_better=map_dbl(cia_list, ~.['posterior']),
-               bayesian_cr_diff_estimate=map_dbl(cia_list, ~.['cr_diff_estimate']),
-               bayesian_conf.low=map_dbl(cia_list, ~.['conf.low']),
-               bayesian_conf.high=map_dbl(cia_list, ~.['conf.high']))
+        mutate(bayesian_prob_variant_gt_control=map_dbl(cia_list, ~.['posterior']),
+               bayesian_cr_difference=map_dbl(cia_list, ~.['cr_diff_estimate']),
+               bayesian_conf_low=map_dbl(cia_list, ~.['conf.low']),
+               bayesian_conf_high=map_dbl(cia_list, ~.['conf.high']))
 
+    experiments_summary <- experiments_summary %>%                 
+        mutate(bayesian_control_cr = control_alpha / (control_alpha + control_beta),
+               bayesian_variant_cr = variant_alpha / (variant_alpha + variant_beta))
+    
+
+               
     experiments_summary <- experiments_summary %>%
         select(
                # experiment information
@@ -394,33 +398,43 @@ experiments__get_summary <- function(experiment_data,
                end_date,
                last_join_date,
                metric_id,
+
                # conversion rates
                control_conversion_rate,
                variant_conversion_rate,
                percent_change_from_control,
+
                # control & variation raw numbers
                control_name,
                control_successes,
                control_trials,
+
                variant_name,
                variant_successes,
                variant_trials,
+
                # frequentist
                p_value,
-               cr_diff_estimate,
-               p_value_conf_low,
-               p_value_conf_high,
+               frequentist_cr_difference,
+               frequentist_conf_low,
+               frequentist_conf_high,
+
                # bayesian
                prior_alpha,
                prior_beta,
+
                control_alpha,
                control_beta,
                variant_alpha,
                variant_beta,
-               prob_variant_is_better,
-               bayesian_cr_diff_estimate,
-               bayesian_conf.low,
-               bayesian_conf.high)
+
+               bayesian_control_cr,
+               bayesian_variant_cr,
+
+               bayesian_prob_variant_gt_control,
+               bayesian_cr_difference,
+               bayesian_conf_low,
+               bayesian_conf_high)
 
     return (experiments_summary)
 }

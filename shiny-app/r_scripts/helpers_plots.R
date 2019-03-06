@@ -105,7 +105,7 @@ plot__bayesian_posterior <- function(experiments_summary,
     control_beta <- local_experiment$control_beta
     variant_alpha <- local_experiment$variant_alpha
     variant_beta <- local_experiment$variant_beta
-    prob_variant_is_better <- local_experiment$prob_variant_is_better
+    bayesian_prob_variant_gt_control <- local_experiment$bayesian_prob_variant_gt_control
     control_name <- local_experiment$control_name
     variant_name <- local_experiment$variant_name
 
@@ -212,7 +212,7 @@ plot__bayesian_posterior <- function(experiments_summary,
         scale_color_manual(values=custom_colors) +
         labs(title='Posterior Probability Distributions of Control & Variant',
              subtitle=paste0(paste0('The probability the Variant is better is ',
-                                    percent(prob_variant_is_better), ".\n"),
+                                    percent(bayesian_prob_variant_gt_control), ".\n"),
                              paste0('\nExperiment: "', experiment, '"'),
                              paste0('\nMetric: "', metric, '"'),
                              paste0('\nControl Name: "', control_name, '"'),
@@ -359,7 +359,7 @@ plot__percent_change_bayesian <- function(experiments_summary, experiment) {
     current_experiments <- experiments_summary %>%
         filter(experiment_id == experiment) %>%
         select(-percent_change_from_control) %>%
-        mutate(percent_change_from_control = bayesian_cr_diff_estimate / control_conversion_rate)
+        mutate(percent_change_from_control = bayesian_cr_difference / bayesian_control_cr)
     
     nearest_x <- 0.05
     min_perc_change <- ceiling_nearest_x(min(current_experiments$percent_change_from_control),
@@ -368,7 +368,7 @@ plot__percent_change_bayesian <- function(experiments_summary, experiment) {
                                          nearest_x)
 
     plot_object <- current_experiments %>%
-        ggplot(aes(x=metric_id, y=percent_change_from_control, fill=prob_variant_is_better)) +
+        ggplot(aes(x=metric_id, y=percent_change_from_control, fill=bayesian_prob_variant_gt_control)) +
         geom_col()
 
     # if there are any experiments where the percent change is greater than 0, add text
@@ -380,7 +380,7 @@ plot__percent_change_bayesian <- function(experiments_summary, experiment) {
                       aes(label=paste(percent(percent_change_from_control), 'Change')),
                       vjust=-2, size=rel(global__text_size), check_overlap=TRUE) +
             geom_text(data=t,
-                      aes(label=paste(percent(prob_variant_is_better), 'Probability')),
+                      aes(label=paste(percent(bayesian_prob_variant_gt_control), 'Probability')),
                       vjust=-0.5, size=rel(global__text_size), check_overlap=TRUE)
     }
 
@@ -393,7 +393,7 @@ plot__percent_change_bayesian <- function(experiments_summary, experiment) {
                       aes(label=paste(percent(percent_change_from_control), 'Change')),
                       vjust=2.7, size=rel(global__text_size), check_overlap=TRUE) +
             geom_text(data=t,
-                      aes(label=paste(percent(prob_variant_is_better), 'Probability')),
+                      aes(label=paste(percent(bayesian_prob_variant_gt_control), 'Probability')),
                       vjust=1.2, size=rel(global__text_size), check_overlap=TRUE)
     }
 
@@ -423,12 +423,12 @@ plot__percent_change_conf_frequentist <- function(experiments_summary, experimen
     
     current_experiments <- current_experiments %>%
         select(metric_id,
-               contains('conversion_rate'),
-               cr_diff_estimate,
+               control_conversion_rate,
+               p_value,
                percent_change_from_control,
-               contains('p_value')) %>%
-        mutate(percent_change_conf_low=p_value_conf_low / control_conversion_rate,
-               percent_change_conf_high=p_value_conf_high / control_conversion_rate,
+               contains('frequentist')) %>%
+        mutate(percent_change_conf_low=frequentist_conf_low / control_conversion_rate,
+               percent_change_conf_high=frequentist_conf_high / control_conversion_rate,
                p_value_sig = p_value <= global__p_value_threshold) %>%
         select(metric_id, contains('percent_change'), p_value, p_value_sig)
     
@@ -480,25 +480,23 @@ plot__percent_change_conf_bayesian <- function(experiments_summary, experiment) 
     
     current_experiments <- current_experiments %>%
         select(metric_id,
-               contains('conversion_rate'),
-               prob_variant_is_better,
                contains('bayesian')) %>%
-        mutate(percent_change_from_control=bayesian_cr_diff_estimate / control_conversion_rate,
-               percent_change_conf_low=bayesian_conf.low / control_conversion_rate,
-               percent_change_conf_high=bayesian_conf.high / control_conversion_rate) %>%
-        select(metric_id, contains('percent_change'), prob_variant_is_better)
+        mutate(percent_change_from_control=bayesian_cr_difference / bayesian_control_cr,
+               percent_change_conf_low=bayesian_conf_low / bayesian_control_cr,
+               percent_change_conf_high=bayesian_conf_high / bayesian_control_cr) %>%
+        select(metric_id, contains('percent_change'), bayesian_prob_variant_gt_control)
     
     y_expand <- 0.10
     min_y <- ceiling_nearest_x(min(current_experiments$percent_change_conf_low), y_expand)
     max_y <- ceiling_nearest_x(max(current_experiments$percent_change_conf_high), y_expand)
     
     current_experiments %>%
-        ggplot(aes(x=metric_id, y=percent_change_from_control, color=prob_variant_is_better)) +
+        ggplot(aes(x=metric_id, y=percent_change_from_control, color=bayesian_prob_variant_gt_control)) +
         geom_point(size=2) +
         geom_errorbar(aes(ymin=percent_change_conf_low, ymax=percent_change_conf_high), size=0.8) +
         geom_text(aes(label=percent(percent_change_from_control)),
                   hjust=1.2, size=rel(global__text_size), check_overlap=TRUE, color='black') +
-        geom_text(aes(y=max_y + y_expand, label=paste(percent(prob_variant_is_better), "Probability")),
+        geom_text(aes(y=max_y + y_expand, label=paste(percent(bayesian_prob_variant_gt_control), "Probability")),
                   vjust=1, size=rel(global__text_size), check_overlap=TRUE, color='black') +
         geom_hline(yintercept=0, color='#EB5424', size=1.2, alpha=0.5) +
         coord_cartesian(ylim=c(min_y - y_expand, max_y + y_expand)) +
