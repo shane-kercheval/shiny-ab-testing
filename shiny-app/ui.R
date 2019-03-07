@@ -21,7 +21,7 @@ shinyUI(fluidPage(theme="custom.css",
                 uiOutput('experiment__metric_select__UI'),
                 radioButtons(
                     inputId='experiment__stat_type_select',
-                    label="Statistics Methodology",
+                    label="Statistical Methodology",
                     choices=c("Frequentist", "Bayesian"),
                     selected="Frequentist",
                     inline=TRUE,
@@ -35,36 +35,29 @@ shinyUI(fluidPage(theme="custom.css",
             id='main_tabs',
             type='tabs',
             tabPanel(
-                "Percent Change",
+                'Percent Change',
                 #id='main_tabs__overview',
                 tags$br(),
                 plotOutput(outputId='plot__percent_change')
                 #tags$div(class='results-table', dataTableOutput(outputId='source_data__head_table'))
             ),
             tabPanel(
-                "Percent Change Confidence",
-                #id='main_tabs__overview',
+                'Percent Change Confidence',
+                #id='main_tabs__dropoff',
                 tags$br(),
                 plotOutput(outputId='plot__percent_change_confidence')
-                #tags$div(class='results-table', dataTableOutput(outputId='source_data__head_table'))
             ),
             tabPanel(
-                "Conversion Rates",
-                #id='main_tabs__dropoff',
+                'Conversion Rates',
+                #id='main_tabs__discontinuity',
                 tags$br(),
                 plotOutput(outputId='plot__conversion_rates')
             ),
             tabPanel(
-                "Trend",
-                #id='main_tabs__dropoff',
-                tags$br(),
-                plotOutput(outputId='plot__conversion_rates')
-            ),
-            tabPanel(
-                "Bayesian Posterior",
+                'Trends',
                 #id='main_tabs__value_counts',
                 tags$br(),
-                plotOutput(outputId='plot__bayesian_posterior')
+                plotOutput(outputId='plot__trends')
             )
         )
     )

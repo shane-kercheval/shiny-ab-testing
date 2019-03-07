@@ -571,7 +571,7 @@ plot__percent_change_conf_bayesian <- function(experiments_summary, experiment) 
 
 plot__daily_p_value <- function(experiments_daily_summary,
                                 experiment,
-                                mettric) {
+                                metric) {
 
     experiments_daily_summary %>%
         filter(experiment_id == experiment,
@@ -594,7 +594,7 @@ plot__daily_p_value <- function(experiments_daily_summary,
 
 plot__daily_percent_change_frequentist <- function(experiments_daily_summary,
                                                    experiment,
-                                                   mettric) {
+                                                   metric) {
 
     current_daily_summary <-  experiments_daily_summary %>%
         filter(experiment_id == experiment,
