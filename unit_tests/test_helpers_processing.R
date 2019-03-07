@@ -494,7 +494,6 @@ test_that("...", {
     
     # get base summary, required for private__create_prior_experiment_traffic
     experiments_summary <- experiments__get_summary(experiment_data)
-    
     experiments_daily_summary <- experiments__get_daily_summary(experiment_data, experiments_summary)
     
     # the last/final days of the daily cumulative summary should equal the results from the 
@@ -538,7 +537,6 @@ test_that("...", {
                                                        '.png'),
                                            size_inches=c(8,12))
 
-
             plot_object <- plot__daily_percent_change_frequentist(experiments_daily_summary, experiment, metric)
             expect_false(is.null(plot_object))
             plot_object %>% test_save_plot(file=paste0('data/plot_helpers/plot__daily_percent_change_frequentist/',
@@ -547,7 +545,6 @@ test_that("...", {
                                                        '.png'),
                                            size_inches=c(8,12))
 
-
             plot_object <- plot__daily_prob_variant_gt_control(experiments_daily_summary, experiment, metric)
             expect_false(is.null(plot_object))
             plot_object %>% test_save_plot(file=paste0('data/plot_helpers/plot__daily_prob_variant_gt_control/',
@@ -555,7 +552,6 @@ test_that("...", {
                                                        str_remove_all(metric, '/'),
                                                        '.png'),
                                            size_inches=c(8,12))
-
 
             plot_object <- plot__daily_percent_change_bayesian(experiments_daily_summary, experiment, metric)
             expect_false(is.null(plot_object))

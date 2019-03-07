@@ -697,5 +697,3 @@ plot__daily_percent_change_bayesian <- function(experiments_daily_summary, exper
         theme_light() +
         theme(axis.text.x = element_text(angle = 30, hjust = 1))
 }
-
-

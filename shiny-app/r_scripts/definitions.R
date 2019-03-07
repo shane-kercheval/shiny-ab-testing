@@ -1,11 +1,12 @@
+should_log_message <- TRUE
 ##############################################################################################################
 # File Paths
 ##############################################################################################################
-data_path__experiment_info <- '/simulated_data/experiment_info.csv'
-data_path__experiment_traffic <- '/simulated_data/experiment_traffic.csv'
-data_path__attribution_windows <- '/simulated_data/attribution_windows.csv'
-data_path__website_traffic <- '/simulated_data/website_traffic.csv'
-data_path__conversion_events <- '/simulated_data/conversion_events.csv'
+data_path__experiment_info <- 'simulated_data/experiment_info.csv'
+data_path__experiment_traffic <- 'simulated_data/experiment_traffic.csv'
+data_path__attribution_windows <- 'simulated_data/attribution_windows.csv'
+data_path__website_traffic <- 'simulated_data/website_traffic.csv'
+data_path__conversion_events <- 'simulated_data/conversion_events.csv'
 
 global__colors_variant <- '#19A6FF'  # blue
 global__colors_control <- '#FF9500'  # orange
@@ -27,3 +28,8 @@ global__text_size <- 4
 global__theme_base_size <- 16
 
 global__p_value_threshold <- 0.05
+
+global__tab_names__overview <- "Overview"
+global__tab_names__dropoff <- "Event Drop-off"
+global__tab_names__value_counts <- "Event Value Counts"
+global__tab_names__discontinuity <- "Discontinuity Analysis"
