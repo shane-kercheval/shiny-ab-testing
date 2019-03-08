@@ -38,4 +38,4 @@ global__tab_names__discontinuity <- "Discontinuity Analysis"
 global__confidence_level <- 0.95
 global__p_value_threshold <- 1 - global__confidence_level
 
-global__prior_number_of_days <- 10
+global__prior_number_of_days <- 5
