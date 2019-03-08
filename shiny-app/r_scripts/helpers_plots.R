@@ -398,9 +398,8 @@ plot__percent_change_frequentist <- function(experiments_summary, experiment, p_
         scale_fill_manual(values=fill_colors) +
         theme_light(base_size=global__theme_base_size) +
         theme(axis.text.x=element_text(angle=35, hjust=1)) +
-        labs(caption=paste0("\nThe decimal value next to the bar represents the p-value.",
-                            paste("\nThe p-value threshold for statistical significance is",
-                                  p_value_threshold)),
+        labs(caption=paste("\nThe p-value threshold for statistical significance is",
+                           p_value_threshold),
              x="Metric",
              y="Percent Change from Control to Variant",
              fill="Statistically Significant")
@@ -463,7 +462,7 @@ plot__percent_change_bayesian <- function(experiments_summary, experiment) {
                              high = global__colors_good, midpoint = 0.5, limits=c(0,1)) +
         theme_light(base_size=global__theme_base_size) +
         theme(axis.text.x=element_text(angle=35, hjust=1)) +
-        labs(caption="\nThe decimal value next to the bar represents the Probability that the Variant is Better.",
+        labs(#caption="\nThe decimal value next to the bar represents the Probability that the Variant is Better.",
              x="Metric",
              y="Percent Change from Control to Variant",
              fill="Probability Variant is Better")
@@ -517,9 +516,9 @@ plot__percent_change_conf_frequentist <- function(experiments_summary, experimen
         scale_y_continuous(labels=percent_format(), breaks=seq(min_y - y_expand, max_y + y_expand, y_expand)) +
         theme_light(base_size=global__theme_base_size) +
         theme(axis.text.x=element_text(angle=35, hjust=1)) +
-        labs(caption=paste0("\nThe decimals at the top of the graph are the corresponding p-values.",
-                            paste("\nThe p-value threshold for statistical significance is",
-                                  p_value_threshold)),
+        labs(caption=paste(paste("\nThe p-value threshold for statistical significance is",
+                                  p_value_threshold),
+                            "\nThe error bars show the", percent(global__confidence_level), "confidence interval."),
              x="Metric",
              y="Percent Change from Control to Variant",
              color="Statistically Significant")
@@ -563,7 +562,7 @@ plot__percent_change_conf_bayesian <- function(experiments_summary, experiment) 
         scale_y_continuous(labels=percent_format(), breaks=seq(min_y - y_expand, max_y + y_expand, y_expand)) +
         theme_light(base_size=global__theme_base_size) +
         theme(axis.text.x=element_text(angle=35, hjust=1)) +
-        labs(caption="\nThe decimals at the top of the graph is the probability the Variant is better than the Control.",
+        labs(caption=paste("\nThe error bars show the", percent(global__confidence_level), "confidence interval."),
              x="Metric",
              y="Percent Change from Control to Variant",
              color="Probability Variant is Better")
@@ -588,7 +587,7 @@ plot__daily_p_value <- function(experiments_daily_summary,
         labs(title='P-value over time',
              y='P-Value',
              x='Day of Experiment (and days after)') +
-        theme_light() +
+        theme_light(base_size=global__theme_base_size) +
         theme(axis.text.x = element_text(angle = 30, hjust = 1))
 }
 
@@ -629,9 +628,10 @@ plot__daily_percent_change_frequentist <- function(experiments_daily_summary,
         geom_hline(yintercept = 0, color='red', alpha=0.5, size=1.5) +
         geom_text(aes(label=percent(perc_change)), vjust=-1, check_overlap = TRUE) +
         labs(#title='Difference in Conversion Rate of `B` - `A`, with Frequentist Confidence Interval - \nWith Attribution Window',
+             caption=paste("\n", percent(global__confidence_level), "confidence interval"),
              y='Lift (i.e. Percent change from Control to Variant)',
              x='Day of Experiment') +
-        theme_light() +
+        theme_light(base_size=global__theme_base_size) +
         theme(axis.text.x = element_text(angle = 30, hjust = 1))
 }
 
@@ -651,7 +651,7 @@ plot__daily_prob_variant_gt_control <- function(experiments_daily_summary, exper
             labs(title='Probability Variant is Better',
                  y='Probability Variant is Better',
                  x='Day of Experiment (and days after)') +
-            theme_light() +
+            theme_light(base_size=global__theme_base_size) +
             theme(axis.text.x = element_text(angle = 30, hjust = 1))
 }
 
@@ -692,8 +692,9 @@ plot__daily_percent_change_bayesian <- function(experiments_daily_summary, exper
         geom_hline(yintercept = 0, color='red', alpha=0.5, size=1.5) +
         geom_text(aes(label=percent(perc_change)), vjust=-1, check_overlap = TRUE) +
         labs(#title='Difference in Conversion Rate of `B` - `A`, with Frequentist Confidence Interval - \nWith Attribution Window',
-            y='Lift (i.e. Percent change from Control to Variant)',
-            x='Day of Experiment') +
-        theme_light() +
+             caption=paste("\n", percent(global__confidence_level), "confidence interval"),
+             y='Lift (i.e. Percent change from Control to Variant)',
+             x='Day of Experiment') +
+        theme_light(base_size=global__theme_base_size) +
         theme(axis.text.x = element_text(angle = 30, hjust = 1))
 }

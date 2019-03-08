@@ -115,10 +115,9 @@ shinyServer(function(session, input, output) {
     addPopover(
         session,
         'plot__percent_change', 
-        title="Percent Change Graph",
-        content="TBD",
+        title="Percent Change",
+        content=HTML("Shows the percent change from the Control to the Variant.<br><br>The Frequentist graph gives the p-value, while the Bayesian graph gives the probability that the variant's conversion rate is higher than the control's conversion rate.<br><br>The conversion rates will differ between the Frequentist and Bayesian graphs because the Bayesian graphs will anchor the conversion rates toward the prior rates."),
         placement="left", trigger="hover", options=NULL)
-
 
     output$plot__percent_change_confidence <- renderPlot({
 
@@ -144,8 +143,6 @@ shinyServer(function(session, input, output) {
 
                 plot__percent_change_conf_bayesian(reactive__experiments_summary(), input$experiment__select)
             }
-
-            
         })
     }, height=function() {
 
@@ -154,10 +151,9 @@ shinyServer(function(session, input, output) {
     addPopover(
         session,
         'plot__percent_change_confidence', 
-        title="Percent Change Graph",
-        content="TBD",
+        title="Percent Change Confidence Level",
+        content=HTML("Shows the percent change between the Control and Variant, with confidence intervals.<br><br>The frequentist graph shows the p-value at the top of the graph, while the Bayesian graph gives the probability that the variant's conversion rate is higher than the control's conversion rate.<br><br>The conversion rates will differ between the Frequentist and Bayesian graphs because the Bayesian graphs will anchor the conversion rates toward the prior rates."),
         placement="left", trigger="hover", options=NULL)
-
 
     output$plot__conversion_rates <- renderPlot({
 
@@ -181,8 +177,6 @@ shinyServer(function(session, input, output) {
 
                 plot__conversion_rates_bayesian(reactive__experiments_summary(), input$experiment__select)
             }
-
-            
         })
     }, height=function() {
 
@@ -191,10 +185,9 @@ shinyServer(function(session, input, output) {
     addPopover(
         session,
         'plot__conversion_rates', 
-        title="Percent Change Graph",
-        content="TBD",
+        title="Conversion Rates",
+        content=HTML("Shows the conversion rates of the Control and Variant groups.<br><br>The frequentist graph shows the conversions and trials above the bar, while the bayesian graph shows the alpha and beta values above the bar.<br><br>The conversion rates will differ between the Frequentist and Bayesian graphs because the Bayesian graphs will anchor the conversion rates toward the prior rates."),
         placement="left", trigger="hover", options=NULL)
-
 
     output$plot__trends <- renderPlot({
 
@@ -222,8 +215,6 @@ shinyServer(function(session, input, output) {
                                                     input$experiment__select,
                                                     input$experiment__metric_select)
             }
-
-            
         })
     }, height=function() {
 
@@ -232,14 +223,7 @@ shinyServer(function(session, input, output) {
     addPopover(
         session,
         'plot__trends', 
-        title="Percent Change Graph",
-        content="TBD",
+        title="Percent Change Over time",
+        content=HTML("Shows the percent change (i.e. Lift) from the Control to the Variant.<br><br>The colored area is the confidence interval where red indicates that '0% Lift' is within the interval, and green indicates '0% Lift' is outside the interval.<br><br>The conversion rates will differ between the Frequentist and Bayesian graphs because the Bayesian graphs will anchor the conversion rates toward the prior rates."),
         placement="left", trigger="hover", options=NULL)
-
-
-
-
-
-
 })
-
