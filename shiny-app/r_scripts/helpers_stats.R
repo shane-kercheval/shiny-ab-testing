@@ -1,3 +1,5 @@
+library(purrr)
+
 ##############################################################################################################
 # Sample Size Functions
 ##############################################################################################################
@@ -64,7 +66,7 @@ calculate_days_required <- function(daily_traffic,
 #' @param beta_a the beta value for the "A" group
 #' @param alpha_b the alpha value for the "B" group
 #' @param beta_b the beta value for the "B" group
-credible_interval_approx <- function(alpha_a, beta_a, alpha_b, beta_b) {
+credible_interval_approx <- function(alpha_a, beta_a, alpha_b, beta_b, confidence_level=0.95) {
     # https://github.com/dgrtwo/empirical-bayes-book/blob/master/bayesian-ab.Rmd
     u1 <- alpha_a / (alpha_a + beta_a)
     u2 <- alpha_b / (alpha_b + beta_b)
@@ -73,14 +75,19 @@ credible_interval_approx <- function(alpha_a, beta_a, alpha_b, beta_b) {
     mu_diff <- u2 - u1
     sd_diff <- sqrt(var1 + var2)
     
+    confidence_difference <- 1 - confidence_level
+    two_sided_difference <- confidence_difference / 2
+
     # in D.R.'s code, the first player had a higher probability but a negative estimate (i.e. negative
     # difference in conversion rate, mu_diff). This doesn't make sense, so we'll 1) use the first player as
     # the A group and the second as the B group), so B-A which gives the expected intervals (but flips the
     # posterior probability), and 2) use 1-pnorm(...) to get the correct posterior probability
     return (c(posterior = 1 - pnorm(0, mu_diff, sd_diff),
               cr_diff_estimate = mu_diff,
-              conf.low = qnorm(.025, mu_diff, sd_diff),
-              conf.high = qnorm(.975, mu_diff, sd_diff)))
+              conf.low = qnorm(two_sided_difference, mu_diff, sd_diff),
+              conf.high = qnorm(1 - two_sided_difference, mu_diff, sd_diff),
+              conf.low_level = two_sided_difference,
+              conf.high_level=1 - two_sided_difference))
 }
 
 #' get p-values and corresponding confidence intervals
@@ -89,12 +96,19 @@ credible_interval_approx <- function(alpha_a, beta_a, alpha_b, beta_b) {
 #' @param control_trials
 #' @param variant_successes
 #' @param variant_trials
-get_p_values_info <- function(control_successes, control_trials, variant_successes, variant_trials) {
+get_p_values_info <- function(control_successes,
+                              control_trials,
+                              variant_successes,
+                              variant_trials,
+                              confidence_level=0.95) {
 
     test_results <- prop.test(x=c(variant_successes, control_successes),
-                              n=c(variant_trials, control_trials))
+                              n=c(variant_trials, control_trials),
+                              conf.level = confidence_level)
+
     return (c(p_value = test_results$p.value,
               cr_diff_estimate = as.numeric(test_results$estimate[1] - test_results$estimate[2]),
               conf.low = test_results$conf.int[1],
-              conf.high = test_results$conf.int[2]))
+              conf.high = test_results$conf.int[2],
+              conf.level = attr(test_results$conf.int, 'conf.level')))
 }

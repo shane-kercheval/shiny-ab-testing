@@ -339,7 +339,7 @@ plot__conversion_rates_bayesian <- function(experiments_summary, experiment) {
 #' 
 #' @param experiment_data list of data-frames from load_data
 #' @param experiment
-plot__percent_change_frequentist <- function(experiments_summary, experiment) {
+plot__percent_change_frequentist <- function(experiments_summary, experiment, p_value_threshold=0.05) {
 
     current_experiments <- experiments_summary %>%
         filter(experiment_id == experiment)
@@ -352,7 +352,7 @@ plot__percent_change_frequentist <- function(experiments_summary, experiment) {
                                          nearest_x)
     
     plot_object <- current_experiments %>%
-        ggplot(aes(x=metric_id, y=percent_change_from_control, fill=p_value <= global__p_value_threshold)) +
+        ggplot(aes(x=metric_id, y=percent_change_from_control, fill=p_value <= p_value_threshold)) +
         geom_col()
     
     # if there are any experiments where the percent change is greater than 0, add text
@@ -382,7 +382,7 @@ plot__percent_change_frequentist <- function(experiments_summary, experiment) {
     }
     
     # in the case that that all the p-values are statistically significant, the colors will be wrong
-    if(all(current_experiments$p_value <= global__p_value_threshold)) {
+    if(all(current_experiments$p_value <= p_value_threshold)) {
 
         fill_colors <- global__colors_good
 
@@ -400,7 +400,7 @@ plot__percent_change_frequentist <- function(experiments_summary, experiment) {
         theme(axis.text.x=element_text(angle=35, hjust=1)) +
         labs(caption=paste0("\nThe decimal value next to the bar represents the p-value.",
                             paste("\nThe p-value threshold for statistical significance is",
-                                  global__p_value_threshold)),
+                                  p_value_threshold)),
              x="Metric",
              y="Percent Change from Control to Variant",
              fill="Statistically Significant")
@@ -473,7 +473,7 @@ plot__percent_change_bayesian <- function(experiments_summary, experiment) {
 #' 
 #' @param experiment_data list of data-frames from load_data
 #' @param experiment
-plot__percent_change_conf_frequentist <- function(experiments_summary, experiment) {
+plot__percent_change_conf_frequentist <- function(experiments_summary, experiment, p_value_threshold=0.05) {
 
     current_experiments <- experiments_summary %>%
         filter(experiment_id == experiment)
@@ -486,7 +486,7 @@ plot__percent_change_conf_frequentist <- function(experiments_summary, experimen
                contains('frequentist')) %>%
         mutate(percent_change_conf_low=frequentist_conf_low / control_conversion_rate,
                percent_change_conf_high=frequentist_conf_high / control_conversion_rate,
-               p_value_sig = p_value <= global__p_value_threshold) %>%
+               p_value_sig = p_value <= p_value_threshold) %>%
         select(metric_id, contains('percent_change'), p_value, p_value_sig)
     
     y_expand <- 0.10
@@ -519,7 +519,7 @@ plot__percent_change_conf_frequentist <- function(experiments_summary, experimen
         theme(axis.text.x=element_text(angle=35, hjust=1)) +
         labs(caption=paste0("\nThe decimals at the top of the graph are the corresponding p-values.",
                             paste("\nThe p-value threshold for statistical significance is",
-                                  global__p_value_threshold)),
+                                  p_value_threshold)),
              x="Metric",
              y="Percent Change from Control to Variant",
              color="Statistically Significant")

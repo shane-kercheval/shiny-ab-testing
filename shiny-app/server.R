@@ -100,13 +100,13 @@ shinyServer(function(session, input, output) {
 
             if(input$experiment__stat_type_select == "Frequentist") {
 
-                plot__percent_change_frequentist(reactive__experiments_summary(), input$experiment__select)
+                plot__percent_change_frequentist(reactive__experiments_summary(),
+                                                 input$experiment__select,
+                                                 p_value_threshold=global__p_value_threshold)
             } else {
 
                 plot__percent_change_bayesian(reactive__experiments_summary(), input$experiment__select)
             }
-
-            
         })
     }, height=function() {
 
@@ -137,7 +137,9 @@ shinyServer(function(session, input, output) {
 
             if(input$experiment__stat_type_select == "Frequentist") {
 
-                plot__percent_change_conf_frequentist(reactive__experiments_summary(), input$experiment__select)
+                plot__percent_change_conf_frequentist(reactive__experiments_summary(),
+                                                      input$experiment__select,
+                                                      p_value_threshold=global__p_value_threshold)
             } else {
 
                 plot__percent_change_conf_bayesian(reactive__experiments_summary(), input$experiment__select)

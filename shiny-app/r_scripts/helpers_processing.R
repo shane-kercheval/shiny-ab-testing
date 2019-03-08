@@ -322,7 +322,8 @@ experiments__get_base_summary <- function(experiment_data) {
 #' 
 #' @param experiment_data list of data-frames from load_data
 experiments__get_summary <- function(experiment_data,
-                                     days_of_prior_data=15) {
+                                     days_of_prior_data=15,
+                                     confidence_level=0.95) {
 
     experiments_summary <- experiments__get_base_summary(experiment_data)
     
@@ -334,7 +335,8 @@ experiments__get_summary <- function(experiment_data,
                           experiments_summary$control_trials,
                           experiments_summary$variant_successes,
                           experiments_summary$variant_trials),
-                     function(bs, bt, vs, vt) get_p_values_info(bs, bt, vs, vt))
+                     function(bs, bt, vs, vt) get_p_values_info(bs, bt, vs, vt,
+                                                                confidence_level=confidence_level))
  
     experiments_summary$p_value <- map_dbl(p_values, ~ .['p_value'])
     experiments_summary$frequentist_cr_difference <- map_dbl(p_values, ~ .['cr_diff_estimate'])
@@ -375,7 +377,8 @@ experiments__get_summary <- function(experiment_data,
     cia_list <- pmap(with(experiments_summary,
                           list(control_alpha, control_beta, variant_alpha, variant_beta)),
                      function(alpha_a, beta_a, alpha_b, beta_b){  
-                         credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)
+                         credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b,
+                                                  confidence_level=confidence_level)
                      })
 
     experiments_summary <- experiments_summary %>%                 
@@ -509,7 +512,7 @@ private__create_prior_experiment_traffic <- function(experiment_data,
     return (prior_data)
 }
 
-experiments__get_daily_summary <- function(experiment_data, experiments_summary) {
+experiments__get_daily_summary <- function(experiment_data, experiments_summary, confidence_level=0.95) {
 
     # per metric, since it is based on attribution windows
     # for each day of the experiment, get the total number of trials (i.e. denominator); must allow enough
@@ -568,7 +571,8 @@ experiments__get_daily_summary <- function(experiment_data, experiments_summary)
                           cumulative_traffic$control_cumulative_trials,
                           cumulative_traffic$variant_cumulative_successes,
                           cumulative_traffic$variant_cumulative_trials),
-                     function(bs, bt, vs, vt) get_p_values_info(bs, bt, vs, vt))
+                     function(bs, bt, vs, vt) get_p_values_info(bs, bt, vs, vt,
+                                                                confidence_level=confidence_level))
 
     cumulative_traffic$p_value <- map_dbl(p_values, ~ .['p_value'])
     cumulative_traffic$frequentist_cr_difference <- map_dbl(p_values, ~ .['cr_diff_estimate'])
@@ -590,7 +594,8 @@ experiments__get_daily_summary <- function(experiment_data, experiments_summary)
     cia_list <- pmap(with(cumulative_traffic,
                           list(control_alpha, control_beta, variant_alpha, variant_beta)),
                      function(alpha_a, beta_a, alpha_b, beta_b){  
-                         credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)
+                         credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b,
+                                                  confidence_level=confidence_level)
                      })
     
     cumulative_traffic <- cumulative_traffic %>%                 

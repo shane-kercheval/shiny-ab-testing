@@ -27,9 +27,15 @@ global__colors_good <- '#37B57F'  # green
 global__text_size <- 4
 global__theme_base_size <- 16
 
-global__p_value_threshold <- 0.05
-
 global__tab_names__overview <- "Overview"
 global__tab_names__dropoff <- "Event Drop-off"
 global__tab_names__value_counts <- "Event Value Counts"
 global__tab_names__discontinuity <- "Discontinuity Analysis"
+
+##############################################################################################################
+# Statistical Variables
+##############################################################################################################
+global__confidence_level <- 0.95
+global__p_value_threshold <- 1 - global__confidence_level
+
+global__prior_number_of_days <- 10

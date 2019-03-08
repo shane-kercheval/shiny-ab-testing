@@ -107,40 +107,193 @@ test_that("credible_interval_approx", {
         
         return ( mean(b_cr_simulation > a_cr_simulation) )
     }
+
+    ##########################################################################################################
+    # confidence_level=0.95
+    ##########################################################################################################
     
     alpha_a <- 3872
     beta_a <- 8880
     alpha_b <- 2228
     beta_b <- 5071
-    prob_b_better_cia <- as.numeric(credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)['posterior'])
+    temp_cred <- credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)
+    expect_equal(temp_cred[["conf.low_level"]], 0.025)
+    expect_equal(temp_cred[["conf.high_level"]], 0.975)
+    expect_equal(temp_cred[['cr_diff_estimate']], (alpha_b / (alpha_b + beta_b)) - (alpha_a / (alpha_a + beta_a)))
+    prob_b_better_cia <- temp_cred[['posterior']]
     prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
-    
     expect_equal(round(prob_b_better_cia, 2) , round(prob_b_better_sim, 2))
     
     alpha_a <- 5111
     beta_a <- 272055
     alpha_b <- 5253
     beta_b <- 272251
-    prob_b_better_cia <- as.numeric(credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)['posterior'])
+    temp_cred <- credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)
+    expect_equal(temp_cred[['conf.low_level']], 0.025)
+    expect_equal(temp_cred[['conf.high_level']], 0.975)
+    expect_equal(temp_cred[['cr_diff_estimate']], (alpha_b / (alpha_b + beta_b)) - (alpha_a / (alpha_a + beta_a)))
+    prob_b_better_cia <- temp_cred[['posterior']]
     prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
-    
     expect_equal(round(prob_b_better_cia, 2) , round(prob_b_better_sim, 2))
     
     alpha_a <- 2724
     beta_a <- 144083
     alpha_b <- 2733
     beta_b <- 144247
-    prob_b_better_cia <- as.numeric(credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)['posterior'])
+    temp_cred <- credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)
+    expect_equal(temp_cred[['conf.low_level']], 0.025)
+    expect_equal(temp_cred[['conf.high_level']], 0.975)
+    expect_equal(temp_cred[['cr_diff_estimate']], (alpha_b / (alpha_b + beta_b)) - (alpha_a / (alpha_a + beta_a)))
+    prob_b_better_cia <- temp_cred[['posterior']]
     prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
-    
     expect_equal(round(prob_b_better_cia, 2) , round(prob_b_better_sim, 2))
     
     alpha_a <- 22973
     beta_a <- 341979
     alpha_b <- 22206
     beta_b <- 342860
-    prob_b_better_cia <- as.numeric(credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)['posterior'])
+    temp_cred <- credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b)
+    expect_equal(temp_cred[['conf.low_level']], 0.025)
+    expect_equal(temp_cred[['conf.high_level']], 0.975)
+    expect_equal(temp_cred[['cr_diff_estimate']], (alpha_b / (alpha_b + beta_b)) - (alpha_a / (alpha_a + beta_a)))
+    prob_b_better_cia <- temp_cred[['posterior']]
     prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
-    
     expect_equal(round(prob_b_better_cia, 4) , round(prob_b_better_sim, 4))
+    
+    ##########################################################################################################
+    # confidence_level=0.90
+    ##########################################################################################################
+    alpha_a <- 3872
+    beta_a <- 8880
+    alpha_b <- 2228
+    beta_b <- 5071
+    temp_cred <- credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b, confidence_level=0.90)
+    expect_equal(temp_cred[["conf.low_level"]], 0.05)
+    expect_equal(temp_cred[["conf.high_level"]], 0.95)
+    expect_equal(temp_cred[['cr_diff_estimate']], (alpha_b / (alpha_b + beta_b)) - (alpha_a / (alpha_a + beta_a)))
+    prob_b_better_cia <- temp_cred[['posterior']]
+    prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
+    expect_equal(round(prob_b_better_cia, 2) , round(prob_b_better_sim, 2))
+    
+    alpha_a <- 5111
+    beta_a <- 272055
+    alpha_b <- 5253
+    beta_b <- 272251
+    temp_cred <- credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b, confidence_level=0.90)
+    expect_equal(temp_cred[['conf.low_level']], 0.05)
+    expect_equal(temp_cred[['conf.high_level']], 0.95)
+    expect_equal(temp_cred[['cr_diff_estimate']], (alpha_b / (alpha_b + beta_b)) - (alpha_a / (alpha_a + beta_a)))
+    prob_b_better_cia <- temp_cred[['posterior']]
+    prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
+    expect_equal(round(prob_b_better_cia, 2) , round(prob_b_better_sim, 2))
+    
+    alpha_a <- 2724
+    beta_a <- 144083
+    alpha_b <- 2733
+    beta_b <- 144247
+    temp_cred <- credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b, confidence_level=0.90)
+    expect_equal(temp_cred[['conf.low_level']], 0.05)
+    expect_equal(temp_cred[['conf.high_level']], 0.95)
+    expect_equal(temp_cred[['cr_diff_estimate']], (alpha_b / (alpha_b + beta_b)) - (alpha_a / (alpha_a + beta_a)))
+    prob_b_better_cia <- temp_cred[['posterior']]
+    prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
+    expect_equal(round(prob_b_better_cia, 2) , round(prob_b_better_sim, 2))
+    
+    alpha_a <- 22973
+    beta_a <- 341979
+    alpha_b <- 22206
+    beta_b <- 342860
+    temp_cred <- credible_interval_approx(alpha_a, beta_a, alpha_b, beta_b, confidence_level=0.90)
+    expect_equal(temp_cred[['conf.low_level']], 0.05)
+    expect_equal(temp_cred[['conf.high_level']], 0.95)
+    expect_equal(temp_cred[['cr_diff_estimate']], (alpha_b / (alpha_b + beta_b)) - (alpha_a / (alpha_a + beta_a)))
+    prob_b_better_cia <- temp_cred[['posterior']]
+    prob_b_better_sim <- simulate_b_wins(alpha_a, beta_a, alpha_b, beta_b)
+    expect_equal(round(prob_b_better_cia, 4) , round(prob_b_better_sim, 4))
+})
+
+test_that("get_p_values_info", {
+    context("helpers_stats::get_p_values_info")
+    
+    ##########################################################################################################
+    # confidence_level=0.95
+    ##########################################################################################################
+    control_successes <- 4612
+    control_trials <- 131189
+    variant_successes <- 4140
+    variant_trials <- 131116
+    expected_diff <- (variant_successes / variant_trials) - (control_successes / control_trials)
+    temp_info <- get_p_values_info(control_successes, control_trials, variant_successes, variant_trials)
+    expect_equal(temp_info[['cr_diff_estimate']], expected_diff)
+    expect_equal(temp_info[['conf.level']], 0.95)
+
+    control_successes <- 3303
+    control_trials <- 123077
+    variant_successes <- 3526
+    variant_trials <- 123100
+    expected_diff <- (variant_successes / variant_trials) - (control_successes / control_trials)
+    temp_info <- get_p_values_info(control_successes, control_trials, variant_successes, variant_trials)
+    expect_equal(temp_info[['cr_diff_estimate']], expected_diff)
+    expect_equal(temp_info[['conf.level']], 0.95)
+
+    control_successes <- 2299
+    control_trials <- 106879
+    variant_successes <- 2373
+    variant_trials <- 106899
+    expected_diff <- (variant_successes / variant_trials) - (control_successes / control_trials)
+    temp_info <- get_p_values_info(control_successes, control_trials, variant_successes, variant_trials)
+    expect_equal(temp_info[['cr_diff_estimate']], expected_diff)
+    expect_equal(temp_info[['conf.level']], 0.95)
+
+    control_successes <- 1319
+    control_trials <- 90865
+    variant_successes <- 1370
+    variant_trials <- 91064
+    expected_diff <- (variant_successes / variant_trials) - (control_successes / control_trials)
+    temp_info <- get_p_values_info(control_successes, control_trials, variant_successes, variant_trials)
+    expect_equal(temp_info[['cr_diff_estimate']], expected_diff)
+    expect_equal(temp_info[['conf.level']], 0.95)
+
+    ##########################################################################################################
+    # confidence_level=0.90
+    ##########################################################################################################
+    control_successes <- 4612
+    control_trials <- 131189
+    variant_successes <- 4140
+    variant_trials <- 131116
+    expected_diff <- (variant_successes / variant_trials) - (control_successes / control_trials)
+    temp_info <- get_p_values_info(control_successes, control_trials, variant_successes, variant_trials,
+                                   confidence_level=0.90)
+    expect_equal(temp_info[['cr_diff_estimate']], expected_diff)
+    expect_equal(temp_info[['conf.level']], 0.90)
+
+    control_successes <- 3303
+    control_trials <- 123077
+    variant_successes <- 3526
+    variant_trials <- 123100
+    expected_diff <- (variant_successes / variant_trials) - (control_successes / control_trials)
+    temp_info <- get_p_values_info(control_successes, control_trials, variant_successes, variant_trials,
+                                   confidence_level=0.90)
+    expect_equal(temp_info[['cr_diff_estimate']], expected_diff)
+    expect_equal(temp_info[['conf.level']], 0.90)
+
+    control_successes <- 2299
+    control_trials <- 106879
+    variant_successes <- 2373
+    variant_trials <- 106899
+    expected_diff <- (variant_successes / variant_trials) - (control_successes / control_trials)
+    temp_info <- get_p_values_info(control_successes, control_trials, variant_successes, variant_trials,
+                                   confidence_level=0.90)
+    expect_equal(temp_info[['cr_diff_estimate']], expected_diff)
+    expect_equal(temp_info[['conf.level']], 0.90)
+
+    control_successes <- 1319
+    control_trials <- 90865
+    variant_successes <- 1370
+    variant_trials <- 91064
+    expected_diff <- (variant_successes / variant_trials) - (control_successes / control_trials)
+    temp_info <- get_p_values_info(control_successes, control_trials, variant_successes, variant_trials,
+                                   confidence_level=0.90)
+    expect_equal(temp_info[['cr_diff_estimate']], expected_diff)
+    expect_equal(temp_info[['conf.level']], 0.90)
 })

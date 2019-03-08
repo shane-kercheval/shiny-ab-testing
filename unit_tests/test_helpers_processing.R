@@ -473,25 +473,11 @@ test_that("experiments__get_base_summary_priors", {
     expect_true(abs(mean(prior_vs_control_cr$percent_diff)) < 0.03)
 })
 
-test_that("...", {
-    context("helpers_processing::...")
+test_that("plot__daily_...", {
+    context("helpers_processing::plot__daily_...")
     
     experiment_data <- load_data()
-    
-    ###############
-    # shift all dates relative to today so we can test excluding people (who recently entered into the
-    # experiment) based on the attribution window
-    ###############
-    max_date <- max(max(experiment_data$experiment_traffic$first_joined_experiment),
-                    #max(conversion_events$conversion_date),
-                    max(experiment_data$website_traffic$visit_date))
-    
-    days_offset <- Sys.Date() - as.Date(max_date)
-    
-    experiment_data$experiment_traffic$first_joined_experiment <- experiment_data$experiment_traffic$first_joined_experiment + days_offset
-    experiment_data$website_traffic$visit_date <- experiment_data$website_traffic$visit_date + days_offset
-    experiment_data$conversion_events$conversion_date <- experiment_data$conversion_events$conversion_date + days_offset
-    
+
     # get base summary, required for private__create_prior_experiment_traffic
     experiments_summary <- experiments__get_summary(experiment_data)
     experiments_daily_summary <- experiments__get_daily_summary(experiment_data, experiments_summary)
@@ -526,8 +512,8 @@ test_that("...", {
         for(metric in unique(experiments_summary$metric_id)) {
             # experiment <- "Ask Additional Questions During Signup"
             # metric <- "Use Feature 1"
-            print(experiment)
-            print(metric)
+            # print(experiment)
+            # print(metric)
             
             plot_object <- plot__daily_p_value(experiments_daily_summary, experiment, metric)
             expect_false(is.null(plot_object))
