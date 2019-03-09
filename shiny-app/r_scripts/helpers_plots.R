@@ -250,7 +250,8 @@ plot__conversion_rates <- function(experiments_summary, experiment) {
         select(-type) %>%
         spread(actual_type, value) %>%
         group_by(metric_id) %>%
-        mutate(p_value=min(p_value, na.rm=TRUE)) %>%
+        mutate(p_value=min(p_value, na.rm=TRUE),
+               highest_conversion_rate = max(conversion_rate)) %>%
         ungroup()
 
     modified_summary %>%
@@ -259,9 +260,9 @@ plot__conversion_rates <- function(experiments_summary, experiment) {
             geom_bar(stat="identity", position=position_dodge(width=0.8), width=0.75) +
             scale_y_continuous(labels=percent_format()) +
             coord_cartesian(ylim=c(0, max(modified_summary$conversion_rate) + 0.05)) +
-            geom_text(aes(label= percent_format()(conversion_rate)),
-                      position=position_dodge(width=.8), check_overlap=TRUE, vjust=-3, 
-                      size=rel(global__text_size)) + 
+            geom_text(aes(y=highest_conversion_rate, label= percent_format()(conversion_rate)),
+                      position=position_dodge(width=.8), check_overlap=TRUE, vjust=-4, 
+                      size=rel(global__text_size + 0.5)) + 
             geom_text(aes(label= comma_format()(successes)),
                       position=position_dodge(width=.8), check_overlap=TRUE, vjust=-1.75,
                       size=rel(global__text_size)) + 
@@ -307,7 +308,8 @@ plot__conversion_rates_bayesian <- function(experiments_summary, experiment) {
         select(-type) %>%
         spread(actual_type, value) %>%
         group_by(metric_id) %>%
-        mutate(bayesian_prob_variant_gt_control=min(bayesian_prob_variant_gt_control, na.rm=TRUE)) %>%
+        mutate(bayesian_prob_variant_gt_control=min(bayesian_prob_variant_gt_control, na.rm=TRUE),
+               highest_conversion_rate = max(conversion_rate)) %>%
         ungroup()
 
     modified_summary %>%
@@ -316,15 +318,15 @@ plot__conversion_rates_bayesian <- function(experiments_summary, experiment) {
             geom_bar(stat="identity", position=position_dodge(width=0.8), width=0.75) +
             scale_y_continuous(labels=percent_format()) +
             coord_cartesian(ylim=c(0, max(modified_summary$conversion_rate) + 0.05)) +
-            geom_text(aes(label= percent_format()(conversion_rate)),
-                      position=position_dodge(width=.8), check_overlap=TRUE, vjust=-3, 
-                      size=rel(global__text_size)) + 
+            geom_text(aes(y=highest_conversion_rate, label= percent_format()(conversion_rate)),
+                      position=position_dodge(width=.8), check_overlap=TRUE, vjust=-4, 
+                      size=rel(global__text_size + 0.5)) + 
             geom_text(aes(label=paste('a:', comma_format()(alpha))),
                       position=position_dodge(width=.8), check_overlap=TRUE, vjust=-1.75,
-                      size=rel(global__text_size - 0.5)) + 
+                      size=rel(global__text_size)) + 
             geom_text(aes(label=paste('b:', comma_format()(beta))),
                       position=position_dodge(width=.8), check_overlap=TRUE, vjust=-0.5,
-                      size=rel(global__text_size - 0.5)) + 
+                      size=rel(global__text_size)) + 
             #facet_wrap(~ track_field_name, ncol=1, scales='free_x') +
             scale_fill_manual(values=c(global__colors_control, global__colors_variant)) +
             theme_light(base_size=global__theme_base_size) +
@@ -570,17 +572,40 @@ plot__percent_change_conf_bayesian <- function(experiments_summary, experiment) 
 
 plot__daily_p_value <- function(experiments_daily_summary,
                                 experiment,
-                                metric) {
+                                metric,
+                                p_value_threshold=0.05) {
 
-    experiments_daily_summary %>%
+    current_daily_summary <- experiments_daily_summary %>%
         filter(experiment_id == experiment,
-               metric_id == metric) %>%
+               metric_id == metric)
+
+    error_bar_height <- sd(current_daily_summary$p_value, na.rm = TRUE) / 4
+    median_p_value <- median(current_daily_summary$p_value, na.rm = TRUE)
+    missing_dates <- current_daily_summary %>%
+        filter(is.na(control_conversion_rate)) %>%
+        select(day_expired_attribution) %>%
+        mutate(y_axis_location = p_value_threshold + error_bar_height) #median_p_value)
+
+    missing_dates <- missing_dates %>%
+        mutate(message = ifelse(as.character(missing_dates$day_expired_attribution) == as.character(min(missing_dates$day_expired_attribution)),
+                              'Lag from\nAttribution\nWindows',
+                              NA))
+
+    current_daily_summary %>%
         mutate(day_expired_attribution = as.Date(day_expired_attribution)) %>%
         ggplot(aes(x=day_expired_attribution, y=p_value)) +
-        geom_line() +
-        geom_point() +
-        geom_text(aes(label=round(p_value, 3)), vjust=-0.5, check_overlap = TRUE) +
-        geom_hline(yintercept = 0.05, color ='red', alpha=0.5, size=1.5) +
+        geom_line(na.rm = TRUE) +
+        geom_point(na.rm = TRUE) +
+        geom_text(aes(label=round(p_value, 3)), vjust=-0.5, check_overlap = TRUE, na.rm = TRUE) +
+        geom_hline(yintercept = p_value_threshold, color ='red', alpha=0.5, size=1.5) +
+        geom_errorbarh(data=missing_dates, aes(y = y_axis_location,
+                                               xmin = min(day_expired_attribution),
+                                               xmax = max(day_expired_attribution)),
+                       color='#828282', height=rel(error_bar_height), size=rel(0.45)) +
+        geom_text(data=missing_dates, aes(y=y_axis_location, label=message),
+                  vjust=-0.5,
+                  hjust='left',#0.325,
+                  check_overlap = TRUE, na.rm=TRUE) +
         scale_x_date(date_breaks = '1 days') + 
         #scale_y_continuous(breaks = seq(0, 1, 0.05)) +
         expand_limits(y=0) +
@@ -593,40 +618,65 @@ plot__daily_p_value <- function(experiments_daily_summary,
 
 plot__daily_percent_change_frequentist <- function(experiments_daily_summary,
                                                    experiment,
-                                                   metric) {
+                                                   metric,
+                                                   p_value_threshold=0.05) {
 
-    current_daily_summary <-  experiments_daily_summary %>%
+    current_daily_summary <- experiments_daily_summary %>%
         filter(experiment_id == experiment,
                metric_id == metric) %>%
         mutate(day_expired_attribution = as.Date(day_expired_attribution)) %>%
         mutate(perc_change = frequentist_cr_difference / control_conversion_rate,
                perc_change_conf_low = frequentist_conf_low / control_conversion_rate,
                perc_change_conf_high = frequentist_conf_high / control_conversion_rate)
+    
+    error_bar_height <- sd(current_daily_summary$perc_change, na.rm = TRUE) / 2
+    median_percent_change <- median(current_daily_summary$perc_change, na.rm = TRUE)
+    missing_dates <- current_daily_summary %>%
+        filter(is.na(control_conversion_rate)) %>%
+        select(day_expired_attribution) %>%
+        mutate(y_axis_location = error_bar_height) #median_percent_change)
+
+    missing_dates <- missing_dates %>%
+        mutate(message = ifelse(as.character(missing_dates$day_expired_attribution) == as.character(min(missing_dates$day_expired_attribution)),
+                              'Lag from\nAttribution\nWindows',
+                              NA))
 
     plot_object <- current_daily_summary %>%
         ggplot(aes(x=day_expired_attribution, y=perc_change)) +
-        geom_line() +
+        geom_line(na.rm = TRUE) +
         #coord_cartesian(ylim=c(-0.10, 0.3)) +
         scale_y_continuous(labels = percent_format()) +
         scale_x_date(date_breaks = '1 days') + 
         geom_ribbon(aes(ymin = perc_change_conf_low, ymax = perc_change_conf_high), fill = 'green', alpha=0.15)
 
-    if(any(current_daily_summary$p_value > 0.05)) {
+    if(any(current_daily_summary$p_value > p_value_threshold, na.rm=TRUE)) {
     
         plot_object <- plot_object +
-            geom_ribbon(aes(ymin = ifelse(p_value > 0.05, perc_change_conf_low, NA), ymax = ifelse(p_value > 0.05, perc_change_conf_high, NA)), fill = 'red', alpha=0.45)
+            geom_ribbon(aes(ymin = ifelse(p_value > p_value_threshold, perc_change_conf_low, NA),
+                            ymax = ifelse(p_value > p_value_threshold, perc_change_conf_high, NA)),
+                        fill = 'red', alpha=0.45)
     }
 
-    if(any(current_daily_summary$p_value <= 0.05)) {
+    if(any(current_daily_summary$p_value <= p_value_threshold, na.rm=TRUE)) {
     
         plot_object <- plot_object +
-            geom_ribbon(aes(ymin = ifelse(p_value <= 0.05, perc_change_conf_low, NA), ymax = ifelse(p_value <= 0.05, perc_change_conf_high, NA)), fill = 'green', alpha=0.2)
+            geom_ribbon(aes(ymin = ifelse(p_value <= p_value_threshold, perc_change_conf_low, NA),
+                            ymax = ifelse(p_value <= p_value_threshold, perc_change_conf_high, NA)),
+                        fill = 'green', alpha=0.2)
 
     }
-        
+    
     plot_object +
         geom_hline(yintercept = 0, color='red', alpha=0.5, size=1.5) +
-        geom_text(aes(label=percent(perc_change)), vjust=-1, check_overlap = TRUE) +
+        geom_text(aes(label=percent(perc_change)), vjust=-1, check_overlap = TRUE, na.rm=TRUE) +
+        geom_errorbarh(data=missing_dates, aes(y = y_axis_location,
+                                               xmin = min(day_expired_attribution),
+                                               xmax = max(day_expired_attribution)),
+                       color='#828282', height=rel(error_bar_height), size=rel(0.45)) +
+        geom_text(data=missing_dates, aes(y=y_axis_location, label=message),
+                  vjust=-0.5,
+                  hjust='left',#0.325,
+                  check_overlap = TRUE, na.rm=TRUE) +
         labs(#title='Difference in Conversion Rate of `B` - `A`, with Frequentist Confidence Interval - \nWith Attribution Window',
              caption=paste("\n", percent(global__confidence_level), "confidence interval"),
              y='Lift (i.e. Percent change from Control to Variant)',
@@ -636,15 +686,38 @@ plot__daily_percent_change_frequentist <- function(experiments_daily_summary,
 }
 
 plot__daily_prob_variant_gt_control <- function(experiments_daily_summary, experiment, metric) {
-    experiments_daily_summary %>%
+    current_daily_summary <- experiments_daily_summary %>%
             filter(experiment_id == experiment,
-                   metric_id == metric) %>%
+                   metric_id == metric)
+
+    error_bar_height <- sd(current_daily_summary$bayesian_prob_variant_gt_control, na.rm = TRUE) / 2
+    median_probability <- median(current_daily_summary$bayesian_prob_variant_gt_control, na.rm = TRUE)
+    missing_dates <- current_daily_summary %>%
+        filter(is.na(control_conversion_rate)) %>%
+        select(day_expired_attribution) %>%
+        mutate(y_axis_location = 0.5 + error_bar_height) #median_probability)
+
+    missing_dates <- missing_dates %>%
+        mutate(message = ifelse(as.character(missing_dates$day_expired_attribution) == as.character(min(missing_dates$day_expired_attribution)),
+                              'Lag from\nAttribution\nWindows',
+                              NA))
+
+    current_daily_summary %>%
             mutate(day_expired_attribution = as.Date(day_expired_attribution)) %>%
             ggplot(aes(x=day_expired_attribution, y=bayesian_prob_variant_gt_control)) +
-            geom_line() +
-            geom_point() +
-            geom_text(aes(label=percent(bayesian_prob_variant_gt_control)), vjust=-0.5, check_overlap = TRUE) +
+            geom_line(na.rm=TRUE) +
+            geom_point(na.rm=TRUE) +
+            geom_text(aes(label=percent(bayesian_prob_variant_gt_control)),
+                      vjust=-0.5, check_overlap = TRUE, na.rm=TRUE) +
             geom_hline(yintercept = 0.5, color ='red', alpha=0.5, size=1.5) +
+            geom_errorbarh(data=missing_dates, aes(y = y_axis_location,
+                                               xmin = min(day_expired_attribution),
+                                               xmax = max(day_expired_attribution)),
+                           color='#828282', height=rel(error_bar_height), size=rel(0.45)) +
+            geom_text(data=missing_dates, aes(y=y_axis_location, label=message),
+                      vjust=-0.5,
+                      hjust='left',#0.325,
+                      check_overlap = TRUE, na.rm=TRUE) +
             scale_x_date(date_breaks = '1 days') + 
             #scale_y_continuous(breaks = seq(0, 1, 0.05)) +
             expand_limits(y=c(0, 1)) +
@@ -667,21 +740,33 @@ plot__daily_percent_change_bayesian <- function(experiments_daily_summary, exper
                # it is "statistically significant" if the confidence interval is completely above or below 0
                is_stat_sig=(perc_change_conf_low < 0 & perc_change_conf_high < 0) | (perc_change_conf_low > 0 & perc_change_conf_high > 0))
 
+    error_bar_height <- sd(current_daily_summary$perc_change, na.rm = TRUE) / 2
+    median_percent_change <- median(current_daily_summary$perc_change, na.rm = TRUE)
+    missing_dates <- current_daily_summary %>%
+        filter(is.na(control_conversion_rate)) %>%
+        select(day_expired_attribution) %>%
+        mutate(y_axis_location = error_bar_height) #median_percent_change)
+
+    missing_dates <- missing_dates %>%
+        mutate(message = ifelse(as.character(missing_dates$day_expired_attribution) == as.character(min(missing_dates$day_expired_attribution)),
+                              'Lag from\nAttribution\nWindows',
+                              NA))
+
     plot_object <- current_daily_summary %>%
-        ggplot(aes(x=day_expired_attribution, y=perc_change)) +
-        geom_line() +
+        ggplot(aes(x=day_expired_attribution, y=perc_change), na.rm=TRUE) +
+        geom_line(na.rm=TRUE) +
         #coord_cartesian(ylim=c(-0.10, 0.3)) +
         scale_y_continuous(labels = percent_format()) +
         scale_x_date(date_breaks = '1 days') + 
         geom_ribbon(aes(ymin = perc_change_conf_low, ymax = perc_change_conf_high), fill = 'green', alpha=0.15)
 
-    if(any(!current_daily_summary$is_stat_sig)) {
+    if(any(!current_daily_summary$is_stat_sig, na.rm=TRUE)) {
     
         plot_object <- plot_object +
             geom_ribbon(aes(ymin = ifelse(!is_stat_sig, perc_change_conf_low, NA), ymax = ifelse(!is_stat_sig, perc_change_conf_high, NA)), fill = 'red', alpha=0.45)
     }
 
-    if(any(current_daily_summary$is_stat_sig)) {
+    if(any(current_daily_summary$is_stat_sig, na.rm=TRUE)) {
     
         plot_object <- plot_object +
             geom_ribbon(aes(ymin = ifelse(is_stat_sig, perc_change_conf_low, NA), ymax = ifelse(is_stat_sig, perc_change_conf_high, NA)), fill = 'green', alpha=0.2)
@@ -690,7 +775,16 @@ plot__daily_percent_change_bayesian <- function(experiments_daily_summary, exper
 
     plot_object +
         geom_hline(yintercept = 0, color='red', alpha=0.5, size=1.5) +
-        geom_text(aes(label=percent(perc_change)), vjust=-1, check_overlap = TRUE) +
+        geom_text(aes(label=percent(perc_change)),
+                  vjust=-1, check_overlap = TRUE, na.rm=TRUE) +
+        geom_errorbarh(data=missing_dates, aes(y = y_axis_location,
+                                               xmin = min(day_expired_attribution),
+                                               xmax = max(day_expired_attribution)),
+                       color='#828282', height=rel(error_bar_height), size=rel(0.45)) +
+        geom_text(data=missing_dates, aes(y=y_axis_location, label=message),
+                  vjust=-0.5,
+                  hjust='left',#0.325,
+                  check_overlap = TRUE, na.rm=TRUE) +
         labs(#title='Difference in Conversion Rate of `B` - `A`, with Frequentist Confidence Interval - \nWith Attribution Window',
              caption=paste("\n", percent(global__confidence_level), "confidence interval"),
              y='Lift (i.e. Percent change from Control to Variant)',

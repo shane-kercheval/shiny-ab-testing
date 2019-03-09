@@ -564,7 +564,7 @@ experiments__get_daily_summary <- function(experiment_data, experiments_summary,
         select(-is_control) %>%
         unite(temp, variation, variable) %>%
         spread(temp, value)
-    colnames(cumulative_traffic)
+    #colnames(cumulative_traffic)
 
     # add frequentist data to cumulative traffic
     p_values <- pmap(list(cumulative_traffic$control_cumulative_successes,
@@ -604,14 +604,31 @@ experiments__get_daily_summary <- function(experiment_data, experiments_summary,
                bayesian_conf_low=map_dbl(cia_list, ~.['conf.low']),
                bayesian_conf_high=map_dbl(cia_list, ~.['conf.high']))
     
-    #################### NOTE:
-    # I need to do the same thing for the percent change bayesian graphs
     cumulative_traffic <- cumulative_traffic %>%
         mutate(bayesian_control_cr = control_alpha / (control_alpha + control_beta),
                bayesian_variant_cr = variant_alpha / (variant_alpha + variant_beta),
-               # NOTE::::::: ADD THIS TEST TO experiment_summary unit test
-               t = bayesian_cr_difference - (bayesian_variant_cr - bayesian_control_cr),
                bayesian_percent_change = (bayesian_variant_cr - bayesian_control_cr) /  bayesian_control_cr)
+    
+    ##########################################################################################################
+    # we need at add on the missing dates at the beginning of the expriment to account for the attribution
+    # windows, e.g. so a graph can still plot those dates and it is obvious that there is a delay
+    ##########################################################################################################
+    experiment_dates <- experiment_data$experiment_traffic %>% 
+        mutate(day_expired_attribution = as.Date(first_joined_experiment)) %>%
+        select(experiment_id, day_expired_attribution) %>%
+        distinct() %>%
+        inner_join(experiment_data$attribution_windows %>% select(-attribution_window),
+                   by='experiment_id') %>%
+        mutate(metric_id = factor(metric_id, levels = levels(cumulative_traffic$metric_id))) %>%
+        select(experiment_id, metric_id, day_expired_attribution) %>%
+        arrange(experiment_id, day_expired_attribution, metric_id)
+    
+    # This gives all the days (days of experiment + lag in attribution days)
+    cumulative_traffic <- full_join(cumulative_traffic %>%
+                                        mutate(day_expired_attribution = as.Date(day_expired_attribution)),
+                                    experiment_dates,
+                                    by = c("experiment_id", "metric_id", "day_expired_attribution")) %>%
+        arrange(experiment_id, day_expired_attribution, metric_id)
     
     return (cumulative_traffic)
 }

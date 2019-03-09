@@ -473,8 +473,8 @@ test_that("experiments__get_base_summary_priors", {
     expect_true(abs(mean(prior_vs_control_cr$percent_diff)) < 0.03)
 })
 
-test_that("plot__daily_...", {
-    context("helpers_processing::plot__daily_...")
+test_that("experiments__get_daily_summary", {
+    context("helpers_processing::experiments__get_daily_summary")
     
     experiment_data <- load_data()
 
@@ -489,7 +489,7 @@ test_that("plot__daily_...", {
         mutate(r = rank(-as.numeric(day_expired_attribution))) %>%
         ungroup() %>%
         filter(r == 1) %>%
-        select(-day_expired_attribution) %>%
+        #select(-day_expired_attribution) %>%
         rename(control_successes = control_cumulative_successes,
                control_trials = control_cumulative_trials,
                variant_successes = variant_cumulative_successes,
@@ -503,17 +503,65 @@ test_that("plot__daily_...", {
                -variant_name) %>%
         arrange(experiment_id, metric_id)
                              
-    last_days_daily_summary <- last_days_daily_summary %>%
+    found_summary <- last_days_daily_summary %>%
         select_(.dots=colnames(expected_summary))
     
-    expect_dataframes_equal(expected_summary, last_days_daily_summary)
+    expect_dataframes_equal(expected_summary, found_summary)
+
+    # check that there are NA values that correspond to the lag in the attribution windows (+1 day since 
+    # we need to wait x FULL days; e.g. experiment started on 1st with 2-day window, but it started at noon,
+    # so we need 2 full days and we don't want to start reporting with data for half a day on the 3rd, so
+    # we start reporting on the 4th)
     
+    # first check that the starting day matches the starting day of experiments_summary
+    missing_data <- experiments_daily_summary %>% 
+        filter(is.na(control_conversion_rate))
+    
+    missing_data_summary <- missing_data %>%
+        group_by(experiment_id, metric_id) %>%
+        summarise(min_date = min(day_expired_attribution),
+                  num_missing_days = length(unique(day_expired_attribution))) %>%
+        ungroup() %>%
+        arrange(experiment_id, metric_id)
+    
+    summary_start_dates <- experiments_summary %>%
+        mutate(min_date = as.Date(start_date)) %>%
+        select(experiment_id, metric_id, min_date) %>%
+        arrange(experiment_id, metric_id)
+    
+    expect_dataframes_equal(summary_start_dates, missing_data_summary %>% select(-num_missing_days))
+    # then check that the number of days of NA values matches the attribution window for that metric + 1 day
+    
+    expected_missing_days <- experiment_data$attribution_windows %>%
+        mutate(num_missing_days = attribution_window + 1) %>%
+        select(-attribution_window)
+    expect_dataframes_equal(expected_missing_days,
+                            missing_data_summary %>% select(-min_date))
+
+    # then check that the end date matches the end date of experiments_summary + attribution window + 1 day
+    expected_end_dates <- experiments_summary %>% 
+        mutate(end_date = as.Date(end_date)) %>%
+        select(experiment_id, metric_id, end_date) %>%
+        inner_join(expected_missing_days %>%
+                       mutate(metric_id = factor(metric_id, levels=levels(experiments_summary$metric_id))),
+                   by = c("experiment_id", "metric_id")) %>%
+        mutate(end_date = end_date + days(num_missing_days)) %>%
+        select(-num_missing_days) %>%
+        arrange(experiment_id, metric_id)
+    
+    found_end_dates <- last_days_daily_summary %>%
+        select(experiment_id, metric_id, day_expired_attribution) %>%
+        rename(end_date = day_expired_attribution)
+
+    expect_dataframes_equal(expected_end_dates, found_end_dates)
+    
+    ##### Plot each daily graph
     for(experiment in unique(experiments_summary$experiment_id)) {
         for(metric in unique(experiments_summary$metric_id)) {
             # experiment <- "Ask Additional Questions During Signup"
             # metric <- "Use Feature 1"
-            # print(experiment)
-            # print(metric)
+            print(experiment)
+            print(metric)
             
             plot_object <- plot__daily_p_value(experiments_daily_summary, experiment, metric)
             expect_false(is.null(plot_object))
@@ -575,7 +623,7 @@ test_that("plot__conversion_rates_bayesian", {
     experiments_summary <- experiments__get_summary(experiment_data, days_of_prior_data=15)
     
     for(experiment in experiment_names) {
-        
+        # experiment <- experiment_names[1]
         plot_object <- plot__conversion_rates_bayesian(experiments_summary, experiment=experiment)
         expect_false(is.null(plot_object))
         plot_object %>% test_save_plot(file=paste0('data/plot_helpers/plot__conversion_rates_bayesian/',

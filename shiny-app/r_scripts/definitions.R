@@ -27,10 +27,10 @@ global__colors_good <- '#37B57F'  # green
 global__text_size <- 4
 global__theme_base_size <- 16
 
-global__tab_names__overview <- "Overview"
-global__tab_names__dropoff <- "Event Drop-off"
-global__tab_names__value_counts <- "Event Value Counts"
-global__tab_names__discontinuity <- "Discontinuity Analysis"
+global__experiment__tab_names__percent_change <- "Percent Change"
+global__experiment__tab_names__percent_change_conf <- "Percent Change Confidence"
+global__experiment__tab_names__conversion_rates <- "Conversion Rates"
+global__experiment__tab_names__trends <- "Trends"
 
 ##############################################################################################################
 # Statistical Variables
