@@ -605,7 +605,7 @@ plot__daily_p_value <- function(experiments_daily_summary,
         geom_text(data=missing_dates, aes(y=y_axis_location, label=message),
                   vjust=-0.5,
                   hjust='left',#0.325,
-                  check_overlap = TRUE, na.rm=TRUE) +
+                  check_overlap = TRUE, na.rm=TRUE, size=rel(global__text_size)) +
         scale_x_date(date_breaks = '1 days') + 
         #scale_y_continuous(breaks = seq(0, 1, 0.05)) +
         expand_limits(y=0) +
@@ -676,7 +676,7 @@ plot__daily_percent_change_frequentist <- function(experiments_daily_summary,
         geom_text(data=missing_dates, aes(y=y_axis_location, label=message),
                   vjust=-0.5,
                   hjust='left',#0.325,
-                  check_overlap = TRUE, na.rm=TRUE) +
+                  check_overlap = TRUE, na.rm=TRUE, size=rel(global__text_size)) +
         labs(#title='Difference in Conversion Rate of `B` - `A`, with Frequentist Confidence Interval - \nWith Attribution Window',
              caption=paste("\n", percent(global__confidence_level), "confidence interval"),
              y='Lift (i.e. Percent change from Control to Variant)',
@@ -717,7 +717,7 @@ plot__daily_prob_variant_gt_control <- function(experiments_daily_summary, exper
             geom_text(data=missing_dates, aes(y=y_axis_location, label=message),
                       vjust=-0.5,
                       hjust='left',#0.325,
-                      check_overlap = TRUE, na.rm=TRUE) +
+                      check_overlap = TRUE, na.rm=TRUE, size=rel(global__text_size)) +
             scale_x_date(date_breaks = '1 days') + 
             #scale_y_continuous(breaks = seq(0, 1, 0.05)) +
             expand_limits(y=c(0, 1)) +
@@ -784,7 +784,7 @@ plot__daily_percent_change_bayesian <- function(experiments_daily_summary, exper
         geom_text(data=missing_dates, aes(y=y_axis_location, label=message),
                   vjust=-0.5,
                   hjust='left',#0.325,
-                  check_overlap = TRUE, na.rm=TRUE) +
+                  check_overlap = TRUE, na.rm=TRUE, size=rel(global__text_size)) +
         labs(#title='Difference in Conversion Rate of `B` - `A`, with Frequentist Confidence Interval - \nWith Attribution Window',
              caption=paste("\n", percent(global__confidence_level), "confidence interval"),
              y='Lift (i.e. Percent change from Control to Variant)',
