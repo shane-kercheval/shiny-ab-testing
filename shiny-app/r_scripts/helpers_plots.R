@@ -588,7 +588,7 @@ plot__daily_p_value <- function(experiments_daily_summary,
 
     missing_dates <- missing_dates %>%
         mutate(message = ifelse(as.character(missing_dates$day_expired_attribution) == as.character(min(missing_dates$day_expired_attribution)),
-                              'Lag from\nAttribution\nWindows',
+                              'Lag from\nAttribution\nWindow',
                               NA))
 
     current_daily_summary %>%
@@ -638,7 +638,7 @@ plot__daily_percent_change_frequentist <- function(experiments_daily_summary,
 
     missing_dates <- missing_dates %>%
         mutate(message = ifelse(as.character(missing_dates$day_expired_attribution) == as.character(min(missing_dates$day_expired_attribution)),
-                              'Lag from\nAttribution\nWindows',
+                              'Lag from\nAttribution\nWindow',
                               NA))
 
     plot_object <- current_daily_summary %>%
@@ -699,7 +699,7 @@ plot__daily_prob_variant_gt_control <- function(experiments_daily_summary, exper
 
     missing_dates <- missing_dates %>%
         mutate(message = ifelse(as.character(missing_dates$day_expired_attribution) == as.character(min(missing_dates$day_expired_attribution)),
-                              'Lag from\nAttribution\nWindows',
+                              'Lag from\nAttribution\nWindow',
                               NA))
 
     current_daily_summary %>%
@@ -749,7 +749,7 @@ plot__daily_percent_change_bayesian <- function(experiments_daily_summary, exper
 
     missing_dates <- missing_dates %>%
         mutate(message = ifelse(as.character(missing_dates$day_expired_attribution) == as.character(min(missing_dates$day_expired_attribution)),
-                              'Lag from\nAttribution\nWindows',
+                              'Lag from\nAttribution\nWindow',
                               NA))
 
     plot_object <- current_daily_summary %>%
