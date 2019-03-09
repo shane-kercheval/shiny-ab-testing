@@ -340,13 +340,15 @@ test_that("experiments__get_summary", {
     ##########################################################################################################
     plot_object <- plot__bayesian_posterior(experiments_summary,
                                              experiment=unique(experiments_summary$experiment_id)[1],
-                                             metric='Sign Up')
+                                             metric='Sign Up',
+                                             confidence_level=0.95)
 
     plot_object %>% test_save_plot(file='data/plot_helpers/plot__bayesian_posterior/experiment_1_signup.png')
     
     plot_object <- plot__bayesian_posterior(experiments_summary,
                                              experiment=unique(experiments_summary$experiment_id)[1],
                                              metric='Sign Up',
+                                             confidence_level=0.95,
                                              show_prior_distribution = FALSE)
     
     plot_object %>% test_save_plot(file='data/plot_helpers/plot__bayesian_posterior/experiment_1_signup_no_prior.png')
@@ -354,6 +356,7 @@ test_that("experiments__get_summary", {
     plot_object <- plot__bayesian_posterior(experiments_summary,
                                              experiment="New Signup CTA Color",
                                              metric='Pay/Subscribe',
+                                             confidence_level=0.95,
                                              show_prior_distribution = TRUE)
     
     plot_object %>% test_save_plot(file='data/plot_helpers/plot__bayesian_posterior/signup_color_pay.png')
@@ -361,6 +364,7 @@ test_that("experiments__get_summary", {
     plot_object <- plot__bayesian_posterior(experiments_summary,
                                              experiment="New Signup CTA Color",
                                              metric='Pay/Subscribe',
+                                             confidence_level=0.95,
                                              show_prior_distribution = FALSE)
     
     plot_object %>% test_save_plot(file='data/plot_helpers/plot__bayesian_posterior/signup_color_pay_no_prior.png')
@@ -368,6 +372,7 @@ test_that("experiments__get_summary", {
     plot_object <- plot__bayesian_posterior(experiments_summary,
                                              experiment="Redesign Website",
                                              metric='Pay/Subscribe',
+                                             confidence_level=0.95,
                                              show_prior_distribution = TRUE)
     
     plot_object %>% test_save_plot(file='data/plot_helpers/plot__bayesian_posterior/redesign_website_pay.png')
@@ -375,6 +380,7 @@ test_that("experiments__get_summary", {
     plot_object <- plot__bayesian_posterior(experiments_summary,
                                              experiment="Redesign Website",
                                              metric='Pay/Subscribe',
+                                             confidence_level=0.95,
                                              show_prior_distribution = FALSE)
     
     plot_object %>% test_save_plot(file='data/plot_helpers/plot__bayesian_posterior/redesign_website_pay_no_prior.png')

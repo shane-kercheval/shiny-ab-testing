@@ -91,10 +91,13 @@ plot__website_traffic <- function(experiment_data,
 #' @param experiment_data list of data-frames from load_data
 #' @param experiment
 #' @param metric
+#' @param confidence_level the confidence level passed to `experiments__get_summary()` which generates
+#'    `experiment_data`
 #' @param show_prior_distribution
 plot__bayesian_posterior <- function(experiments_summary,
                                      experiment,
                                      metric,
+                                     confidence_level,
                                      show_prior_distribution=TRUE) {
     
     local_experiment <-  experiments_summary %>%
@@ -170,18 +173,14 @@ plot__bayesian_posterior <- function(experiments_summary,
         custom_colors <- custom_colors %>% remove_val(global__colors_prior)
     }
 
-    control_cred_low <- qbeta(0.025, control_alpha, control_beta)
-    control_cred_high <- qbeta(0.975, control_alpha, control_beta)
+    confidence_difference <- 1 - confidence_level
+    two_sided_difference <- confidence_difference / 2
 
-    variant_cred_low <- qbeta(0.025, variant_alpha, variant_beta)
-    variant_cred_high <- qbeta(0.975, variant_alpha, variant_beta)
+    control_cred_low <- qbeta(two_sided_difference, control_alpha, control_beta)
+    control_cred_high <- qbeta(1 - two_sided_difference, control_alpha, control_beta)
 
-
-    cia <- credible_interval_approx(alpha_a=control_alpha,
-                                    beta_a=control_beta,
-                                    alpha_b=variant_alpha,
-                                    beta_b=variant_beta)
-    percent_of_time_b_wins <- cia['posterior']
+    variant_cred_low <- qbeta(two_sided_difference, variant_alpha, variant_beta)
+    variant_cred_high <- qbeta(1 - two_sided_difference, variant_alpha, variant_beta)
 
     # a_cr_simulation <- rbeta(1e6, control_alpha, control_beta)
     # b_cr_simulation <- rbeta(1e6, variant_alpha, variant_beta)
@@ -204,18 +203,18 @@ plot__bayesian_posterior <- function(experiments_summary,
                        height = max_distros_20th * 0.75, color = global__colors_variant, alpha=0.3) +
         scale_x_continuous(breaks = seq(0, 1, x_axis_break_steps),
                            labels = percent_format()) +
-        theme_light() +
+        theme_light(base_size=global__theme_base_size) +
         theme(axis.text.x = element_text(angle = 30, hjust = 1),
-              legend.text=element_text(size=rel(0.5)),
-              plot.subtitle=element_text(size=rel(0.7))) +
+              legend.text=element_text(size=rel(0.9)),
+              plot.subtitle=element_text(size=rel(0.9))) +
         coord_cartesian(xlim=c(x_min, x_max)) +
         scale_fill_manual(values=custom_colors) +
         scale_color_manual(values=custom_colors) +
-        labs(title='Posterior Probability Distributions of Control & Variant',
+        labs(#title='Posterior Probability Distributions of Control & Variant',
              subtitle=paste0(paste0('The probability the Variant is better is ',
                                     percent(bayesian_prob_variant_gt_control), ".\n"),
-                             paste0('\nExperiment: "', experiment, '"'),
-                             paste0('\nMetric: "', metric, '"'),
+                             #paste0('\nExperiment: "', experiment, '"'),
+                             #paste0('\nMetric: "', metric, '"'),
                              paste0('\nControl Name: "', control_name, '"'),
                              paste0('\nVariant Name: "', variant_name, '"')),
              x="Conversion Rates",
@@ -521,7 +520,7 @@ plot__percent_change_conf_frequentist <- function(experiments_summary, experimen
         theme(axis.text.x=element_text(angle=35, hjust=1)) +
         labs(caption=paste(paste("\nThe p-value threshold for statistical significance is",
                                   p_value_threshold),
-                            "\nThe error bars show the", percent(global__confidence_level), "confidence interval."),
+                            "\nThe error bars show the", percent(1 - p_value_threshold), "confidence interval."),
              x="Metric",
              y="Percent Change from Control to Variant",
              color="Statistically Significant")

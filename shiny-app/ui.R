@@ -29,10 +29,14 @@ shinyUI(fluidPage(theme="custom.css",
                     inline=TRUE,
                     width=NULL, choiceNames=NULL,
                     choiceValues=NULL),
+                bsTooltip(id='experiment__stat_type_select',
+                          title="Choose to display the Frequentist or Bayesian methodology.",
+                          placement='top', trigger='hover'),
                 uiOutput('graph_options__percent_change__UI'),
                 uiOutput('graph_options__percent_change_conidence__UI'),
                 uiOutput('graph_options__conversion_rates__UI'),
-                uiOutput('graph_options__trends__UI')
+                uiOutput('graph_options__trends__UI'),
+                uiOutput('graph_options__bayesian_posteriors__UI')
             )
         )
     ),
@@ -64,6 +68,12 @@ shinyUI(fluidPage(theme="custom.css",
                 #id='main_tabs__value_counts',
                 tags$br(),
                 plotOutput(outputId='plot__trends')
+            ),
+            tabPanel(
+                global__experiment__tab_names__bayesian,
+                #id='main_tabs__value_counts',
+                tags$br(),
+                plotOutput(outputId='plot__bayesian_posteriors')
             )
         )
     )

@@ -31,6 +31,7 @@ global__experiment__tab_names__percent_change <- "Percent Change"
 global__experiment__tab_names__percent_change_conf <- "Percent Change Confidence"
 global__experiment__tab_names__conversion_rates <- "Conversion Rates"
 global__experiment__tab_names__trends <- "Trends"
+global__experiment__tab_names__bayesian <- "Bayesian Posteriors"
 
 ##############################################################################################################
 # Statistical Variables
