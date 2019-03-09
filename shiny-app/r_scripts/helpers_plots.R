@@ -218,7 +218,10 @@ plot__bayesian_posterior <- function(experiments_summary,
                              paste0('\nControl Name: "', control_name, '"'),
                              paste0('\nVariant Name: "', variant_name, '"')),
              x="Conversion Rates",
-             y="Density of beta")
+             y="Density of beta",
+             caption=paste("\nThe lines under each distribution show the corresponding",
+                           percent(confidence_level),
+                           "confidence interval."))
 
     return (plot_object)
 }

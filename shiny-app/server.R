@@ -451,6 +451,6 @@ shinyServer(function(session, input, output) {
         session,
         'plot__bayesian_posteriors', 
         title="Posterior Probability Distributions of the Control & Variant",
-        content=HTML("This graph shows the posterior probability distributions of the Control, Variant, and if selected, the Priors. It also shows a confdience "),
+        content=HTML("This graph shows the posterior probability distributions of the Control, Variant, and if selected, the Priors. It also shows a confidence intervals for the Control and Variant distributions below."),
         placement="left", trigger="hover", options=NULL)
 })
