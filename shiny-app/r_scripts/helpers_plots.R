@@ -579,7 +579,7 @@ plot__daily_p_value <- function(experiments_daily_summary,
         filter(experiment_id == experiment,
                metric_id == metric)
 
-    error_bar_height <- sd(current_daily_summary$p_value, na.rm = TRUE) / 4
+    error_bar_height <- (max(current_daily_summary$p_value, na.rm=TRUE) - min(current_daily_summary$p_value, na.rm=TRUE)) / 25
     median_p_value <- median(current_daily_summary$p_value, na.rm = TRUE)
     missing_dates <- current_daily_summary %>%
         filter(is.na(control_conversion_rate)) %>%
@@ -629,7 +629,7 @@ plot__daily_percent_change_frequentist <- function(experiments_daily_summary,
                perc_change_conf_low = frequentist_conf_low / control_conversion_rate,
                perc_change_conf_high = frequentist_conf_high / control_conversion_rate)
     
-    error_bar_height <- sd(current_daily_summary$perc_change, na.rm = TRUE) / 2
+    error_bar_height <- (max(current_daily_summary$perc_change_conf_high, na.rm=TRUE) - min(current_daily_summary$perc_change_conf_low, na.rm=TRUE)) / 25
     median_percent_change <- median(current_daily_summary$perc_change, na.rm = TRUE)
     missing_dates <- current_daily_summary %>%
         filter(is.na(control_conversion_rate)) %>%
@@ -690,7 +690,7 @@ plot__daily_prob_variant_gt_control <- function(experiments_daily_summary, exper
             filter(experiment_id == experiment,
                    metric_id == metric)
 
-    error_bar_height <- sd(current_daily_summary$bayesian_prob_variant_gt_control, na.rm = TRUE) / 2
+    error_bar_height <- (max(current_daily_summary$bayesian_prob_variant_gt_control, na.rm=TRUE) - min(current_daily_summary$bayesian_prob_variant_gt_control, na.rm=TRUE)) / 25
     median_probability <- median(current_daily_summary$bayesian_prob_variant_gt_control, na.rm = TRUE)
     missing_dates <- current_daily_summary %>%
         filter(is.na(control_conversion_rate)) %>%
@@ -740,7 +740,7 @@ plot__daily_percent_change_bayesian <- function(experiments_daily_summary, exper
                # it is "statistically significant" if the confidence interval is completely above or below 0
                is_stat_sig=(perc_change_conf_low < 0 & perc_change_conf_high < 0) | (perc_change_conf_low > 0 & perc_change_conf_high > 0))
 
-    error_bar_height <- sd(current_daily_summary$perc_change, na.rm = TRUE) / 2
+    error_bar_height <- (max(current_daily_summary$perc_change_conf_high, na.rm=TRUE) - min(current_daily_summary$perc_change_conf_low, na.rm=TRUE)) / 25
     median_percent_change <- median(current_daily_summary$perc_change, na.rm = TRUE)
     missing_dates <- current_daily_summary %>%
         filter(is.na(control_conversion_rate)) %>%
