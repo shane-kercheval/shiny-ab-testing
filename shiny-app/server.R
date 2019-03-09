@@ -303,6 +303,6 @@ shinyServer(function(session, input, output) {
         session,
         'plot__trends', 
         title="Percent Change Over time",
-        content=HTML("Shows the percent change (i.e. Lift) from the Control to the Variant.<br><br>The colored area is the confidence interval where red indicates that '0% Lift' is within the interval, and green indicates '0% Lift' is outside the interval.<br><br>The conversion rates will differ between the Frequentist and Bayesian graphs because the Bayesian methodology will anchor the conversion rates toward the prior rates."),
+        content=HTML("Shows the percent change (i.e. Lift) from the Control to the Variant over the lifetime of the experiment.<br><br>There will be a lag between the start of the experiment and when data will start appearing, due to the attribution window.<br><br>The colored area is the confidence interval where red indicates that '0% Lift' is within the interval, and green indicates '0% Lift' is outside the interval.<br><br>The conversion rates will differ between the Frequentist and Bayesian graphs because the Bayesian methodology will anchor the conversion rates toward the prior rates."),
         placement="left", trigger="hover", options=NULL)
 })

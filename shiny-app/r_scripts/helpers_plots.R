@@ -74,7 +74,8 @@ plot__website_traffic <- function(experiment_data,
         geom_line() +
         geom_point() +
         expand_limits(y = 0) +
-        geom_text(aes(label = prettify_numerics(num_users)), check_overlap=TRUE, vjust = -0.5) +
+        geom_text(aes(label = prettify_numerics(num_users)),
+                  check_overlap=TRUE, vjust = -0.5, size=rel(global__text_size)) +
         scale_y_continuous(labels = comma_format()) +
         theme_light() +
         theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
@@ -596,7 +597,8 @@ plot__daily_p_value <- function(experiments_daily_summary,
         ggplot(aes(x=day_expired_attribution, y=p_value)) +
         geom_line(na.rm = TRUE) +
         geom_point(na.rm = TRUE) +
-        geom_text(aes(label=round(p_value, 3)), vjust=-0.5, check_overlap = TRUE, na.rm = TRUE) +
+        geom_text(aes(label=round(p_value, 3)),
+                  vjust=-0.5, check_overlap = TRUE, na.rm = TRUE, size=rel(global__text_size)) +
         geom_hline(yintercept = p_value_threshold, color ='red', alpha=0.5, size=1.5) +
         geom_errorbarh(data=missing_dates, aes(y = y_axis_location,
                                                xmin = min(day_expired_attribution),
@@ -668,7 +670,8 @@ plot__daily_percent_change_frequentist <- function(experiments_daily_summary,
     
     plot_object +
         geom_hline(yintercept = 0, color='red', alpha=0.5, size=1.5) +
-        geom_text(aes(label=percent(perc_change)), vjust=-1, check_overlap = TRUE, na.rm=TRUE) +
+        geom_text(aes(label=percent(perc_change)),
+                  vjust=-1, check_overlap = TRUE, na.rm=TRUE, size=rel(global__text_size)) +
         geom_errorbarh(data=missing_dates, aes(y = y_axis_location,
                                                xmin = min(day_expired_attribution),
                                                xmax = max(day_expired_attribution)),
@@ -708,7 +711,7 @@ plot__daily_prob_variant_gt_control <- function(experiments_daily_summary, exper
             geom_line(na.rm=TRUE) +
             geom_point(na.rm=TRUE) +
             geom_text(aes(label=percent(bayesian_prob_variant_gt_control)),
-                      vjust=-0.5, check_overlap = TRUE, na.rm=TRUE) +
+                      vjust=-0.5, check_overlap = TRUE, na.rm=TRUE, size=rel(global__text_size)) +
             geom_hline(yintercept = 0.5, color ='red', alpha=0.5, size=1.5) +
             geom_errorbarh(data=missing_dates, aes(y = y_axis_location,
                                                xmin = min(day_expired_attribution),
@@ -776,7 +779,7 @@ plot__daily_percent_change_bayesian <- function(experiments_daily_summary, exper
     plot_object +
         geom_hline(yintercept = 0, color='red', alpha=0.5, size=1.5) +
         geom_text(aes(label=percent(perc_change)),
-                  vjust=-1, check_overlap = TRUE, na.rm=TRUE) +
+                  vjust=-1, check_overlap = TRUE, na.rm=TRUE, size=rel(global__text_size)) +
         geom_errorbarh(data=missing_dates, aes(y = y_axis_location,
                                                xmin = min(day_expired_attribution),
                                                xmax = max(day_expired_attribution)),
