@@ -560,8 +560,8 @@ test_that("experiments__get_daily_summary", {
         for(metric in unique(experiments_summary$metric_id)) {
             # experiment <- "Ask Additional Questions During Signup"
             # metric <- "Use Feature 1"
-            print(experiment)
-            print(metric)
+            # print(experiment)
+            # print(metric)
             
             plot_object <- plot__daily_p_value(experiments_daily_summary, experiment, metric)
             expect_false(is.null(plot_object))

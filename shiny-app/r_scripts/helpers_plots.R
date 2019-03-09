@@ -690,7 +690,7 @@ plot__daily_prob_variant_gt_control <- function(experiments_daily_summary, exper
             filter(experiment_id == experiment,
                    metric_id == metric)
 
-    error_bar_height <- (max(current_daily_summary$bayesian_prob_variant_gt_control, na.rm=TRUE) - min(current_daily_summary$bayesian_prob_variant_gt_control, na.rm=TRUE)) / 25
+    error_bar_height <- 0.04  # we can hard code this value because the y-axis is always between 0-1
     median_probability <- median(current_daily_summary$bayesian_prob_variant_gt_control, na.rm = TRUE)
     missing_dates <- current_daily_summary %>%
         filter(is.na(control_conversion_rate)) %>%
