@@ -15,9 +15,6 @@ shinyUI(tagList(
     navbarPage("A/B Test Dashboard", theme="custom.css",
         tabPanel(
             "Experiment Analysis",
-            #id='main_tabs__overview',
-            tags$br(),
-            #plotOutput(outputId='plot__percent_change')
             column(3,
                 class='column-input-control-style',
                 bsCollapse(id='main__bscollapse', open=c("Experiment", "Graph Options"), multiple=TRUE,
@@ -53,37 +50,31 @@ shinyUI(tagList(
                     type='tabs',
                     tabPanel(
                         global__experiment__tab_names__percent_change,
-                        #id='experiment_tabs__overview',
                         tags$br(),
                         plotOutput(outputId='plot__percent_change')
                     ),
                     tabPanel(
                         global__experiment__tab_names__percent_change_conf,
-                        #id='experiment_tabs__dropoff',
                         tags$br(),
                         plotOutput(outputId='plot__percent_change_confidence')
                     ),
                     tabPanel(
                         global__experiment__tab_names__conversion_rates,
-                        #id='experiment_tabs__discontinuity',
                         tags$br(),
                         plotOutput(outputId='plot__conversion_rates')
                     ),
                     tabPanel(
                         global__experiment__tab_names__trends,
-                        #id='experiment_tabs__value_counts',
                         tags$br(),
                         plotOutput(outputId='plot__trends')
                     ),
                     tabPanel(
                         global__experiment__tab_names__bayesian,
-                        #id='experiment_tabs__value_counts',
                         tags$br(),
                         plotOutput(outputId='plot__bayesian_posteriors')
                     ),
                     tabPanel(
                         global__experiment__tab_names__raw_data,
-                        #id='experiment_tabs__value_counts',
                         tags$br(),
                         tags$div(class='results-table', dataTableOutput(outputId='experiment__raw_data_table'))
                     )
@@ -93,7 +84,26 @@ shinyUI(tagList(
         ),
         navbarMenu("Planning",
             tabPanel("Website Traffic",
-                tags$br()
+                column(3,
+                    class='column-input-control-style',
+                    bsCollapse(id='main__bscollapse', open=c("Options"), multiple=TRUE,
+                        bsCollapsePanel(
+                            "Options",
+                            radioButtons(
+                                inputId='traffic__tbd',
+                                label="TBD",
+                                choices=c("1", "2"),
+                                selected="1",
+                                inline=TRUE,
+                                width=NULL, choiceNames=NULL,
+                                choiceValues=NULL)
+                        )
+                    )
+                ),
+                column(9,
+                    tags$br(),
+                    tags$p('TBD')
+                )
             ),
             tabPanel("Duration Estimator",
                 fluidRow(
@@ -102,13 +112,18 @@ shinyUI(tagList(
             )
         ),
         navbarMenu("More",
-            tabPanel("Settings",
-                tags$br()
-              #DT::dataTableOutput("table")
-            ),
             tabPanel("View Raw Data",
                 tags$br()
               #DT::dataTableOutput("table")
+            ),
+            tabPanel("Settings",
+                tags$br(),
+                fluidRow(
+                    column(12, align="center",
+                        tags$div(class='results-table',
+                            dataTableOutput(outputId='more__settings__table'))
+                    )
+                )
             ),
             tabPanel("About",
                 fluidRow(

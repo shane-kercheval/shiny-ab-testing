@@ -578,4 +578,19 @@ shinyServer(function(session, input, output) {
         )
     })
 
+    output$more__settings__table <- renderDataTable({
+
+        return (
+            tribble(
+                ~Name, ~Value,
+                #--|--
+                "Confidence Level", global__confidence_level,
+                "P-Value Threshold", global__p_value_threshold,
+                "Days of Prior Information", global__prior_number_of_days
+            )
+        )
+    },
+    options = list(paging = FALSE, info = TRUE)
+    )
+
 })
