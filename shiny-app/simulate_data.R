@@ -151,7 +151,7 @@ plot_object <- first_time_users %>%
     labs(title='Simulated Daily website_traffic') +
     scale_x_date(date_labels="%y-%m-%d",date_breaks  ="5 days") +
     theme(axis.text.x = element_text(angle = 30, hjust = 1))
-plot_object %>% test_save_plot(file='simulated_data/plots/simulated_daily_website_traffic.png')
+plot_object %>% test_save_plot(file='simulated_data_plots/simulated_daily_website_traffic.png')
 
 plot_object <- website_traffic %>%
     count(user_id) %>%  # gives a count of days visited for each user-id
@@ -165,7 +165,7 @@ plot_object <- website_traffic %>%
     geom_text(aes(label=percent(percent_of_user_ids)), vjust=-0.3) +
     geom_text(aes(label=number_of_ids), vjust=-1) +
     labs(title='Distribution of Unique Website Traffic Per User-Id')
-plot_object %>% test_save_plot(file='simulated_data/plots/unique_website_traffic_per_user_id.png')
+plot_object %>% test_save_plot(file='simulated_data_plots/unique_website_traffic_per_user_id.png')
 
 plot_object <- website_traffic %>%
     count(path) %>%
@@ -173,7 +173,7 @@ plot_object <- website_traffic %>%
     ggplot(aes(x=path, y=n)) +
     geom_col() +
     labs(title='Total website_traffic (day/user) single row represents >=1 Website Traffic for that day/user/path')
-plot_object %>% test_save_plot(file='simulated_data/plots/count_of_traffic_to_paths.png')
+plot_object %>% test_save_plot(file='simulated_data_plots/count_of_traffic_to_paths.png')
 
 plot_object <- website_traffic %>%
     group_by(user_id) %>%
@@ -182,7 +182,7 @@ plot_object <- website_traffic %>%
     ggplot(aes(x=t)) +
         geom_histogram() +
         labs(title='Distribution of Number of Days between Website Traffic')
-plot_object %>% test_save_plot(file='simulated_data/plots/distribution_of_num_days_between_traffic.png')
+plot_object %>% test_save_plot(file='simulated_data_plots/distribution_of_num_days_between_traffic.png')
 
 temp <- inner_join(
     website_traffic %>% 
@@ -204,7 +204,7 @@ plot_object <- temp %>%
     ggplot(aes(x=date, y=num_users, color=user_type)) +
         geom_line() +
         labs(title='New vs. All Visits Over time')
-plot_object %>% test_save_plot(file='simulated_data/plots/new_vs_all_visits_over_time.png')
+plot_object %>% test_save_plot(file='simulated_data_plots/new_vs_all_visits_over_time.png')
 
 plot_object <- temp %>%
     mutate(percent_new_visits = new_visits / all_visits) %>%
@@ -212,7 +212,7 @@ plot_object <- temp %>%
         geom_line() +
         expand_limits(y=0) +
         labs(title="Percent New users Over time")
-plot_object %>% test_save_plot(file='simulated_data/plots/percent_new_visits_over_time.png')
+plot_object %>% test_save_plot(file='simulated_data_plots/percent_new_visits_over_time.png')
 
 plot_object <- website_traffic %>%
     mutate(visit_date = floor_date(visit_date, unit = 'days')) %>%
@@ -220,7 +220,7 @@ plot_object <- website_traffic %>%
     ggplot(aes(x=visit_date, y=n, color=path)) +
     geom_line() +
     labs(title='Website Traffic (per day/user) i.e. single row represents >=1 Website Traffic for that day/user/path')
-plot_object %>% test_save_plot(file='simulated_data/plots/website_traffic_per_path.png')
+plot_object %>% test_save_plot(file='simulated_data_plots/website_traffic_per_path.png')
 
 check_data__website_traffic(website_traffic)
 write.csv(website_traffic, file='simulated_data/website_traffic.csv', row.names = FALSE)
@@ -264,7 +264,7 @@ create_experiment_visits <- function(website_traffic, start_date, end_date, expe
         theme(legend.position = 'none') +
         labs(title=paste('Variation Count -', current_experiment_id),
              subtitle='All visitors in experiment are new to the site (i.e. first visit >= experiment start date)')
-    plot_object %>% test_save_plot(file=paste0('simulated_data/plots/create_', 
+    plot_object %>% test_save_plot(file=paste0('simulated_data_plots/create_', 
                                                current_experiment_id,
                                                '_variation_count.png'))
         
@@ -297,7 +297,7 @@ create_experiment_visits <- function(website_traffic, start_date, end_date, expe
         geom_text(aes(label=daily_traffic), check_overlap = TRUE, vjust=-0.5) +
         expand_limits(y=0)+
         labs(title='Number of People Entering Experiment')
-    plot_object %>% test_save_plot(file=paste0('simulated_data/plots/create_', 
+    plot_object %>% test_save_plot(file=paste0('simulated_data_plots/create_', 
                                                current_experiment_id,
                                                '_experiment_trials_over_time.png'))
     
@@ -310,7 +310,7 @@ create_experiment_visits <- function(website_traffic, start_date, end_date, expe
         geom_text(aes(label=n), check_overlap = TRUE, vjust=-0.5) +
         expand_limits(y=0)+
         labs(title='Number of People Entering Experiment - By Variation')
-    plot_object %>% test_save_plot(file=paste0('simulated_data/plots/create_', 
+    plot_object %>% test_save_plot(file=paste0('simulated_data_plots/create_', 
                                                current_experiment_id,
                                                '_experiment_trials_over_time_variation.png'))
 
@@ -325,7 +325,7 @@ create_experiment_visits <- function(website_traffic, start_date, end_date, expe
         expand_limits(y=0)+
         scale_x_continuous(breaks=seq(1, 100)) +
         labs(title='Percent of Cumulative Traffic Attained for the Corresponding Sample Size')
-    plot_object %>% test_save_plot(file=paste0('simulated_data/plots/create_', 
+    plot_object %>% test_save_plot(file=paste0('simulated_data_plots/create_', 
                                                current_experiment_id,
                                                '_percent_cumulative_traffic_to_sample_size_over_time.png'))
     
@@ -424,7 +424,7 @@ plot_object <- experiment_traffic %>%
         scale_x_datetime(date_labels="%y-%m-%d",date_breaks  ="10 days") +
         theme(axis.text.x = element_text(angle = 30, hjust = 1, size=6),
               legend.position="none")
-plot_object %>% test_save_plot(file='simulated_data/plots/experiment_start_stop.png')
+plot_object %>% test_save_plot(file='simulated_data_plots/experiment_start_stop.png')
 
 check_data__experiment_traffic(experiment_traffic, experiment_info)
 write.csv(experiment_traffic, file='simulated_data/experiment_traffic.csv', row.names = FALSE)
@@ -548,7 +548,7 @@ plot_object <- user_metric_crs %>%
     geom_text(aes(label=percent(n))) +
     labs(title='Conversion Rates (among all users) for Each Metric',
          subtitle= "Doesn't account for the lag between first visit and the conversion date.")
-plot_object %>% test_save_plot(file='simulated_data/plots/metric_conversion_rates_no_lag_consideration.png')
+plot_object %>% test_save_plot(file='simulated_data_plots/metric_conversion_rates_no_lag_consideration.png')
 
 # create a dataset of the website traffic users that have converted
 conversion_data <- inner_join(user_metric_crs %>%
@@ -581,7 +581,7 @@ plot_object <- temp %>%
               size=3) +
     theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
     labs(title='Conversion Rates Between Variations Per Metric')
-plot_object %>% test_save_plot(file='simulated_data/plots/conversion_rates_of_experiments_per_variation.png')
+plot_object %>% test_save_plot(file='simulated_data_plots/conversion_rates_of_experiments_per_variation.png')
 
 plot_object <- temp %>%
     group_by(experiment_id, metric_id) %>%
@@ -602,7 +602,7 @@ plot_object <- temp %>%
               vjust=-0.75) +
     theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
     labs(title="% Change in CR from the Baseline (A) variation to the Variant (B)")
-plot_object %>% test_save_plot(file='simulated_data/plots/percent_change_in_cr_of_experiments_per_variation.png')
+plot_object %>% test_save_plot(file='simulated_data_plots/percent_change_in_cr_of_experiments_per_variation.png')
 
 ##############################################################################################################
 # For those who convert to a metric, generate the offset (number of days) from first-visit to conversion-date
@@ -645,7 +645,7 @@ plot_object <- conversion_data %>%
         geom_col() +
     facet_wrap( ~ metric_id, scales = 'free_y') +
     labs(title='Distribution of Days from First Visit to Event Conversion, for those that convert')
-plot_object %>% test_save_plot(file='simulated_data/plots/distro_days_from_first_visit_to_conversion_per_metric.png')
+plot_object %>% test_save_plot(file='simulated_data_plots/distro_days_from_first_visit_to_conversion_per_metric.png')
 
 plot_object <- conversion_data %>%
     mutate(conversion_date = as.Date(conversion_date)) %>%
@@ -654,7 +654,7 @@ plot_object <- conversion_data %>%
         geom_line() +
     facet_wrap( ~ metric_id, scales = 'free_y') +
     labs(title='Daily Conversions')
-plot_object %>% test_save_plot(file='simulated_data/plots/daiy_conversion_events_per_metric.png')
+plot_object %>% test_save_plot(file='simulated_data_plots/daiy_conversion_events_per_metric.png')
 
 conversion_data <- conversion_data %>%
     select(user_id, metric_id, conversion_date) %>%
