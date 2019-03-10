@@ -190,15 +190,46 @@ shinyServer(function(session, input, output) {
         #})
     })
 
+    graph_options__raw_data__choices <- c(
+        "Date Info",
+        "Variation Names",
+        "Raw Counts",
+        "Frequentist",
+        "Frequentist Conf. Int.",
+        "Bayesian",
+        "Bayesian Conf. Int.",
+        "Bayesian Alpha/Beta"
+    )
+
+    output$graph_options__raw_data__UI <- renderUI({
+        selected <- c(
+            "Frequentist",
+            "Bayesian"
+        )
+        ui_show_in_table <- checkboxGroupInput(
+            inputId='experiment__raw_data__show_options',
+            label='Show in Table',
+            choices = graph_options__raw_data__choices, 
+            selected = selected,
+            inline = FALSE,
+            width = NULL, 
+            choiceNames = NULL,
+            choiceValues = NULL)
+
+        ui_list <- list()
+        ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_show_in_table)
+        return (tagList(list=ui_list))
+    })
+
     ##########################################################################################################
     # Update Dynamic Graph Options based on the Selected Tab
     ##########################################################################################################
-    observeEvent(input$main_tabs, {
+    observeEvent(input$experiment_tabs, {
 
-        req(input$main_tabs)
-        log_message_variable('Selected New Tab', input$main_tabs)
+        req(input$experiment_tabs)
+        log_message_variable('Selected New Tab', input$experiment_tabs)
 
-        if(input$main_tabs == global__experiment__tab_names__percent_change) {
+        if(input$experiment_tabs == global__experiment__tab_names__percent_change) {
 
             shinyjs::show('experiment__stat_type_select')
 
@@ -208,8 +239,9 @@ shinyServer(function(session, input, output) {
             shinyjs::hide('graph_options__conversion_rates__UI')
             shinyjs::hide('graph_options__trends__UI')
             shinyjs::hide('graph_options__bayesian_posteriors__UI')
+            shinyjs::hide('graph_options__raw_data__UI')
             
-        } else if(input$main_tabs == global__experiment__tab_names__percent_change_conf) {
+        } else if(input$experiment_tabs == global__experiment__tab_names__percent_change_conf) {
 
             shinyjs::show('experiment__stat_type_select')
 
@@ -218,9 +250,10 @@ shinyServer(function(session, input, output) {
             shinyjs::hide('graph_options__conversion_rates__UI')
             shinyjs::hide('graph_options__trends__UI')
             shinyjs::hide('graph_options__bayesian_posteriors__UI')
+            shinyjs::hide('graph_options__raw_data__UI')
             #updateCollapse(session, 'main__bscollapse', open="Graph Options")
 
-        } else if(input$main_tabs == global__experiment__tab_names__conversion_rates) {
+        } else if(input$experiment_tabs == global__experiment__tab_names__conversion_rates) {
             
             shinyjs::show('experiment__stat_type_select')
 
@@ -229,9 +262,10 @@ shinyServer(function(session, input, output) {
             shinyjs::show('graph_options__conversion_rates__UI')
             shinyjs::hide('graph_options__trends__UI')
             shinyjs::hide('graph_options__bayesian_posteriors__UI')
+            shinyjs::hide('graph_options__raw_data__UI')
             #updateCollapse(session, 'main__bscollapse', open="Graph Options")
 
-        } else if(input$main_tabs == global__experiment__tab_names__trends) {
+        } else if(input$experiment_tabs == global__experiment__tab_names__trends) {
             
             shinyjs::show('experiment__stat_type_select')
 
@@ -240,9 +274,10 @@ shinyServer(function(session, input, output) {
             shinyjs::hide('graph_options__conversion_rates__UI')
             shinyjs::show('graph_options__trends__UI')
             shinyjs::hide('graph_options__bayesian_posteriors__UI')
+            shinyjs::hide('graph_options__raw_data__UI')
             #updateCollapse(session, 'main__bscollapse', open="Graph Options")
 
-        } else if(input$main_tabs == global__experiment__tab_names__bayesian) {
+        } else if(input$experiment_tabs == global__experiment__tab_names__bayesian) {
             
             shinyjs::hide('experiment__stat_type_select')
 
@@ -251,8 +286,21 @@ shinyServer(function(session, input, output) {
             shinyjs::hide('graph_options__conversion_rates__UI')
             shinyjs::hide('graph_options__trends__UI')
             shinyjs::show('graph_options__bayesian_posteriors__UI')
+            shinyjs::hide('graph_options__raw_data__UI')
             #updateCollapse(session, 'main__bscollapse', open="Graph Options")
             
+        } else if(input$experiment_tabs == global__experiment__tab_names__raw_data) {
+            
+            shinyjs::hide('experiment__stat_type_select')
+
+            shinyjs::hide('graph_options__percent_change__UI')
+            shinyjs::hide('graph_options__percent_change_conidence__UI')
+            shinyjs::hide('graph_options__conversion_rates__UI')
+            shinyjs::hide('graph_options__trends__UI')
+            shinyjs::hide('graph_options__bayesian_posteriors__UI')
+            shinyjs::show('graph_options__raw_data__UI')
+            #updateCollapse(session, 'main__bscollapse', open="Graph Options")
+
         } else {
 
             stopifnot(FALSE)
@@ -260,7 +308,7 @@ shinyServer(function(session, input, output) {
     })
 
     ##########################################################################################################
-    # PLOTS
+    # PLOTS & TABLES
     ##########################################################################################################
     output$plot__percent_change <- renderPlot({
 
@@ -453,4 +501,81 @@ shinyServer(function(session, input, output) {
         title="Posterior Probability Distributions of the Control & Variant",
         content=HTML("This graph shows the posterior probability distributions of the Control, Variant, and if selected, the Priors. It also shows a confidence intervals for the Control and Variant distributions below."),
         placement="left", trigger="hover", options=NULL)
+
+
+    output$experiment__raw_data_table <- renderDataTable({
+
+        req(reactive__experiments_summary())
+        req(input$experiment__select)
+        req(input$experiment__raw_data__show_options)
+
+        log_message_block_start("Showing Raw Data of Experiment")
+
+        log_message_variable('experiment__raw_data__show_options',
+            paste(input$experiment__raw_data__show_options, collapse=', '))
+
+        summary_columns <- list(
+            #'experiment_id',
+            `Date Info`=c(
+                'start_date',
+                'end_date',
+                'last_join_date'
+            ),
+            'metric_id',
+            `Variation Names`=c(
+                'control_name',
+                'variant_name'
+            ),
+            'control_conversion_rate',
+            'variant_conversion_rate',
+            'percent_change_from_control',
+            `Raw Counts`=c(
+                'control_successes',
+                'control_trials',
+                'variant_successes',
+                'variant_trials'
+            ),
+            `Frequentist`=c(
+                'p_value',
+                'frequentist_cr_difference'
+            ),
+            `Frequentist Conf. Int.`=c(
+                'frequentist_conf_low',
+                'frequentist_conf_high'
+            ),
+            `Bayesian`=c(
+                'bayesian_control_cr',
+                'bayesian_variant_cr',
+                'bayesian_prob_variant_gt_control'
+            ),
+            `Bayesian Conf. Int.`=c(
+                'bayesian_cr_difference',
+                'bayesian_conf_low',
+                'bayesian_conf_high'
+            ),
+            `Bayesian Alpha/Beta`=c(
+                'prior_alpha',
+                'prior_beta',
+                'control_alpha',
+                'control_beta',
+                'variant_alpha',
+                'variant_beta'
+            )
+        )
+
+        # Lets remove the items that are in graph_options__raw_data__choices but were not selected
+        items_to_remove <- graph_options__raw_data__choices[!graph_options__raw_data__choices %in% input$experiment__raw_data__show_options]
+        remaining_columns <- summary_columns
+        for(item_to_remove in items_to_remove) {
+
+            remaining_columns[[item_to_remove]] <- NULL 
+        }
+
+        return (
+            reactive__experiments_summary() %>%
+                filter(experiment_id == input$experiment__select) %>%
+                select_(.dots=unlist(remaining_columns, use.names = FALSE))
+        )
+    })
+
 })

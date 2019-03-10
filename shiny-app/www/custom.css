@@ -1,3 +1,12 @@
+/* NavbarPage */
+.navbar {
+    margin-bottom: 0px;
+    padding-left: 15px;
+}
+.container-fluid {
+    padding-left: 5px;
+}
+/* Progress Bar */
 .shiny-notification {
     height: 100%;
     width: 100%;
@@ -19,6 +28,12 @@
     text-align: center;
     font-size: 18px;
 }
+
+
+
+
+
+
 .results-table {
     font-size: 85%;
     width: 70%;
