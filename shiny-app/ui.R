@@ -83,6 +83,11 @@ shinyUI(tagList(
             )
         ),
         navbarMenu("Planning",
+            tabPanel("Duration Estimator",
+                fluidRow(
+                    tags$br()
+                )
+            ),
             tabPanel("Website Traffic",
                 column(3,
                     class='column-input-control-style',
@@ -103,9 +108,9 @@ shinyUI(tagList(
                 column(9,
                     tags$br(),
                     tags$p('TBD')
-                )
+                )                
             ),
-            tabPanel("Duration Estimator",
+            tabPanel("Conversion Rates",
                 fluidRow(
                     tags$br()
                 )
