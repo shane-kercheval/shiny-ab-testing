@@ -17,14 +17,14 @@ shinyServer(function(session, input, output) {
     ##########################################################################################################
     # LOAD DATA
     ##########################################################################################################
-    reactive__experiment_data <- reactive({
+    # reactive__experiment_data <- reactive({
 
-        #withProgress(value=1/2, message="Loading Data", {
+    #     #withProgress(value=1/2, message="Loading Data", {
             
-            log_message_block_start("Loading Data")
-            load_data()
-        #})
-    })
+    #         log_message_block_start("Loading Data")
+    #         load_data()
+    #     #})
+    # })
 
     reactive__experiments_summary <- reactive({
 
