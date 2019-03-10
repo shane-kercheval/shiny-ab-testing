@@ -33,6 +33,8 @@ global__experiment__tab_names__conversion_rates <- "Conversion Rates"
 global__experiment__tab_names__trends <- "Trends"
 global__experiment__tab_names__bayesian <- "Bayesian Posteriors"
 
+global__progress_bar_html <- HTML('"<div id="shiny-notification-panel"><div id="shiny-notification-42ec5661c2722d29" class="shiny-notification"><div class="shiny-notification-close">×</div><div class="shiny-notification-content"><div class="shiny-notification-content-text"><div id="shiny-progress-42ec5661c2722d29" class="shiny-progress-notification"><div class="progress progress-striped active" style=""><div class="progress-bar" style="width: 50%;"></div></div><div class="progress-text"><span class="progress-message">Processing Data</span> <span class="progress-detail"></span></div></div></div><div class="shiny-notification-content-action"></div></div></div></div>"')
+
 ##############################################################################################################
 # Statistical Variables
 ##############################################################################################################

@@ -19,29 +19,29 @@ shinyServer(function(session, input, output) {
     ##########################################################################################################
     reactive__experiment_data <- reactive({
 
-        withProgress(value=1/2, message="Loading Data", {
-
+        #withProgress(value=1/2, message="Loading Data", {
+            
             log_message_block_start("Loading Data")
             load_data()
-        })
+        #})
     })
 
     reactive__experiments_summary <- reactive({
 
-        withProgress(value=1/2, message="Loading Experiments Summary Data", {
+        #withProgress(value=1/2, message="Loading Experiments Summary Data", {
 
             log_message_block_start("Loading Experiments Summary Data")
             readRDS('processed_data/experiments_summary.RDS')
-        })
+        #})
     })
 
     reactive__experiments_daily_summary <- reactive({
 
-        withProgress(value=1/2, message="Loading Daily Summary Data", {
+        #withProgress(value=1/2, message="Loading Daily Summary Data", {
 
             log_message_block_start("Loading Daily Summary Data")
             readRDS('processed_data/experiments_daily_summary.RDS')
-        })
+        #})
     })
 
     ##########################################################################################################
@@ -100,7 +100,7 @@ shinyServer(function(session, input, output) {
         req(reactive__experiments_summary())
         req(input$experiment__select)
 
-        withProgress(value=1/2, message="Generating Graph Options", {
+        #withProgress(value=1/2, message="Generating Graph Options", {
 
             log_message_variable('experiment__select', input$experiment__select)
 
@@ -138,7 +138,7 @@ shinyServer(function(session, input, output) {
             ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_metric)
 
             return (tagList(list=ui_list))
-        })
+        #})
     })
 
     output$graph_options__bayesian_posteriors__UI <- renderUI({
@@ -147,7 +147,7 @@ shinyServer(function(session, input, output) {
         req(reactive__experiments_summary())
         req(input$experiment__select)
 
-        withProgress(value=1/2, message="Generating Graph Options", {
+        #withProgress(value=1/2, message="Generating Graph Options", {
 
             log_message_variable('experiment__select', input$experiment__select)
 
@@ -187,7 +187,7 @@ shinyServer(function(session, input, output) {
             ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_metric)
 
             return (tagList(list=ui_list))
-        })
+        #})
     })
 
     ##########################################################################################################
@@ -268,7 +268,7 @@ shinyServer(function(session, input, output) {
         req(input$experiment__select)
         req(input$experiment__stat_type_select)
 
-        withProgress(value=1/2, message="Creating Percent Change Graph", {
+        #withProgress(value=1/2, message="Creating Percent Change Graph", {
 
             log_message_block_start("Creating Percent Change Graph")
 
@@ -284,7 +284,7 @@ shinyServer(function(session, input, output) {
 
                 plot__percent_change_bayesian(reactive__experiments_summary(), input$experiment__select)
             }
-        })
+        #})
     }, height=function() {
 
         session$clientData$output_plot__percent_change_width * 0.65  # set height to % of width
@@ -302,7 +302,7 @@ shinyServer(function(session, input, output) {
         req(input$experiment__select)
         req(input$experiment__stat_type_select)
 
-        withProgress(value=1/2, message="Creating Percent Change Conf. Graph", {
+        #withProgress(value=1/2, message="Creating Percent Change Conf. Graph", {
 
             log_message_block_start("Creating Percent Change Conf. Graph")
 
@@ -318,7 +318,7 @@ shinyServer(function(session, input, output) {
 
                 plot__percent_change_conf_bayesian(reactive__experiments_summary(), input$experiment__select)
             }
-        })
+        #})
     }, height=function() {
 
         session$clientData$output_plot__percent_change_confidence_width * 0.65  # set height to % of width
@@ -336,7 +336,7 @@ shinyServer(function(session, input, output) {
         req(input$experiment__select)
         req(input$experiment__stat_type_select)
 
-        withProgress(value=1/2, message="Creating Conversion Rates Graph", {
+        #withProgress(value=1/2, message="Creating Conversion Rates Graph", {
 
             log_message_block_start("Creating Conversion Rates Graph")
 
@@ -350,7 +350,7 @@ shinyServer(function(session, input, output) {
 
                 plot__conversion_rates_bayesian(reactive__experiments_summary(), input$experiment__select)
             }
-        })
+        #})
     }, height=function() {
 
         session$clientData$output_plot__conversion_rates_width * 0.65  # set height to % of width
@@ -370,7 +370,7 @@ shinyServer(function(session, input, output) {
         req(input$experiment__stat_type_select)
         req(input$experiment__trend_graph_type)
 
-        withProgress(value=1/2, message="Creating Trends Graph", {
+        #withProgress(value=1/2, message="Creating Trends Graph", {
 
             log_message_block_start("Creating Trends Graph")
 
@@ -408,7 +408,7 @@ shinyServer(function(session, input, output) {
                                                         input$experiment__trends__metric_select)
                 }
             }
-        })
+        #})
     }, height=function() {
 
         session$clientData$output_plot__trends_width * 0.65  # set height to % of width
@@ -429,7 +429,7 @@ shinyServer(function(session, input, output) {
         req(input$experiment__bayesian_posterior__metric_select)
         req(input$experiment__bayesian_posterior__show_prior)
 
-        withProgress(value=1/2, message="Creating Bayesian Posterior Graph", {
+        #withProgress(value=1/2, message="Creating Bayesian Posterior Graph", {
 
             log_message_block_start("Creating Bayesian Posterior Graph")
 
@@ -442,7 +442,7 @@ shinyServer(function(session, input, output) {
                                      input$experiment__bayesian_posterior__metric_select,
                                      confidence_level=global__confidence_level,
                                      show_prior_distribution=input$experiment__bayesian_posterior__show_prior == "Yes")
-        })
+        #})
     }, height=function() {
 
         session$clientData$output_plot__bayesian_posteriors_width * 0.65  # set height to % of width

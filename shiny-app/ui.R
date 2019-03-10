@@ -76,5 +76,8 @@ shinyUI(fluidPage(theme="custom.css",
                 plotOutput(outputId='plot__bayesian_posteriors')
             )
         )
-    )
+    ),
+    # this is a hack because ggplot takes a long time to process some graphs, but withProgress doesn't block
+    # because the ggplot object doesn't "load" until it is being rendered.
+    conditionalPanel(condition="$('html').hasClass('shiny-busy')", global__progress_bar_html)
 ))
