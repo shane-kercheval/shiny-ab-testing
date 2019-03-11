@@ -28,12 +28,6 @@
     text-align: center;
     font-size: 18px;
 }
-
-
-
-
-
-
 .results-table {
     font-size: 85%;
     width: 70%;
@@ -74,4 +68,18 @@
 
 .inline_label_control .form-group {
     margin-bottom: 0px !important;
+}
+
+/* Custom Controls */
+.dynamic_filter .shiny-options-group {
+    margin-left: 10px;
+}
+
+.dynamic_filter .checkbox label {
+    margin-bottom: 5px;
+    font-weight: 700 !important;
+}
+
+.dynamic_filter .selectize-control {
+    margin-left: 10px;
 }

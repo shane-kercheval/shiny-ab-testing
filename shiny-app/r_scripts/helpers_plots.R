@@ -42,7 +42,7 @@ plot__website_traffic <- function(experiment_data,
         title <- paste("Unique User Visits Per", cohort_name)
         subtitle <- paste0("Users are only counted once in the given ",
                            tolower(cohort_name),
-                           "but same user may be represented in multiple ",
+                           ", but the same user may be represented in multiple ",
                            tolower(cohort_name), ".")
         y_label <- paste0("Unique User Visits (per ", cohort_name, ")")
     }
@@ -77,7 +77,7 @@ plot__website_traffic <- function(experiment_data,
         geom_text(aes(label = prettify_numerics(num_users)),
                   check_overlap=TRUE, vjust = -0.5, size=rel(global__text_size)) +
         scale_y_continuous(labels = comma_format()) +
-        theme_light() +
+        theme_light(base_size=global__theme_base_size) +
         theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
         labs(title = title,
              subtitle = subtitle,

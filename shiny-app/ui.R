@@ -6,12 +6,7 @@ library(shinyBS)
 source('r_scripts/definitions.R')
 
 shinyUI(tagList(
-    
     useShinyjs(),
-    # this is a hack because ggplot takes a long time to process some graphs, but withProgress doesn't block
-    # because the ggplot object doesn't "load" until it is being rendered.
-    conditionalPanel(condition="$('html').hasClass('shiny-busy')", global__progress_bar_html),
-
     navbarPage("A/B Test Dashboard", theme="custom.css",
         tabPanel(
             "Experiment Analysis",
@@ -24,14 +19,16 @@ shinyUI(tagList(
                     ),
                     bsCollapsePanel(
                         "Graph Options",
-                        radioButtons(
-                            inputId='experiment__stat_type_select',
-                            label="Statistical Methodology",
-                            choices=c("Frequentist", "Bayesian"),
-                            selected="Frequentist",
-                            inline=TRUE,
-                            width=NULL, choiceNames=NULL,
-                            choiceValues=NULL),
+                        tags$div(class='dynamic_filter',
+                            radioButtons(
+                                inputId='experiment__stat_type_select',
+                                label="Statistical Methodology",
+                                choices=c("Frequentist", "Bayesian"),
+                                selected="Frequentist",
+                                inline=TRUE,
+                                width=NULL, choiceNames=NULL,
+                                choiceValues=NULL)
+                        ),
                         bsTooltip(id='experiment__stat_type_select',
                                   title="Choose to display the Frequentist or Bayesian methodology.",
                                   placement='top', trigger='hover'),
@@ -83,48 +80,203 @@ shinyUI(tagList(
             )
         ),
         navbarMenu("Planning",
-            tabPanel("Duration Estimator",
+            tabPanel("Test Duration Estimator",
                 fluidRow(
                     tags$br()
                 )
             ),
-            tabPanel("Website Traffic",
+            tabPanel("Conversion Rates",
                 column(3,
                     class='column-input-control-style',
-                    bsCollapse(id='main__bscollapse', open=c("Options"), multiple=TRUE,
+                    bsCollapse(id='conversion_rates__bscollapse', open=c("Options", "Graph Options"), multiple=TRUE,
                         bsCollapsePanel(
                             "Options",
-                            radioButtons(
-                                inputId='traffic__tbd',
-                                label="TBD",
-                                choices=c("1", "2"),
-                                selected="1",
-                                inline=TRUE,
-                                width=NULL, choiceNames=NULL,
-                                choiceValues=NULL)
+                            tags$div(
+                                class="dynamic_filter",
+                                radioButtons(
+                                    inputId='conversion_rates__graph_type',
+                                    label="Graph Type",
+                                    choices=c("Cohort", "Historical"),
+                                    selected="Cohort",
+                                    inline=TRUE
+                                )
+                            )
+                        ),
+                        bsCollapsePanel(
+                            "Graph Options",
+                            tags$div(
+                                class="dynamic_filter",
+                                radioButtons(
+                                    inputId='conversion_rates__cohort_type',
+                                    label="Cohort Type",
+                                    choiceNames=c("Week", "Month"),
+                                    choiceValues=c('%W', '%m'),
+                                    selected="Week",
+                                    inline=TRUE
+                                )
+                            ),
+                            tags$div(
+                                class="dynamic_filter",
+                                radioButtons(
+                                    inputId='conversion_rates__cr_type',
+                                    label="Conversion Rate Type",
+                                    choices=c("Absolute", "Percent of All Conversions"),
+                                    selected="Absolute",
+                                    inline=TRUE
+                                )
+                            ),
+                            tags$div(
+                                class="dynamic_filter",
+                                numericInput(
+                                    inputId='conversion_rates__snapshot_1_days',
+                                    label="Snapshot 1 (days)",
+                                    value=1,
+                                    min = NA,
+                                    max = NA,
+                                    step = NA,
+                                    width = NULL
+                                )
+                            ),
+                            tags$div(
+                                class="dynamic_filter",
+                                numericInput(
+                                    inputId='conversion_rates__snapshot_2_days',
+                                    label="Snapshot 2 (days)",
+                                    value=5,
+                                    min = NA,
+                                    max = NA,
+                                    step = NA,
+                                    width = NULL
+                                )
+                            ),
+                            tags$div(
+                                class="dynamic_filter",
+                                numericInput(
+                                    inputId='conversion_rates__snapshot_3_days',
+                                    label="Snapshot 3 (days)",
+                                    value=10,
+                                    min = NA,
+                                    max = NA,
+                                    step = NA,
+                                    width = NULL
+                                )
+                            ),
+                            tags$div(
+                                class="dynamic_filter",
+                                numericInput(
+                                    inputId='conversion_rates__max_days_to_convert',
+                                    label="Max Days to Convert",
+                                    value=30,
+                                    min = NA,
+                                    max = NA,
+                                    step = NA,
+                                    width = NULL
+                                )
+                            )
                         )
                     )
                 ),
                 column(9,
                     tags$br(),
-                    tags$p('TBD')
+                    plotOutput(outputId='asdfasdfasdf')
                 )                
             ),
-            tabPanel("Conversion Rates",
-                fluidRow(
-                    tags$br()
-                )
+            tabPanel("Website Traffic",
+                column(3,
+                    class='column-input-control-style',
+                    bsCollapse(id='website_traffic__bscollapse', open=c("Options"), multiple=TRUE,
+                        bsCollapsePanel(
+                            "Options",
+                            tags$div(
+                                class="dynamic_filter",
+                                radioButtons(
+                                    inputId='website_traffic__cohort_type',
+                                    label="Cohort Type",
+                                    choices=c("Week", "Month"),
+                                    selected="Week",
+                                    inline=TRUE
+                                )
+                            ),
+                            tags$div(
+                                class="dynamic_filter",
+                                checkboxInput(
+                                    inputId='website_traffic__show_first_time_visits',
+                                    label="Show First-Time User Visits",
+                                    value=TRUE
+                                )
+                            ),
+                            tags$div(
+                                class="dynamic_filter",
+                                checkboxInput(
+                                    inputId='website_traffic__show_path_breakdown',
+                                    label="Show Path Breakdown",
+                                    value=TRUE
+                                )
+                            ),
+                            tags$div(
+                                class="dynamic_filter",
+                                numericInput(
+                                    inputId='website_traffic__top_n_paths',
+                                    label="Top N Paths",
+                                    value=3,
+                                    min = NA,
+                                    max = NA,
+                                    step = NA,
+                                    width = NULL
+                                )
+                            )
+                        )
+                    )
+                ),
+                column(9,
+                    tags$br(),
+                    plotOutput(outputId='plot__website_traffic')
+                )                
             )
         ),
         navbarMenu("More",
             tabPanel("View Raw Data",
-                tags$br()
+                column(3,
+                    class='column-input-control-style',
+                    bsCollapse(id='main__bscollapse', open=c("Dataset"), multiple=TRUE,
+                        bsCollapsePanel(
+                            "Dataset",
+                            tags$div(class='dynamic_filter',
+                                radioButtons(
+                                    inputId='raw_data__select_dataset',
+                                    label="",
+                                    choices=c(
+                                        "Attribution Windows",
+                                        "Experiment Info",
+                                        "Experiment Traffic",
+                                        "Website Traffic",
+                                        "Conversion Events",
+                                        "Experiments Summary",
+                                        "Daily Summary"
+                                    ),
+                                    selected="Attribution Windows",
+                                    inline=FALSE,
+                                    width=NULL, choiceNames=NULL,
+                                    choiceValues=NULL)
+                            )
+                        )
+                    )
+                ),
+                column(9, #align="center",
+                    tags$h2('First 1000 Records of Selected Dataset'),
+                    tags$div(class='results-table', dataTableOutput(outputId='raw_data__table'))
+                )      
+
               #DT::dataTableOutput("table")
             ),
             tabPanel("Settings",
                 tags$br(),
                 fluidRow(
-                    column(12, align="center",
+                    column(1, #align="center",
+                        tags$br()
+                    ),
+                    column(11, #align="center",
+                        tags$h2('Settings'),
                         tags$div(class='results-table',
                             dataTableOutput(outputId='more__settings__table'))
                     )
@@ -152,5 +304,8 @@ shinyUI(tagList(
                 )
             )
         )
-    )
+    ),
+    # this is a hack because ggplot takes a long time to process some graphs, but withProgress doesn't block
+    # because the ggplot object doesn't "load" until it is being rendered.
+    conditionalPanel(condition="$('html').hasClass('shiny-busy')", global__progress_bar_html)
 ))

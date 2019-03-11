@@ -11,20 +11,21 @@ source('r_scripts/definitions.R')
 source('r_scripts/helpers_logging.R', chdir=TRUE)
 
 theme_set(theme_light())
+options(scipen=999)
 
 shinyServer(function(session, input, output) {
 
     ##########################################################################################################
     # LOAD DATA
     ##########################################################################################################
-    # reactive__experiment_data <- reactive({
+    reactive__experiment_data <- reactive({
 
-    #     #withProgress(value=1/2, message="Loading Data", {
+        #withProgress(value=1/2, message="Loading Data", {
             
-    #         log_message_block_start("Loading Data")
-    #         load_data()
-    #     #})
-    # })
+            log_message_block_start("Loading Data")
+            load_data()
+        #})
+    })
 
     reactive__experiments_summary <- reactive({
 
@@ -151,18 +152,18 @@ shinyServer(function(session, input, output) {
 
             log_message_variable('experiment__select', input$experiment__select)
 
-            # ui_show_prior <- checkboxInput(
-            #     inputId='experiment__bayesian_posterior__show_prior',
-            #     label="Show Prior Distribution",
-            #     value=TRUE)
-            ui_show_prior <- radioButtons(
-                    inputId='experiment__bayesian_posterior__show_prior',
-                    label="Show Prior Distribution",
-                    choices=c("Yes", "No"),
-                    selected="Yes",
-                    inline=TRUE,
-                    width=NULL, choiceNames=NULL,
-                    choiceValues=NULL)
+            ui_show_prior <- checkboxInput(
+                inputId='experiment__bayesian_posterior__show_prior',
+                label="Show Prior Distribution",
+                value=TRUE)
+            # ui_show_prior <- radioButtons(
+            #         inputId='experiment__bayesian_posterior__show_prior',
+            #         label="Show Prior Distribution",
+            #         choices=c("Yes", "No"),
+            #         selected="Yes",
+            #         inline=TRUE,
+            #         width=NULL, choiceNames=NULL,
+            #         choiceValues=NULL)
 
             metrics <- reactive__experiments_summary() %>%
                 filter(experiment_id == input$experiment__select) %>%
@@ -475,7 +476,6 @@ shinyServer(function(session, input, output) {
         req(reactive__experiments_summary())
         req(input$experiment__select)
         req(input$experiment__bayesian_posterior__metric_select)
-        req(input$experiment__bayesian_posterior__show_prior)
 
         #withProgress(value=1/2, message="Creating Bayesian Posterior Graph", {
 
@@ -489,7 +489,7 @@ shinyServer(function(session, input, output) {
                                      input$experiment__select,
                                      input$experiment__bayesian_posterior__metric_select,
                                      confidence_level=global__confidence_level,
-                                     show_prior_distribution=input$experiment__bayesian_posterior__show_prior == "Yes")
+                                     show_prior_distribution=input$experiment__bayesian_posterior__show_prior)
         #})
     }, height=function() {
 
@@ -501,6 +501,28 @@ shinyServer(function(session, input, output) {
         title="Posterior Probability Distributions of the Control & Variant",
         content=HTML("This graph shows the posterior probability distributions of the Control, Variant, and if selected, the Priors. It also shows a confidence intervals for the Control and Variant distributions below."),
         placement="left", trigger="hover", options=NULL)
+
+    output$plot__website_traffic <- renderPlot({
+
+        req(reactive__experiment_data())
+
+        top_n_paths <- NULL
+
+        if(input$website_traffic__show_path_breakdown) {
+            top_n_paths <- input$website_traffic__top_n_paths
+        }
+
+        plot__website_traffic(
+            experiment_data=reactive__experiment_data(),
+            only_first_time_visits=input$website_traffic__show_first_time_visits,
+            is_weekly=input$website_traffic__cohort_type == "Week",
+            filter_year_end_beginning_weeks=input$website_traffic__cohort_type == "Week",
+            top_n_paths=top_n_paths)
+
+    }, height=function() {
+
+        session$clientData$output_plot__website_traffic_width * 0.65  # set height to % of width
+    })
 
 
     output$experiment__raw_data_table <- renderDataTable({
@@ -593,4 +615,45 @@ shinyServer(function(session, input, output) {
     options = list(paging = FALSE, info = TRUE)
     )
 
+    output$raw_data__table <- renderDataTable({
+
+        req(input$raw_data__select_dataset)
+
+        df <- NULL
+
+        if(input$raw_data__select_dataset == "Attribution Windows") {
+
+            df <- reactive__experiment_data()$attribution_windows
+
+        } else if(input$raw_data__select_dataset == "Experiment Info") {
+
+            df <- reactive__experiment_data()$experiment_info
+
+        } else if(input$raw_data__select_dataset == "Experiment Traffic") {
+
+            df <- reactive__experiment_data()$experiment_traffic
+
+        } else if(input$raw_data__select_dataset == "Website Traffic") {
+
+            df <- reactive__experiment_data()$website_traffic
+
+        } else if(input$raw_data__select_dataset == "Conversion Events") {
+
+            df <- reactive__experiment_data()$conversion_events
+
+        } else if(input$raw_data__select_dataset == "Experiments Summary") {
+
+            df <- reactive__experiments_summary()
+
+        } else if(input$raw_data__select_dataset == "Daily Summary") {
+
+            df <- reactive__experiments_daily_summary()
+
+        } else {
+
+            stopifnot(FALSE)
+        }
+
+        return (df %>% head(1000))
+    })
 })
