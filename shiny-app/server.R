@@ -22,7 +22,7 @@ shinyServer(function(session, input, output) {
 
         #withProgress(value=1/2, message="Loading Data", {
             
-            log_message_block_start("Loading Experiment Data")
+            log_message_block_start("Loading Data")
             load_data()
         #})
     })
@@ -190,10 +190,10 @@ shinyServer(function(session, input, output) {
 
     output$graph_options__bayesian_posteriors__UI <- renderUI({
 
+        log_message_block_start("Creating Bayesian Posterior Graph")
         req(reactive__experiments_summary())
         req(input$experiment__select)
 
-        log_message_block_start("Creating Bayesian Posterior Graph")
         #withProgress(value=1/2, message="Generating Graph Options", {
 
             log_message_variable('experiment__select', input$experiment__select)
@@ -382,6 +382,7 @@ shinyServer(function(session, input, output) {
 
         if(input$conversion_rates__graph_type == "Cohort") {
 
+            shinyjs::show('conversion_rates__metric__UI')
             shinyjs::show('conversion_rates__metric')
             shinyjs::hide('conversion_rates__cohort_type')
             shinyjs::show('conversion_rates__cr_type')
@@ -670,6 +671,8 @@ shinyServer(function(session, input, output) {
         snapshot_3_days <- input$conversion_rates__snapshot_3_days
 
         if(input$conversion_rates__graph_type == "Cohort") {
+            
+            req(input$conversion_rates__metric)
 
             if(input$conversion_rates__cr_type == "Absolute") {
 

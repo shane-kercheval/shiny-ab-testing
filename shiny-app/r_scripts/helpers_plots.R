@@ -1052,7 +1052,7 @@ plot__conversion_rates_attribution <- function(experiment_data,
         geom_text(aes(y=conversion_rate, label=paste(percent(conversion_rate), "(historical)")), vjust=-0.5) +
         scale_y_continuous(labels = percent_format()) +
         labs(#title='P-value over time',
-            y='Historical Conversion Rate',
+            y='Conversion Rates within Attribution Window',
             x='Metric') +
         scale_fill_manual(values=global__metric_colors) +
         theme_light(base_size=global__theme_base_size) +
