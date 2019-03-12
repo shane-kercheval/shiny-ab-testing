@@ -22,7 +22,7 @@ shinyServer(function(session, input, output) {
 
         #withProgress(value=1/2, message="Loading Data", {
             
-            log_message_block_start("Loading Data")
+            log_message_block_start("Loading Experiment Data")
             load_data()
         #})
     })
@@ -190,10 +190,10 @@ shinyServer(function(session, input, output) {
 
     output$graph_options__bayesian_posteriors__UI <- renderUI({
 
-        log_message_block_start("Creating Bayesian Posterior Graph")
         req(reactive__experiments_summary())
         req(input$experiment__select)
 
+        log_message_block_start("Creating Bayesian Posterior Graph")
         #withProgress(value=1/2, message="Generating Graph Options", {
 
             log_message_variable('experiment__select', input$experiment__select)
@@ -366,6 +366,61 @@ shinyServer(function(session, input, output) {
             shinyjs::hide('graph_options__bayesian_posteriors__UI')
             shinyjs::show('graph_options__raw_data__UI')
             #updateCollapse(session, 'main__bscollapse', open="Graph Options")
+
+        } else {
+
+            stopifnot(FALSE)
+        }
+    })
+
+    observe({
+
+        req(input$conversion_rates__graph_type)
+
+        log_message_block_start('Hide/Show Conversion Rate Options')
+        log_message_variable('conversion_rates__graph_type', input$conversion_rates__graph_type)
+
+        if(input$conversion_rates__graph_type == "Cohort") {
+
+            shinyjs::show('conversion_rates__metric')
+            shinyjs::hide('conversion_rates__cohort_type')
+            shinyjs::show('conversion_rates__cr_type')
+            shinyjs::show('conversion_rates__snapshot_1_days')
+            shinyjs::show('conversion_rates__snapshot_2_days')
+            shinyjs::show('conversion_rates__snapshot_3_days')
+
+            if(input$conversion_rates__cr_type == "Absolute") {
+
+                shinyjs::hide('conversion_rates__max_days_to_convert')
+            
+            } else {
+
+                shinyjs::show('conversion_rates__max_days_to_convert')    
+            }
+
+            shinyjs::hide('conversion_rates__exclude_last_n_days')
+
+        } else if(input$conversion_rates__graph_type == "Historical") {
+
+            shinyjs::hide('conversion_rates__metric')
+            shinyjs::hide('conversion_rates__cohort_type')
+            shinyjs::hide('conversion_rates__cr_type')
+            shinyjs::hide('conversion_rates__snapshot_1_days')
+            shinyjs::hide('conversion_rates__snapshot_2_days')
+            shinyjs::hide('conversion_rates__snapshot_3_days')
+            shinyjs::hide('conversion_rates__max_days_to_convert')
+            shinyjs::show('conversion_rates__exclude_last_n_days')
+
+        } else if(input$conversion_rates__graph_type == "Attribution") {
+
+            shinyjs::hide('conversion_rates__metric')
+            shinyjs::hide('conversion_rates__cohort_type')
+            shinyjs::hide('conversion_rates__cr_type')
+            shinyjs::hide('conversion_rates__snapshot_1_days')
+            shinyjs::hide('conversion_rates__snapshot_2_days')
+            shinyjs::hide('conversion_rates__snapshot_3_days')
+            shinyjs::hide('conversion_rates__max_days_to_convert')
+            shinyjs::show('conversion_rates__exclude_last_n_days')
 
         } else {
 
@@ -618,7 +673,6 @@ shinyServer(function(session, input, output) {
 
             if(input$conversion_rates__cr_type == "Absolute") {
 
-                log_message_block_start('1')
                 return (plot__conversion_rates_snapshot_absolute(traffic_conversions=reactive__traffic_conversions_metric(),
                                                          snapshot_1_days,
                                                          snapshot_2_days,
@@ -627,30 +681,28 @@ shinyServer(function(session, input, output) {
 
 
             } else {
-                log_message_block_start('2')
                 plot__conversion_rates_snapshot_percent(traffic_conversions=reactive__traffic_conversions_metric(),
                                                         snapshot_1_days,
                                                         snapshot_2_days,
                                                         snapshot_3_days,
-                                                        snapshot_max_days=45,
+                                                        snapshot_max_days=input$conversion_rates__max_days_to_convert,
                                                         cohort_label=input$conversion_rates__cohort_type)
             }
 
 
         } else if(input$conversion_rates__graph_type == "Historical") { 
 
-            log_message_block_start('3')
             plot__conversion_rates_historical(experiment_data=reactive__experiment_data(),
-                                              exclude_last_n_days=30) 
+                                              exclude_last_n_days=input$conversion_rates__exclude_last_n_days)
 
         } else if(input$conversion_rates__graph_type == "Attribution") {
 
-            log_message_block_start('4')
+            plot__conversion_rates_attribution(experiment_data=reactive__experiment_data(),
+                                               exclude_last_n_days=input$conversion_rates__exclude_last_n_days) 
 
         } else {
 
-            log_message_block_start('5')
-
+            stopifnot(FALSE)
         }
 
     }, height=function() {

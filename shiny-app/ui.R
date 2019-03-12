@@ -98,12 +98,12 @@ shinyUI(tagList(
                                 radioButtons(
                                     inputId='conversion_rates__graph_type',
                                     label="Graph Type",
-                                    choices=c("Cohort", "Historical", "Attribution"),
-                                    selected="Cohort",
+                                    choices=c("Attribution", "Historical", "Cohort"),
+                                    selected="Attribution",
                                     inline=FALSE
                                 )
                             ),
-                            uiOutput('conversion_rates__metric__UI')
+                            hidden(uiOutput('conversion_rates__metric__UI'))
                         ),
                         bsCollapsePanel(
                             "Graph Options",
@@ -175,7 +175,20 @@ shinyUI(tagList(
                                     step = NA,
                                     width = NULL
                                 )
+                            ),
+                            tags$div(
+                                class="dynamic_filter",
+                                numericInput(
+                                    inputId='conversion_rates__exclude_last_n_days',
+                                    label="Exclude Last N Days",
+                                    value=30,
+                                    min = NA,
+                                    max = NA,
+                                    step = NA,
+                                    width = NULL
+                                )
                             )
+                            
                         )
                     )
                 ),

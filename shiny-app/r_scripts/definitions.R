@@ -18,7 +18,7 @@ global__colors_good <- '#37B57F'  # green
 
 # color_event_type_join <- '#EBB13E'
 
-global__metric_colors <- c('#EBB13E', '#11499C', '#2AADB7', '#F28E2B', '#C396E8')
+global__metric_colors <- c('#40C6EE', '#EBB13E', '#2AADB7', '#F28E2B', '#C396E8')
 # color_event_type_initial <- '#40C6EE'
 # color_event_type_click <- '#11499C'
 # color_event_type_backclick <- '#7A7A7A'

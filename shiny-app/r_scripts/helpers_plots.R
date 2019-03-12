@@ -1001,6 +1001,59 @@ plot__conversion_rates_historical <- function(experiment_data,
         labs(#title='P-value over time',
             y='Historical Conversion Rate',
             x='Metric') +
+        geom_text(aes(label=percent(conversion_rate)), vjust=-0.5) +
+        scale_fill_manual(values=global__metric_colors) +
+        theme_light(base_size=global__theme_base_size) +
+        theme(axis.text.x = element_text(angle = 30, hjust = 1),
+              legend.position='none')
+}
+
+#' gives historical conversion rates, but considering the *median* attribution rates for each metric over
+#' all experiments
+plot__conversion_rates_attribution <- function(experiment_data,
+                                               exclude_last_n_days=30) {
+
+    
+    attr_windows <- experiment_data$attribution_windows %>%
+        group_by(metric_id) %>%
+        summarise(median_attr_window = median(attribution_window)) %>%
+        ungroup()
+    
+    # Historical Conversion Rates
+    traffic_conversions <- left_join(experiment_data$website_traffic %>%
+                                        group_by(user_id) %>%
+                                        summarise(first_visit = min(visit_date)) %>%
+                                        ungroup(),
+                                     experiment_data$conversion_events,
+                                     by='user_id') %>%
+        filter(first_visit < Sys.Date() - days(exclude_last_n_days)) %>%
+        left_join(attr_windows, by='metric_id') %>%
+        mutate(converted_within_window = first_visit + days(median_attr_window) < conversion_date) %>%
+        mutate(converted_within_window = ifelse(is.na(converted_within_window), FALSE, converted_within_window))
+    
+    total_users <- length(unique(traffic_conversions$user_id))
+    
+    temp <- traffic_conversions %>%
+        filter(!is.na(metric_id)) %>%
+        group_by(metric_id) %>%
+        summarise(conversion_rate=n_distinct(user_id) / total_users,
+                  conversion_rate_within_window=sum(converted_within_window) / total_users,
+                  percent_cr_window_realized=conversion_rate_within_window / conversion_rate) %>%
+        arrange(desc(conversion_rate))
+    temp <- temp %>%
+        mutate(metric_id = factor(metric_id, temp$metric_id))
+    
+    temp %>%
+    ggplot(aes(x=metric_id, y=conversion_rate_within_window, fill=metric_id)) +
+        geom_col() +
+        geom_text(aes(label=paste(percent(conversion_rate_within_window), "(within Attribution)")), vjust=-0.5) +
+        geom_text(aes(label=paste(percent(percent_cr_window_realized), "of total")), vjust=1.5) +
+        geom_col(aes(y=conversion_rate), fill='black', alpha=0.2) +
+        geom_text(aes(y=conversion_rate, label=paste(percent(conversion_rate), "(historical)")), vjust=-0.5) +
+        scale_y_continuous(labels = percent_format()) +
+        labs(#title='P-value over time',
+            y='Historical Conversion Rate',
+            x='Metric') +
         scale_fill_manual(values=global__metric_colors) +
         theme_light(base_size=global__theme_base_size) +
         theme(axis.text.x = element_text(angle = 30, hjust = 1),
