@@ -45,6 +45,52 @@ shinyServer(function(session, input, output) {
         #})
     })
 
+    create_traffic_convesions <- function(experiment_data,
+                                          metric,
+                                          cohort_format) {
+        left_join(experiment_data$website_traffic %>%
+                      group_by(user_id) %>%
+                      summarise(first_visit = min(visit_date)) %>%
+                      ungroup() %>%
+                      mutate(cohort = create_cohort(first_visit, cohort_format)),
+                  experiment_data$conversion_events %>%
+                      filter(metric_id == metric),
+                  by='user_id')
+        
+    }
+    reactive__traffic_conversions_metric <- reactive({
+
+        req(reactive__experiment_data())
+        req(input$conversion_rates__metric)
+        req(input$conversion_rates__cohort_type)
+
+        log_message_block_start("Building Traffic Conversions Metric")
+        log_message_variable("conversion_rates__metric", input$conversion_rates__metric)
+        log_message_variable("conversion_rates__cohort_type", input$conversion_rates__cohort_type)
+
+        if(input$conversion_rates__cohort_type == "Week") {
+
+            cohort_format <- "%W"
+
+        } else if (input$conversion_rates__cohort_type == "Month") {
+
+            cohort_format <- "%m"
+
+        }else {
+
+            stopifnot(FALSE)
+        }
+
+        log_message_variable("cohort_format", cohort_format)
+
+        #withProgress(value=1/2, message="Loading Daily Summary Data", {
+        
+        create_traffic_convesions(experiment_data=reactive__experiment_data(),
+                                  metric=input$conversion_rates__metric,
+                                  cohort_format=cohort_format)
+        #})
+    })
+
     ##########################################################################################################
     # UI
     ##########################################################################################################
@@ -219,6 +265,25 @@ shinyServer(function(session, input, output) {
 
         ui_list <- list()
         ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_show_in_table)
+        return (tagList(list=ui_list))
+    })
+
+    output$conversion_rates__metric__UI <- renderUI({
+
+        req(reactive__experiments_summary())
+
+        metric_names <- reactive__experiments_summary() %>%
+            get_vector('metric_id', return_unique = TRUE) %>%
+            as.character()
+
+        ui_metric <- selectInput(
+            inputId='conversion_rates__metric',
+            label="Metric",
+            choices=metric_names,
+            selected=metric_names[1])
+
+        ui_list <- list()
+        ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_metric)
         return (tagList(list=ui_list))
     })
 
@@ -522,6 +587,75 @@ shinyServer(function(session, input, output) {
     }, height=function() {
 
         session$clientData$output_plot__website_traffic_width * 0.65  # set height to % of width
+    })
+
+    output$conversion_rates__plot <- renderPlot({
+
+        log_message_block_start("Building Conversion Rate Plots2")
+        log_message_variable('conversion_rates__metric', input$conversion_rates__metric)
+        log_message_variable('conversion_rates__graph_type', input$conversion_rates__graph_type)
+        log_message_variable('conversion_rates__cr_type', input$conversion_rates__cr_type)
+
+        req(input$conversion_rates__graph_type)
+        # req(input$conversion_rates__metric)
+        # #req(reactive__traffic_conversions_metric())
+        # req(input$conversion_rates__cr_type)
+
+        # req(input$conversion_rates__cohort_type)
+        # req(input$conversion_rates__snapshot_1_days)
+        # req(input$conversion_rates__snapshot_2_days)
+        # req(input$conversion_rates__snapshot_3_days)
+        # req(input$conversion_rates__max_days_to_convert)
+
+        log_message_block_start("Building Conversion Rate Plots")
+        log_message_variable('conversion_rates__metric', input$conversion_rates__metric)
+
+        snapshot_1_days <- input$conversion_rates__snapshot_1_days
+        snapshot_2_days <- input$conversion_rates__snapshot_2_days
+        snapshot_3_days <- input$conversion_rates__snapshot_3_days
+
+        if(input$conversion_rates__graph_type == "Cohort") {
+
+            if(input$conversion_rates__cr_type == "Absolute") {
+
+                log_message_block_start('1')
+                return (plot__conversion_rates_snapshot_absolute(traffic_conversions=reactive__traffic_conversions_metric(),
+                                                         snapshot_1_days,
+                                                         snapshot_2_days,
+                                                         snapshot_3_days,
+                                                         cohort_label=input$conversion_rates__cohort_type))
+
+
+            } else {
+                log_message_block_start('2')
+                plot__conversion_rates_snapshot_percent(traffic_conversions=reactive__traffic_conversions_metric(),
+                                                        snapshot_1_days,
+                                                        snapshot_2_days,
+                                                        snapshot_3_days,
+                                                        snapshot_max_days=45,
+                                                        cohort_label=input$conversion_rates__cohort_type)
+            }
+
+
+        } else if(input$conversion_rates__graph_type == "Historical") { 
+
+            log_message_block_start('3')
+            plot__conversion_rates_historical(experiment_data=reactive__experiment_data(),
+                                              exclude_last_n_days=30) 
+
+        } else if(input$conversion_rates__graph_type == "Attribution") {
+
+            log_message_block_start('4')
+
+        } else {
+
+            log_message_block_start('5')
+
+        }
+
+    }, height=function() {
+
+        session$clientData$output_conversion_rates__plot_width * 0.65  # set height to % of width
     })
 
 

@@ -797,3 +797,212 @@ plot__daily_percent_change_bayesian <- function(experiments_daily_summary, exper
         theme_light(base_size=global__theme_base_size) +
         theme(axis.text.x = element_text(angle = 30, hjust = 1))
 }
+
+#' Returns Traffic Data Left Joined with Conversion Event Data, for a specific metric
+create_traffic_convesions <- function(experiment_data,
+                                      metric,
+                                      cohort_format) {
+    left_join(experiment_data$website_traffic %>%
+                  group_by(user_id) %>%
+                  summarise(first_visit = min(visit_date)) %>%
+                  ungroup() %>%
+                  mutate(cohort = create_cohort(first_visit, cohort_format)),
+              experiment_data$conversion_events %>%
+                  filter(metric_id == metric_name),
+              by='user_id')
+    
+}
+
+#' returns conversion rate data over time for the cohorts defined in traffic_conversions;
+#' The user defines several snapshots (i.e. number of days after each person's first visit) to view the
+#' overall conversion rates for each cohort
+plot__conversion_rates_snapshot_absolute <- function(traffic_conversions,
+                                                     snapshot_1_days,
+                                                     snapshot_2_days,
+                                                     snapshot_3_days,
+                                                     cohort_label) {
+
+    # per snapshot - need to filter out any cohort that has people in it where they haven't been given
+    # enough time
+    snapshot_1_day_threshold <- Sys.Date() - days(snapshot_1_days)
+    snapshot_2_day_threshold <- Sys.Date() - days(snapshot_2_days)
+    snapshot_3_day_threshold <- Sys.Date() - days(snapshot_3_days)
+    
+    color_label_lookup <- paste(c(snapshot_1_days, snapshot_2_days, snapshot_3_days), "Days")
+    names(color_label_lookup) <- c("Snapshot 1", "Snapshot 2", "Snapshot 3")
+    
+    if(cohort_label == "Week") {
+
+        cohort_format <- "%W"
+
+    } else if (cohort_label == "Month") {
+
+        cohort_format <- "%m"
+
+    }else {
+
+        stopifnot(FALSE)
+    }
+
+    temp <- traffic_conversions %>%
+        mutate(days_to_convert=as.numeric(difftime(conversion_date, first_visit, units = 'days')),
+               converted_1=!is.na(conversion_date) & conversion_date > first_visit & days_to_convert <= snapshot_1_days,
+               converted_2=!is.na(conversion_date) & conversion_date > first_visit & days_to_convert <= snapshot_2_days,
+               converted_3=!is.na(conversion_date) & conversion_date > first_visit & days_to_convert <= snapshot_3_days) %>%
+        group_by(cohort) %>%
+        summarise(max_first_visit=max(first_visit),
+                  num_users=n_distinct(user_id),
+                  snapshot_1_conversions=sum(converted_1),
+                  snapshot_2_conversions=sum(converted_2),
+                  snapshot_3_conversions=sum(converted_3)) %>%
+        ungroup() %>%
+        filter(# filter out current cohort
+               cohort != create_cohort(Sys.Date(), cohort_format = cohort_format)
+               ) %>%
+        # filter out (i.e. set to NA) any cohort where the last person to visit the website in that cohort  hasn't had enough time to convert to the corresponding snapshot
+        mutate(
+            snapshot_1_conversions = ifelse(max_first_visit < snapshot_1_day_threshold, snapshot_1_conversions, NA),
+            snapshot_2_conversions = ifelse(max_first_visit < snapshot_2_day_threshold, snapshot_2_conversions, NA),
+            snapshot_3_conversions = ifelse(max_first_visit < snapshot_3_day_threshold, snapshot_3_conversions, NA)
+        ) %>%
+        mutate(`Snapshot 1` = snapshot_1_conversions / num_users,
+               `Snapshot 2` = snapshot_2_conversions / num_users,
+               `Snapshot 3` = snapshot_3_conversions / num_users) %>%
+        select(cohort, contains('Snapshot ')) %>%
+        gather(snapshot, conversion_rate, -cohort) %>%
+        mutate(snapshot = factor(map_chr(snapshot, ~ color_label_lookup[.]), levels = color_label_lookup))
+
+    temp %>%
+    ggplot(aes(x=cohort, y=conversion_rate, group=snapshot, color=snapshot)) +
+        geom_line(na.rm = TRUE) +
+        geom_point(na.rm = TRUE) +
+        geom_text(aes(label=percent(conversion_rate)),
+                  vjust=-0.5, check_overlap = TRUE, na.rm = TRUE, size=rel(global__text_size)) +
+        expand_limits(y=0) +
+        scale_y_continuous(labels = percent_format()) +
+        labs(#title='P-value over time',
+             y='Conversion Rate',
+             x=cohort_label,
+             color='Snapshot') +
+        theme_light(base_size=global__theme_base_size) +
+        theme(axis.text.x = element_text(angle = 30, hjust = 1))
+}
+
+# like plot__conversion_rates_snapshot_absolute, but gives the percent of total conversions
+# Generate new graph but instead of absolute conversion rate
+# calcualte the % of conversions (have to actually have another setting, Max days Number of Days allowed to Convert)
+plot__conversion_rates_snapshot_percent <- function(traffic_conversions,
+                                                    snapshot_1_days,
+                                                    snapshot_2_days,
+                                                    snapshot_3_days,
+                                                    snapshot_max_days,
+                                                    cohort_label) {
+
+    color_label_lookup <- paste(c(snapshot_1_days, snapshot_2_days, snapshot_3_days), "Days")
+    names(color_label_lookup) <- c("Snapshot 1", "Snapshot 2", "Snapshot 3")
+
+    snapshot_max_day_threshold <- Sys.Date() - days(snapshot_max_days)
+
+    if(cohort_label == "Week") {
+
+        cohort_format <- "%W"
+
+    } else if (cohort_label == "Month") {
+
+        cohort_format <- "%m"
+
+    }else {
+
+        stopifnot(FALSE)
+    }
+
+    # per snapshot - need to filter out any cohort that has people in it where they haven't been given
+    # enough time
+    snapshot_1_day_threshold <- Sys.Date() - days(snapshot_1_days)
+    snapshot_2_day_threshold <- Sys.Date() - days(snapshot_2_days)
+    snapshot_3_day_threshold <- Sys.Date() - days(snapshot_3_days)
+
+    traffic_conversions %>%
+        mutate(days_to_convert=as.numeric(difftime(conversion_date, first_visit, units = 'days')),
+               converted_1=!is.na(conversion_date) & conversion_date > first_visit & days_to_convert <= snapshot_1_days,
+               converted_2=!is.na(conversion_date) & conversion_date > first_visit & days_to_convert <= snapshot_2_days,
+               converted_3=!is.na(conversion_date) & conversion_date > first_visit & days_to_convert <= snapshot_3_days,
+               converted_max=!is.na(conversion_date) & conversion_date > first_visit & days_to_convert <= snapshot_max_days) %>%
+        # this time, we only want to look at those who have converted within the max time allowed
+        # and, we only want to keep the cohorts where the last person to join the cohort has had enough to convert >= snapshot_max_days
+        filter(converted_max) %>%
+        group_by(cohort) %>%
+        summarise(max_first_visit=max(first_visit),
+                  num_users_converted=n_distinct(user_id),
+                  snapshot_1_conversions=sum(converted_1),
+                  snapshot_2_conversions=sum(converted_2),
+                  snapshot_3_conversions=sum(converted_3)) %>%
+        ungroup() %>%
+        filter(# filter out current cohort
+            cohort != create_cohort(Sys.Date(), cohort_format = cohort_format),
+            # we only want to keep the cohorts where the last person to join the cohort has had enough to convert >= snapshot_max_days
+            max_first_visit < snapshot_max_day_threshold
+        ) %>%
+        # filter out (i.e. set to NA) any cohort where the last person to visit the website in that cohort  hasn't had enough time to convert to the corresponding snapshot
+        mutate(
+            snapshot_1_conversions = ifelse(max_first_visit < snapshot_1_day_threshold, snapshot_1_conversions, NA),
+            snapshot_2_conversions = ifelse(max_first_visit < snapshot_2_day_threshold, snapshot_2_conversions, NA),
+            snapshot_3_conversions = ifelse(max_first_visit < snapshot_3_day_threshold, snapshot_3_conversions, NA)
+        ) %>%
+        mutate(`Snapshot 1` = snapshot_1_conversions / num_users_converted,
+               `Snapshot 2` = snapshot_2_conversions / num_users_converted,
+               `Snapshot 3` = snapshot_3_conversions / num_users_converted) %>%
+        
+        select(cohort, contains('Snapshot ')) %>%
+        gather(snapshot, conversion_rate, -cohort) %>%
+        mutate(snapshot = factor(map_chr(snapshot, ~ color_label_lookup[.]), levels = color_label_lookup)) %>%
+    ggplot(aes(x=cohort, y=conversion_rate, group=snapshot, color=snapshot)) +
+        geom_line(na.rm = TRUE) +
+        geom_point(na.rm = TRUE) +
+        geom_text(aes(label=percent(conversion_rate)),
+                  vjust=-0.5, check_overlap = TRUE, na.rm = TRUE, size=rel(global__text_size)) +
+        expand_limits(y=0) +
+        scale_y_continuous(labels = percent_format()) +
+        labs(#title='P-value over time',
+            y='Percent of Total Conversions',
+            x=cohort_label,
+            color='Snapshot') +
+        theme_light(base_size=global__theme_base_size) +
+        theme(axis.text.x = element_text(angle = 30, hjust = 1))
+}
+
+plot__conversion_rates_historical <- function(experiment_data,
+                                              exclude_last_n_days=30) {
+
+    # Historical Conversion Rates
+    traffic_conversions <- left_join(experiment_data$website_traffic %>%
+                       group_by(user_id) %>%
+                       summarise(first_visit = min(visit_date)) %>%
+                       ungroup(),
+                   experiment_data$conversion_events,
+                   by='user_id') %>%
+    filter(first_visit < Sys.Date() - days(exclude_last_n_days)) %>%
+        select(user_id, metric_id)
+    
+    total_users <- length(unique(traffic_conversions$user_id))
+    
+    temp <- traffic_conversions %>%
+        filter(!is.na(metric_id)) %>%
+        group_by(metric_id) %>%
+        summarise(conversion_rate=n_distinct(user_id) / total_users) %>%
+        arrange(desc(conversion_rate))
+    temp <- temp %>%
+        mutate(metric_id = factor(metric_id, temp$metric_id))
+    
+    temp %>%
+    ggplot(aes(x=metric_id, y=conversion_rate, fill=metric_id)) +
+        geom_col() +
+        scale_y_continuous(labels = percent_format()) +
+        labs(#title='P-value over time',
+            y='Historical Conversion Rate',
+            x='Metric') +
+        scale_fill_manual(values=global__metric_colors) +
+        theme_light(base_size=global__theme_base_size) +
+        theme(axis.text.x = element_text(angle = 30, hjust = 1),
+              legend.position='none')
+}
