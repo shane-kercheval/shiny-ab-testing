@@ -4,8 +4,8 @@ library(shinyjs)
 library(shinyBS)
 
 source('r_scripts/definitions.R')
-
-global__progress_bar_html <- HTML('"<div id="shiny-notification-panel"><div id="shiny-notification-42ec5661c2722d29" class="shiny-notification"><div class="shiny-notification-close">×</div><div class="shiny-notification-content"><div class="shiny-notification-content-text"><div id="shiny-progress-42ec5661c2722d29" class="shiny-progress-notification"><div class="progress progress-striped active" style=""><div class="progress-bar" style="width: 50%;"></div></div><div class="progress-text"><span class="progress-message">Processing Data</span> <span class="progress-detail"></span></div></div></div><div class="shiny-notification-content-action"></div></div></div></div>"')
+global__progress_bar_message <- "Loading/Processing Data"
+global__progress_bar_html <- HTML(paste0('"<div id="shiny-notification-panel"><div id="shiny-notification-42ec5661c2722d29" class="shiny-notification"><div class="shiny-notification-close">×</div><div class="shiny-notification-content"><div class="shiny-notification-content-text"><div id="shiny-progress-42ec5661c2722d29" class="shiny-progress-notification"><div class="progress progress-striped active" style=""><div class="progress-bar" style="width: 50%;"></div></div><div class="progress-text"><span class="progress-message">', global__progress_bar_message,'</span> <span class="progress-detail"></span></div></div></div><div class="shiny-notification-content-action"></div></div></div></div>"'))
 
 shinyUI(tagList(
     useShinyjs(),
@@ -83,8 +83,48 @@ shinyUI(tagList(
         ),
         navbarMenu("Planning",
             tabPanel("Test Duration Estimator",
-                fluidRow(
-                    tags$br()
+                column(3,
+                    class='column-input-control-style',
+                    bsCollapse(id='duration_calculator__bscollapse', open=c("Site Options", "Statistical Options"), multiple=TRUE,
+                        bsCollapsePanel(
+                            "Site Options",
+                            uiOutput('duration_calculator__url__UI'),
+                            uiOutput('duration_calculator__metrics__UI')
+                        ),
+                        bsCollapsePanel(
+                            "Statistical Options",
+                            tags$div(
+                                class="dynamic_filter",
+                                sliderTextInput(inputId='duration_calculator__mde',
+                                   label='Minimum Detectable Effect', ## percent increase
+                                   choices = c(1, seq(5, 50, 5)),
+                                   selected = 5, 
+                                   grid = TRUE,
+                                   post  = " %")
+                            ),
+                            tags$div(
+                                class="dynamic_filter",
+                                sliderTextInput(inputId='duration_calculator__alpha',
+                                   label='Probability of a False Positive (i.e. alpha)',
+                                   choices = c(1, seq(5, 20, 5)),
+                                   selected = 5, 
+                                   grid = TRUE,
+                                   post  = " %")
+                            ),
+                            tags$div(
+                                class="dynamic_filter",
+                                sliderTextInput(inputId='duration_calculator__beta',
+                                   label='Probability of a False Negative (i.e. beta)',
+                                   choices = c(1, seq(5, 20, 5)),
+                                   selected = 20, 
+                                   grid = TRUE,
+                                   post  = " %")
+                            )
+                        )
+                    )
+                ),
+                column(9,
+                    plotOutput(outputId='duration_calculator__plot')
                 )
             ),
             tabPanel("Conversion Rates",
@@ -194,7 +234,7 @@ shinyUI(tagList(
                 ),
                 column(9,
                     plotOutput(outputId='conversion_rates__plot')
-                )                
+                )
             ),
             tabPanel("Website Traffic",
                 column(3,

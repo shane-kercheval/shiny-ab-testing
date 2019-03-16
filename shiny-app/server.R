@@ -287,6 +287,47 @@ shinyServer(function(session, input, output) {
         return (tagList(list=ui_list))
     })
 
+    output$duration_calculator__url__UI <- renderUI({
+    
+        req(reactive__experiment_data())
+
+        paths <- reactive__experiment_data()$website_traffic %>%
+            count(path) %>%
+            arrange(desc(n)) %>%
+            get_vector('path')
+
+        ui_paths <- selectInput(
+            inputId='duration_calculator__url',
+            label="Path",
+            choices=c("<Select Path>", paths),
+            selected="<Select Path>")
+
+        ui_list <- list()
+        ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_paths)
+        return (tagList(list=ui_list))
+    })
+
+    output$duration_calculator__metrics__UI <- renderUI({
+
+        req(reactive__experiments_summary())
+
+        metric_names <- reactive__experiments_summary() %>%
+            get_vector('metric_id', return_unique = TRUE) %>%
+            as.character()
+
+        ui_metric <- selectInput(
+            inputId='duration_calculator__metrics',
+            label="Metrics",
+            choices=metric_names,
+            selected=metric_names,
+            multiple=TRUE)
+
+        ui_list <- list()
+        ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_metric)
+        return (tagList(list=ui_list))
+    })
+
+
     ##########################################################################################################
     # Update Dynamic Graph Options based on the Selected Tab
     ##########################################################################################################

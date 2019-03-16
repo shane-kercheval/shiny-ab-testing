@@ -13,6 +13,7 @@ source('unit_test_helpers.R')
 # library('testthat')
 # test_file("test_helpers_processing.R")
 
+
 test_that("website_traffic__get_user_first_visit", {
     context("helpers_processing::website_traffic__get_user_first_visit")
 
@@ -704,4 +705,45 @@ test_that("plot__percent_change_conf_bayesian", {
                                                    experiment,'.png'),
                                        size_inches=c(8,12))
     }
+})
+
+test_that("conversion_rates_cohort", {
+    context("helpers_processing::conversion_rates_cohort")
+  
+    experiment_data <- load_data()
+
+    cohort_format <- '%W'
+    #cohort_format <- '%m'
+    metric_name <- 'Sign Up'
+    
+    reactive__traffic_conversions <- create_traffic_convesions(experiment_data,
+                                                               metric=metric_name,
+                                                               cohort_format=cohort_format) 
+    snapshot_1_days <- 3
+    snapshot_2_days <- 5
+    snapshot_3_days <- 10
+
+    plot_object <- plot__conversion_rates_snapshot_absolute(traffic_conversions=reactive__traffic_conversions,
+                                                            snapshot_1_days,
+                                                            snapshot_2_days,
+                                                            snapshot_3_days,
+                                                            cohort_label='Week')
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot__conversion_rates/plot__conversion_rates_snapshot_absolute.png')
+
+    plot_object <- plot__conversion_rates_snapshot_percent(traffic_conversions=reactive__traffic_conversions,
+                                                    snapshot_1_days,
+                                                    snapshot_2_days,
+                                                    snapshot_3_days,
+                                                    snapshot_max_days=45,
+                                                    cohort_label='Week') 
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot__conversion_rates/plot__conversion_rates_snapshot_percent.png')
+
+    plot_object <- plot__conversion_rates_historical(experiment_data=experiment_data,
+                                      exclude_last_n_days=30) 
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot__conversion_rates/plot__conversion_rates_historical.png')
+    
+
+    plot_object <- plot__conversion_rates_attribution(experiment_data=experiment_data,
+                                      exclude_last_n_days=30)
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot__conversion_rates/plot__conversion_rates_attribution.png')
 })
