@@ -857,7 +857,6 @@ get__cohorted_conversions_snapshot <- function(traffic_conversions,
 #' @param simulated_experiment_length the length of "simulated experiment" which is how the daily traffic is
 #'      calculated
 #' @param metric the metric to filter on
-
 site__ab_test_calculator <- function(experiment_data,
                                      historical_conversion_rates,
                                      experiment_path,
@@ -898,11 +897,25 @@ site__ab_test_calculator <- function(experiment_data,
     conversion_rates <- historical_conversion_rates$historical_conversion_rate
     names(conversion_rates) <- historical_conversion_rates$metric_id
 
-    days_required <- ab_test_calculator(daily_traffic=daily_experiment_traffic_count,
+    calc_results <- ab_test_calculator(daily_traffic=daily_experiment_traffic_count,
                                         conversion_rates=conversion_rates,  # vector of conversion_rates
                                         percent_increase=minimum_detectable_effect,
                                         power=power,
                                         alpha=alpha)
     
-    return(c(days_required, list(daily_traffic=daily_experiment_traffic_count)))
+    # make sure all the datasets have the metrics in the same order
+    stopifnot(setequal(metrics, historical_conversion_rates$metric_id))
+    stopifnot(setequal(metrics, names(calc_results$days_required)))
+    stopifnot(setequal(metrics, names(calc_results$entities_required)))
+    
+    detectable_crs <- historical_conversion_rates$historical_conversion_rate +
+        (historical_conversion_rates$historical_conversion_rate * minimum_detectable_effect)
+    results_df <- data.frame(`Metric`=metrics,
+               `Estimated Days Required`=as.numeric(calc_results$days_required),
+               `Estimated Users Required`=as.numeric(calc_results$entities_required),
+               `Historical Conversion Rate`=historical_conversion_rates$historical_conversion_rate,
+               `Detectable Conversion Rate`=detectable_crs,
+               check.names = FALSE)
+    
+    return(list(results=results_df, daily_traffic=daily_experiment_traffic_count))
 }

@@ -792,15 +792,14 @@ test_that("ab_test_calculator", {
                                              alpha=duration_calculator__alpha,
                                              power=power,
                                              simulated_experiment_length = 30)
-    expect_identical(names(calc_results$days_required), duration_calculator__metrics)
-    expect_identical(names(calc_results$entities_required), duration_calculator__metrics)
-    
+    expect_false(any(is.na(calc_results$results)))
+        
+    expect_identical(as.character(calc_results$results$Metric), duration_calculator__metrics)
     expect_equal(round(calc_results$daily_traffic / 1000) * 1000, 8000)
 
     expected_sample_size <- calculate_total_sample_size(original_conversion_rate=historical_conversion_rates$historical_conversion_rate[1],
                                                         percent_increase=duration_calculator__mde,
                                                         power=power,
                                                         alpha=duration_calculator__alpha)
-    
-    expect_equal(as.numeric(calc_results$entities_required[1]), expected_sample_size)
+    expect_equal(calc_results$results$`Estimated Users Required`[1], expected_sample_size)
 })
