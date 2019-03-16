@@ -6,7 +6,7 @@ source('r_scripts/helpers_check_data_integrity.R', chdir=TRUE)
 source('r_scripts/helpers_processing.R', chdir=TRUE)
 source('../unit_tests/unit_test_helpers.R')
 
-baseline_conversion_rates=c(0.10, 0.07, 0.05, 0.03)
+baseline_conversion_rates <- c(0.10, 0.07, 0.05, 0.03)
 
 ##########################################################################################################
 # SIMULATE EXPERIMENT INFO
@@ -262,8 +262,7 @@ create_experiment_visits <- function(website_traffic, start_date, end_date, expe
         ggplot(aes(x=variation, y=n, fill=variation)) +
         geom_col() +
         theme(legend.position = 'none') +
-        labs(title=paste('Variation Count -', current_experiment_id),
-             subtitle='All visitors in experiment are new to the site (i.e. first visit >= experiment start date)')
+        labs(title=paste('Variation Count -', current_experiment_id))
     plot_object %>% test_save_plot(file=paste0('simulated_data_plots/create_', 
                                                current_experiment_id,
                                                '_variation_count.png'))

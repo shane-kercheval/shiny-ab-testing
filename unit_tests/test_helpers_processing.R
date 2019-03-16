@@ -707,43 +707,135 @@ test_that("plot__percent_change_conf_bayesian", {
     }
 })
 
-test_that("conversion_rates_cohort", {
-    context("helpers_processing::conversion_rates_cohort")
-  
+test_that("historical_conversion_rates",  {
+    context("helpers_processing::historical_conversion_rates")
+
     experiment_data <- load_data()
 
+    historical_crs <- get_historical_conversion_rates(experiment_data)
+
+    # check that the metric/attr-windows are expected    
+    expected_attr_windows <- experiment_data$attribution_windows %>%
+        group_by(metric_id) %>%
+        summarise(median_attr_window = median(attribution_window)) %>%
+        arrange(median_attr_window)
+
+    expect_dataframes_equal(historical_crs %>% select(metric_id, median_attr_window),
+                            expected_attr_windows %>% 
+                                mutate(metric_id = factor(metric_id, levels=expected_attr_windows$metric_id)))
+
+    expect_identical(historical_crs$median_attr_window,
+                     floor(historical_crs$median_days_from_first_visit_to_conversion))
+    expect_identical(historical_crs$median_attr_window,
+                     floor(historical_crs$mean_days_from_first_visit_to_conversion))
+
+    expect_equal(historical_crs$conversion_rate_within_window / historical_crs$historical_conversion_rate,
+                 historical_crs$percent_cr_window_realized)
+    
+    # these are the baseline_conversion_rates found in the simulation data
+    expect_identical(round(historical_crs$historical_conversion_rate, 2), c(0.10, 0.07, 0.05, 0.03))
+
+    plot_object <- plot__conversion_rates_historical(historical_crs) 
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot__conversion_rates/plot__conversion_rates_historical.png')
+    
+    plot_object <- plot__conversion_rates_attribution(historical_crs)
+    plot_object %>% test_save_plot(file='data/plot_helpers/plot__conversion_rates/plot__conversion_rates_attribution.png')
+    
+    ########################
+    # test get__cohorted_traffic_conversions, get__cohorted_conversions_snapshot, & plots
+    ########################
     cohort_format <- '%W'
     #cohort_format <- '%m'
     metric_name <- 'Sign Up'
     
-    reactive__traffic_conversions <- create_traffic_convesions(experiment_data,
-                                                               metric=metric_name,
-                                                               cohort_format=cohort_format) 
-    snapshot_1_days <- 3
-    snapshot_2_days <- 5
-    snapshot_3_days <- 10
+    traffic_conversions <- get__cohorted_traffic_conversions(experiment_data,
+                                                                       metric=metric_name,
+                                                                       cohort_format=cohort_format)
+    
+    snapshots <- c(3, 5, 10)
+    cohort_label='Week'
+    
 
-    plot_object <- plot__conversion_rates_snapshot_absolute(traffic_conversions=reactive__traffic_conversions,
-                                                            snapshot_1_days,
-                                                            snapshot_2_days,
-                                                            snapshot_3_days,
+    cohorted_snapshots <- get__cohorted_conversions_snapshot(traffic_conversions,
+                                                             cohort_label=cohort_label,
+                                                             snapshots=snapshots,
+                                                             snapshot_max_days=30)
+
+    
+
+
+
+    plot_object <- plot__conversion_rates_snapshot_absolute(cohorted_snapshots=cohorted_snapshots,
                                                             cohort_label='Week')
     plot_object %>% test_save_plot(file='data/plot_helpers/plot__conversion_rates/plot__conversion_rates_snapshot_absolute.png')
 
-    plot_object <- plot__conversion_rates_snapshot_percent(traffic_conversions=reactive__traffic_conversions,
-                                                    snapshot_1_days,
-                                                    snapshot_2_days,
-                                                    snapshot_3_days,
-                                                    snapshot_max_days=45,
-                                                    cohort_label='Week') 
+    plot_object <- plot__conversion_rates_snapshot_percent(cohorted_snapshots=cohorted_snapshots,
+                                                           snapshot_max_days = 30,
+                                                           cohort_label='Week') 
     plot_object %>% test_save_plot(file='data/plot_helpers/plot__conversion_rates/plot__conversion_rates_snapshot_percent.png')
+})
 
-    plot_object <- plot__conversion_rates_historical(experiment_data=experiment_data,
-                                      exclude_last_n_days=30) 
-    plot_object %>% test_save_plot(file='data/plot_helpers/plot__conversion_rates/plot__conversion_rates_historical.png')
+test_that("sample_size_calculator", {
+    context("helpers_processing::sample_size_calculator")
+
+    experiment_data <- load_data()
+    
+    duration_calculator__url <- 'example.com'
+    duration_calculator__metrics <- c("Sign Up", "Use Feature 1", "Talk to Sales", "Pay/Subscribe")
+    duration_calculator__mde <- 0.05
+    duration_calculator__alpha <- 0.05
+    duration_calculator__beta <- 0.20
+
+    
+    # get expected traffic; returning users are included in experiment
+    # simulate starting a 30-day experiment; must start the experiment 30 days + max attribution window
+    # prior to the last date of the website traffic available
+    simulated_experiment_length <- 30
+    attribution_windows <- experiment_data$attribution_windows %>%
+        filter(metric_id %in% duration_calculator__metrics) %>% 
+        group_by(metric_id) %>%
+        summarise(max_attribution_window = max(attribution_window))
+    
+    experiment_start_date <- max(experiment_data$website_traffic$visit_date) - days(simulated_experiment_length) - days(1) - days(max(attribution_windows$max_attribution_window))
+    
+    simulated_experiment_traffic <- experiment_data$website_traffic %>%
+        filter(visit_date >= experiment_start_date & visit_date <= experiment_start_date + days(simulated_experiment_length),
+               path == duration_calculator__url) %>%
+        group_by(user_id) %>%
+        summarise(first_joined_experiment = min(visit_date))
+    
+    stopif(simulated_experiment_traffic$user_id %>% duplicated() %>% any())
+    
+    total_experiment_traffic_count <- length(simulated_experiment_traffic$user_id)
+    daily_experiment_traffic_count <- total_experiment_traffic_count / simulated_experiment_length
+    
+    simulated_conversions <- left_join(simulated_experiment_traffic,
+               experiment_data$conversion_events %>%
+                  inner_join(attribution_windows, by='metric_id'),
+               by='user_id') %>%
+        # we have to make sure that the conversion happened after the visit date, since we are allowing
+        # returning users into the experiment
+        mutate(converted_days = as.numeric(difftime(conversion_date,  # negative days means the conversion happened before the experiment started
+                                                    first_joined_experiment,
+                                                    units = 'days')),
+               converted_within_window = conversion_date > first_joined_experiment & conversion_date <= first_joined_experiment + days(max_attribution_window),
+               converted_within_window = ifelse(is.na(converted_within_window), FALSE, converted_within_window))
+    
+    stopif(any(simulated_conversions$converted_days < 0 & simulated_conversions$converted_within_window))
+    stopif(length(unique(simulated_conversions$user_id)) != total_experiment_traffic_count)
     
 
-    plot_object <- plot__conversion_rates_attribution(experiment_data=experiment_data,
-                                      exclude_last_n_days=30)
-    plot_object %>% test_save_plot(file='data/plot_helpers/plot__conversion_rates/plot__conversion_rates_attribution.png')
+    simulated_conversions %>%
+        filter(!is.na(metric_id)) %>%
+        group_by(metric_id) %>%
+        summarise(conversion_rate=sum(converted_within_window) / total_experiment_traffic_count)
+    
+    
+
+
+    calculate_days_required(daily_traffic=daily_experiment_traffic_count,
+                                    conversion_rates=,  # vector of conversion_rates
+                                    percent_increase=duration_calculator__mde,
+                                    power=1 - duration_calculator__beta,
+                                    alpha=duration_calculator__alpha)
 })

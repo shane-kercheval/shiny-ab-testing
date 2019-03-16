@@ -82,7 +82,7 @@ shinyUI(tagList(
             )
         ),
         navbarMenu("Planning",
-            tabPanel("Test Duration Estimator",
+            tabPanel("Sample Size Calculator",
                 column(3,
                     class='column-input-control-style',
                     bsCollapse(id='duration_calculator__bscollapse', open=c("Site Options", "Statistical Options"), multiple=TRUE,

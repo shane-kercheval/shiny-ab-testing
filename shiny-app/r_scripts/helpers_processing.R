@@ -512,6 +512,9 @@ private__create_prior_experiment_traffic <- function(experiment_data,
     return (prior_data)
 }
 
+#' @param experiment_data list of data-frames from load_data
+#' @param experiments_summary result of `experiments_get_summary()`
+#' @param confidence_level the confidence level to use for the frequentist and byaesian methods
 experiments__get_daily_summary <- function(experiment_data, experiments_summary, confidence_level=0.95) {
 
     # per metric, since it is based on attribution windows
@@ -631,4 +634,214 @@ experiments__get_daily_summary <- function(experiment_data, experiments_summary,
         arrange(experiment_id, day_expired_attribution, metric_id)
     
     return (cumulative_traffic)
+}
+
+#' gives historical conversion rates per metric, along with conversion rates based on attribution windows
+#' 
+#' @param experiment_data list of data-frames from load_data
+#' @param include_last_n_days number of prior days of data to include
+#' @param exclude_last_n_days number of prior days of data to exclude
+get_historical_conversion_rates <- function(experiment_data,
+                                            include_last_n_days=180,
+                                            exclude_last_n_days=30
+                                            ) {
+
+    attr_windows <- experiment_data$attribution_windows %>%
+        group_by(metric_id) %>%
+        summarise(median_attr_window = median(attribution_window)) %>%
+        ungroup()
+
+    # last date of traffic
+    # use this because if data is updated daily it should give the same answer as Sys.Date()
+    # but if not, or if working on simulated data, it will use the last date in the data
+    last_date_of_traffic <- max(experiment_data$website_traffic$visit_date)
+
+    traffic_conversions <- left_join(experiment_data$website_traffic %>%
+                                        group_by(user_id) %>%
+                                        summarise(first_visit = min(visit_date)) %>%
+                                        ungroup(),
+                                     experiment_data$conversion_events,
+                                     by='user_id') %>%
+        filter(first_visit >= last_date_of_traffic - days(include_last_n_days),
+               first_visit < last_date_of_traffic - days(exclude_last_n_days)) %>%
+        left_join(attr_windows, by='metric_id') %>%
+        # negative days means the conversion happened before the experiment started; which shouldn't be possible in this dataset
+        mutate(days_from_first_visit_to_conversion = as.numeric(difftime(conversion_date,
+                                                                         first_visit,
+                                                                         units = 'days')),
+               converted_within_window = days_from_first_visit_to_conversion >= 0 &
+                   days_from_first_visit_to_conversion <= median_attr_window,
+               converted_within_window = ifelse(is.na(converted_within_window), FALSE, converted_within_window))
+
+    # shouldnt' be possible to have a conversion before the first visit in this dataset; unlike experiment traffic
+    stopif(any(traffic_conversions$days_from_first_visit_to_conversion <= 0, na.rm = TRUE))
+
+    total_users <- length(unique(traffic_conversions$user_id))
+
+    t <- traffic_conversions %>%
+        filter(!is.na(metric_id)) %>%
+        group_by(metric_id) %>%
+        summarise(median_attr_window = min(median_attr_window),
+                  mean_days_from_first_visit_to_conversion=mean(days_from_first_visit_to_conversion),
+                  median_days_from_first_visit_to_conversion=median(days_from_first_visit_to_conversion),
+                  historical_conversion_rate=n_distinct(user_id) / total_users,
+                  conversion_rate_within_window=sum(converted_within_window) / total_users,
+                  percent_cr_window_realized=conversion_rate_within_window / historical_conversion_rate) %>%
+        arrange(desc(historical_conversion_rate))
+    return (t %>% mutate(metric_id = factor(metric_id, levels=t$metric_id)))
+}
+
+
+#' Returns Traffic Data *Left Joined* with Conversion Event Data, for a specific metric; so it returns
+#' all traffic data since it is left-joined
+#' @param experiment_data list of data-frames from load_data
+#' @param metric the metric to filter on
+#' @param cohort_format string format of cohort e.g. "%W" or "%m"
+get__cohorted_traffic_conversions <- function(experiment_data,
+                                              metric,
+                                              cohort_format) {
+    left_join(experiment_data$website_traffic %>%
+                  group_by(user_id) %>%
+                  summarise(first_visit = min(visit_date)) %>%
+                  ungroup() %>%
+                  mutate(cohort = create_cohort(first_visit, cohort_format)),
+              experiment_data$conversion_events %>%
+                  filter(metric_id == metric_name),
+              by='user_id')
+    
+}
+
+#' This function returns conversion rates after n days (based on 3 different snapshots) relative to each
+#'      user's first visit. It also returns the "percent of all conversions" for each snapshot, using 
+#'      the conversion rate at snapshot_max_days as the "maximum" conversion rate i.e. the denominator 
+#' @param traffic_conversions object returned by `get__cohorted_traffic_conversions()`
+#' @param cohort_label the label of the cohort e.g. "Week" or "Month"
+#' @param snapshots a vector of the number of days allowed from the first visit to the conversion to count
+#'      towards the snapshot; each number in the vector represents a different snapshot
+#' @param snapshot_max_days the **maximum** number of days allowed from the first visit to conversion;
+#'      this is used as the denominator 
+get__cohorted_conversions_snapshot <- function(traffic_conversions,
+                                               cohort_label,
+                                               snapshots=c(1, 3, 5),
+                                               snapshot_max_days=30) {
+
+    stopifnot(all(snapshots <= snapshot_max_days))
+    stopifnot(all(snapshots >= 1))
+    
+    label_lookup <- paste(snapshots, "Days")
+    names(label_lookup) <- paste("Snapshot", 1:length(snapshots))
+    
+    value_lookup <- snapshots
+    names(value_lookup) <- as.character(label_lookup)
+    
+    # use current_date rather than Sys.Date() in case data is not refreshed daily or we are using simulated
+    # data
+    current_date <- max(traffic_conversions$first_visit)
+    
+    if(cohort_label == "Week") {
+        
+        cohort_format <- "%W"
+        
+    } else if (cohort_label == "Month") {
+        
+        cohort_format <- "%m"
+        
+    }else {
+        
+        stopifnot(FALSE)
+    }
+    
+    traffic_conversions <- traffic_conversions %>%
+        filter(cohort != create_cohort(current_date, cohort_format = cohort_format)) %>%
+        mutate(days_to_convert=as.numeric(difftime(conversion_date, first_visit, units = 'days')))
+    
+    for(index in 1:length(snapshots)) {
+        #index <- 1
+        
+        column_name <- names(label_lookup[index])
+        traffic_conversions <- traffic_conversions %>%
+            mutate(!!column_name := !is.na(conversion_date) &
+                                    days_to_convert > 0 &
+                                    days_to_convert <= snapshots[index])
+    }
+    
+    traffic_conversions <- traffic_conversions %>%
+        mutate(`Max Snapshot`:= !is.na(conversion_date) &
+                   days_to_convert > 0 &
+                   days_to_convert <= snapshot_max_days)
+    
+    stopifnot(length(unique(traffic_conversions %>% filter(!is.na(metric_id)) %>% get_vector('metric_id', return_unique = TRUE))) == 1)
+    stopif(traffic_conversions$user_id %>% duplicated() %>% any())
+    
+    conversions_absolute <- traffic_conversions %>%
+        select(cohort, first_visit, contains("Snapshot ")) %>%
+        gather(snapshot, converted, -c(cohort, first_visit)) %>%
+        group_by(cohort, snapshot) %>%
+        summarise(max_first_visit=max(first_visit),
+                  num_users=n(),  # verified above there are not any duplicated user-ids
+                  num_converted=sum(converted),
+                  conversion_rate=num_converted / num_users) %>%
+        ungroup()
+    
+    # make sure the number of users for each snapshot within a cohort is the same
+    stopifnot(all(conversions_absolute %>%
+                      group_by(cohort) %>%
+                      summarise(unique_num_users = length(unique(num_users))) %>%
+                      get_vector('unique_num_users') == 1))
+    
+    
+    conversions_absolute <- conversions_absolute %>%
+        mutate(snapshot_label = label_lookup[snapshot],
+               snapshot_value = value_lookup[snapshot_label],
+               conversion_rate = ifelse(max_first_visit > current_date - days(snapshot_value), NA, conversion_rate))
+
+    # this time, we only want to look at those who have converted within the max time allowed
+    # and, we only want to keep the cohorts where the last person to join the cohort has had enough to convert >= snapshot_max_days
+    conversions_percent_of_all <- traffic_conversions %>%
+        filter(`Max Snapshot`) %>%
+        select(cohort, first_visit, contains("Snapshot ")) %>%
+        gather(snapshot, converted, -c(cohort, first_visit)) %>%
+        group_by(cohort, snapshot) %>%
+        summarise(max_first_visit=max(first_visit),
+                  num_users=n(),  # verified above there are not any duplicated user-ids
+                  num_converted=sum(converted),
+                  conversion_rate_percent_of_all=num_converted / num_users) %>%
+        ungroup()
+    
+    # make sure the number of users for each snapshot within a cohort is the same
+    stopifnot(all(conversions_percent_of_all %>%
+                      group_by(cohort) %>%
+                      summarise(unique_num_users = length(unique(num_users))) %>%
+                      get_vector('unique_num_users') == 1))
+    
+    
+    conversions_percent_of_all <- conversions_percent_of_all %>%
+        mutate(snapshot_label = label_lookup[snapshot],
+               snapshot_value = value_lookup[snapshot_label],
+               conversion_rate_percent_of_all = ifelse(max_first_visit > current_date - days(snapshot_max_days), NA, conversion_rate_percent_of_all))
+    
+    expect_dataframes_equal(conversions_absolute %>% select(-max_first_visit, -num_users, -conversion_rate), 
+                            conversions_percent_of_all %>% select(-max_first_visit, -num_users, -conversion_rate_percent_of_all))
+    
+    conversions_final <- inner_join(conversions_absolute %>%
+                                        select(cohort,
+                                               snapshot,
+                                               snapshot_label,
+                                               snapshot_value,
+                                               num_converted,
+                                               num_users,
+                                               conversion_rate),
+                                    conversions_percent_of_all %>%
+                                        select(cohort, snapshot, conversion_rate_percent_of_all),
+                                    by=c('cohort', 'snapshot')) %>%
+        arrange(cohort, snapshot)
+    
+    stopifnot(nrow(conversions_final) == nrow(conversions_absolute))
+    
+    conversions_final <- conversions_final %>%
+        mutate(cohort=factor(cohort, levels=unique(conversions_final$cohort)),
+               snapshot=factor(snapshot, levels=unique(conversions_final$snapshot)),
+               snapshot_label=factor(snapshot_label, levels=unique(conversions_final$snapshot_label)))
+        
+    return(conversions_final)
 }
