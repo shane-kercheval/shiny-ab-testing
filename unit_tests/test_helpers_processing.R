@@ -116,20 +116,9 @@ test_that("experiments__determine_conversions", {
 
     experiment_data <- load_data()
 
-    # I want to manipulate the simulated dataset to
-    # 1) make sure the dates are relative to today (experiments__determine_conversions filter out based on\
-    #    Sys.Date())
-    # 2) simulate people entering the experiment who already converted (so that we can ensure they are not
-    #    counted as converted
-    max_experiment_traffic_date <- max(experiment_data$experiment_traffic$first_joined_experiment)
-    days_offset <- Sys.Date() - as.Date(max_experiment_traffic_date)
+    # use this rather than Sys.Date() in case data is not refreshed daily or we are using simulated data
+    current_date <- max(experiment_data$website_traffic$visit_date)
 
-    experiment_data$experiment_traffic <- experiment_data$experiment_traffic %>%
-        mutate(first_joined_experiment = first_joined_experiment + days_offset)
-
-    experiment_data$conversion_events <- experiment_data$conversion_events %>%
-        # the minus 1 will make it so some people will have already converted
-        mutate(conversion_date = conversion_date + days_offset - 1)
 
     user_conversion_events <- experiments__determine_conversions(experiment_data)
 
@@ -143,7 +132,7 @@ test_that("experiments__determine_conversions", {
 
     # make sure no one that joined the experiment x days ago, where x is attribution window, is in the dataset
     expect_equal(nrow(user_conversion_events %>%
-                          filter(first_joined_experiment + days(attribution_window) >= Sys.Date())),
+                          filter(first_joined_experiment + days(attribution_window) >= current_date)),
                  0)
 
     # make sure the data is unique by experiment/metric/user
@@ -190,7 +179,7 @@ test_that("experiments__determine_conversions", {
         experiment_data$conversion_events %>% select(user_id, metric_id),
                by='user_id') %>%
         inner_join(experiment_data$attribution_windows, by=c('experiment_id', 'metric_id')) %>%
-        filter(first_joined_experiment < Sys.Date() - attribution_window) %>%
+        filter(first_joined_experiment < current_date - days(attribution_window)) %>%
         select(user_id, experiment_id, metric_id) %>%
         arrange(user_id, experiment_id, metric_id)
     
@@ -207,14 +196,8 @@ test_that("private__filter_experiment_traffic_via_attribution", {
 
     experiment_data <- load_data()
 
-    ###############
-    # shift all dates relative to today so we can test excluding people (who recently entered into the
-    # experiment) based on the attribution window
-    ###############
-    max_date <- max(experiment_data$experiment_traffic$first_joined_experiment)
-    days_offset <- Sys.Date() - as.Date(max_date)
-
-    experiment_data$experiment_traffic$first_joined_experiment <- experiment_data$experiment_traffic$first_joined_experiment + days_offset
+    # use this rather than Sys.Date() in case data is not refreshed daily or we are using simulated data
+    current_date <- max(experiment_data$website_traffic$visit_date)
 
     filtered_traffic <- private__filter_experiment_traffic_via_attribution(experiment_data)
 
@@ -226,7 +209,7 @@ test_that("private__filter_experiment_traffic_via_attribution", {
         summarise(max_joined_plus_attribution = max(joined_plus_attribution))
 
     # This might fail due to time-zones
-    expect_true(all(Sys.Date() > max_joined_per_metric$max_joined_plus_attribution))
+    expect_true(all(current_date > max_joined_per_metric$max_joined_plus_attribution))
 
     # for all experiments that ended before max attribution date (relative to today),
     # the end date should equal the end date on the filtered dataset
@@ -234,7 +217,7 @@ test_that("private__filter_experiment_traffic_via_attribution", {
         group_by(experiment_id) %>%
         summarise(start_date = min(first_joined_experiment),
                   end_date = max(first_joined_experiment)) %>%
-        filter(end_date < Sys.Date() - max(experiment_data$attribution_windows$attribution_window))
+        filter(end_date < current_date - days(max(experiment_data$attribution_windows$attribution_window)))
 
     start_end_dates_filtered <- filtered_traffic %>%
         group_by(experiment_id) %>%
@@ -249,21 +232,9 @@ test_that("experiments__get_summary", {
     context("helpers_processing::experiments__get_summary")
 
     experiment_data <- load_data()
-
-    ###############
-    # shift all dates relative to today so we can test excluding people (who recently entered into the
-    # experiment) based on the attribution window
-    ###############
-    max_date <- max(max(experiment_data$experiment_traffic$first_joined_experiment),
-                    #max(conversion_events$conversion_date),
-                    max(experiment_data$website_traffic$visit_date))
-
-    days_offset <- Sys.Date() - as.Date(max_date)
-
-    experiment_data$experiment_traffic$first_joined_experiment <- experiment_data$experiment_traffic$first_joined_experiment + days_offset
-    experiment_data$website_traffic$visit_date <- experiment_data$website_traffic$visit_date + days_offset
-    experiment_data$conversion_events$conversion_date <- experiment_data$conversion_events$conversion_date + days_offset
-
+    # use this rather than Sys.Date() in case data is not refreshed daily or we are using simulated data
+    current_date <- max(experiment_data$website_traffic$visit_date)
+    
     experiments_summary <- experiments__get_summary(experiment_data, days_of_prior_data=15)
 
     expect_false(any(is.na(experiments_summary)))
@@ -300,11 +271,26 @@ test_that("experiments__get_summary", {
     expect_true(all(check_trial_numbers$distinct_variant_trials))
     expect_true(all(check_trial_numbers$expected_actual_match))
 
-    # for the first experiment, these should equal the attribution window plus 1 day padding the end-date is Today
-    expect_identical(as.numeric(round(difftime(experiments_summary$end_date,
-                                               experiments_summary$last_join_date,
-                                               units = c('days')))),
-                     c(3, 4, 6, 8, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0))
+    # for the experiments where not everyone (for a given metric) has been allowed enough time relative to
+    # the attribution window, the "time since the last person joined" the experiment should be greater than
+    # the attribution window for that metric.
+    experiments_still_running <- experiments_summary %>%
+        filter(end_date != last_join_date) %>%  # i.e. the attribution window has not expired
+        mutate(time_since_last_join = as.numeric(difftime(current_date,
+                        last_join_date,
+                        units = c('days')))) %>%
+        select(experiment_id, metric_id, last_join_date, time_since_last_join) %>%
+        mutate(metric_id = as.character(metric_id)) %>%
+        inner_join(experiment_data$attribution_windows,
+                   by = c("experiment_id", "metric_id")) %>%
+        mutate(valid=time_since_last_join > attribution_window)
+    
+    expect_true(nrow(experiments_still_running) >= 4)
+    expect_true(all(experiments_still_running$valid))
+    expect_identical(floor(experiments_still_running$time_since_last_join),
+                     experiments_still_running$attribution_window)
+    
+    
     
     expect_dataframes_equal(distinct(experiments_summary %>% select(experiment_id, metric_id)) %>%
                                 arrange(experiment_id),
@@ -391,20 +377,6 @@ test_that("experiments__get_base_summary_priors", {
     context("helpers_processing::experiments__get_base_summary_priors")
 
     experiment_data <- load_data()
-
-    ###############
-    # shift all dates relative to today so we can test excluding people (who recently entered into the
-    # experiment) based on the attribution window
-    ###############
-    max_date <- max(max(experiment_data$experiment_traffic$first_joined_experiment),
-                    #max(conversion_events$conversion_date),
-                    max(experiment_data$website_traffic$visit_date))
-
-    days_offset <- Sys.Date() - as.Date(max_date)
-
-    experiment_data$experiment_traffic$first_joined_experiment <- experiment_data$experiment_traffic$first_joined_experiment + days_offset
-    experiment_data$website_traffic$visit_date <- experiment_data$website_traffic$visit_date + days_offset
-    experiment_data$conversion_events$conversion_date <- experiment_data$conversion_events$conversion_date + days_offset
 
     # get base summary, required for private__create_prior_experiment_traffic
     experiments_base_summary <- experiments__get_base_summary(experiment_data)
@@ -546,6 +518,8 @@ test_that("experiments__get_daily_summary", {
                             missing_data_summary %>% select(-min_date))
 
     # then check that the end date matches the end date of experiments_summary + attribution window + 1 day
+
+
     expected_end_dates <- experiments_summary %>% 
         mutate(end_date = as.Date(end_date)) %>%
         select(experiment_id, metric_id, end_date) %>%
@@ -555,7 +529,15 @@ test_that("experiments__get_daily_summary", {
         mutate(end_date = end_date + days(num_missing_days)) %>%
         select(-num_missing_days) %>%
         arrange(experiment_id, metric_id)
-    
+    # but, for experiments that have not ended, the max date will be "today"
+    # however, since we round to the nearest date, and calculate the cumulative conversions/trails BEFORE
+    # that date, we will technically need to go to tomorrow
+    # so the cumulation will be the conversions/trails that converted/entered BEFORE tomorrow i.e. today and prior
+    # use this rather than Sys.Date() in case data is not refreshed daily or we are using simulated data
+    current_date <- as.Date(max(experiment_data$website_traffic$visit_date)) + 1
+    expected_end_dates <- expected_end_dates %>%
+        mutate(end_date = if_else(current_date < end_date, current_date, end_date))
+
     found_end_dates <- last_days_daily_summary %>%
         select(experiment_id, metric_id, day_expired_attribution) %>%
         rename(end_date = day_expired_attribution)

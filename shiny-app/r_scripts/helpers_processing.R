@@ -152,6 +152,9 @@ website_traffic__to_cohort_num_users <- function(experiment_data,
 #' @param experiment_data list of data-frames from load_data
 experiments__determine_conversions <- function(experiment_data) {
 
+    # use this rather than Sys.Date() in case data is not refreshed daily or we are using simulated data
+    current_date <- max(experiment_data$website_traffic$visit_date)
+
     # dataset only contains users that converted
     # dataset is per user, per experment, per converted metric
     conversion_events <- experiment_data$experiment_traffic %>% 
@@ -168,7 +171,7 @@ experiments__determine_conversions <- function(experiment_data) {
         # so, when we calculate the "total" users (i.e. denominator) we will also filter out users that joined
         # the experiment in the last x days, to keep the numerator/denominator in the conversion rates in the 
         # same time period.
-        filter(first_joined_experiment < Sys.Date() - attribution_window) %>%
+        filter(first_joined_experiment < current_date - days(attribution_window)) %>%
         mutate(days_from_experiment_to_conversion = as.numeric(difftime(conversion_date,  # negative days means the conversion happened before the experiment started
                                                                         first_joined_experiment,
                                                                         units = 'days')),
@@ -453,12 +456,15 @@ experiments__get_summary <- function(experiment_data,
 #' @param experiment_data list of data-frames from load_data
 private__filter_experiment_traffic_via_attribution <- function(experiment_data){
 
+    # use this rather than Sys.Date() in case data is not refreshed daily or we are using simulated data
+    current_date <- max(experiment_data$website_traffic$visit_date)
+
     inner_join(experiment_data$experiment_traffic,
                experiment_data$attribution_windows,
                by='experiment_id') %>%
         # we only want the people who have had enough time to convert, given the attribution window for a
         # given metric (i.e. exclude people who join within the attribution window relative to today)
-        filter(first_joined_experiment < Sys.Date() - attribution_window) %>%
+        filter(first_joined_experiment < current_date - days(attribution_window)) %>%
         mutate(metric_id = fct_reorder(metric_id, attribution_window)) %>%
         inner_join(experiment_data$experiment_info,
                    by=c('experiment_id', 'variation'))
@@ -733,8 +739,7 @@ get__cohorted_conversions_snapshot <- function(traffic_conversions,
     value_lookup <- snapshots
     names(value_lookup) <- as.character(label_lookup)
     
-    # use current_date rather than Sys.Date() in case data is not refreshed daily or we are using simulated
-    # data
+    # use this rather than Sys.Date() in case data is not refreshed daily or we are using simulated data
     current_date <- max(traffic_conversions$first_visit)
     
     if(cohort_label == "Week") {
