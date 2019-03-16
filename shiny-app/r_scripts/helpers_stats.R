@@ -41,11 +41,11 @@ calculate_total_sample_size <- function(original_conversion_rate,
 #'      be able to detect. Also known as "minimum detectable effect".
 #' @param power probability of a True Positive (i.e. you detect the effect if it exists)
 #' @param alpha probability of a False Positive (i.e. an effect is detected when it does not actually exist)
-calculate_days_required <- function(daily_traffic,
-                                    conversion_rates,  # vector of conversion_rates
-                                    percent_increase,
-                                    power=0.8,
-                                    alpha=0.05) {
+ab_test_calculator <- function(daily_traffic,
+                              conversion_rates,  # vector of conversion_rates
+                              percent_increase,
+                              power=0.8,
+                              alpha=0.05) {
     entities_required <- unlist(map(conversion_rates, ~ calculate_total_sample_size(
             original_conversion_rate=.,
             percent_increase=percent_increase,
@@ -54,7 +54,8 @@ calculate_days_required <- function(daily_traffic,
 
     days_required <- ceiling(entities_required / daily_traffic)
 
-    return (ifelse(days_required > 365, Inf, days_required))
+    return (list(days_required=ifelse(days_required > 365, Inf, days_required),
+                 entities_required=entities_required))
 }
 
 #' Returns a credible interval approximations using the normal distribution, according to the methods in the

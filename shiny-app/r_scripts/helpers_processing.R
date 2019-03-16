@@ -706,9 +706,8 @@ get__cohorted_traffic_conversions <- function(experiment_data,
                   ungroup() %>%
                   mutate(cohort = create_cohort(first_visit, cohort_format)),
               experiment_data$conversion_events %>%
-                  filter(metric_id == metric_name),
+                  filter(metric_id == metric),
               by='user_id')
-    
 }
 
 #' This function returns conversion rates after n days (based on 3 different snapshots) relative to each
@@ -844,4 +843,66 @@ get__cohorted_conversions_snapshot <- function(traffic_conversions,
                snapshot_label=factor(snapshot_label, levels=unique(conversions_final$snapshot_label)))
         
     return(conversions_final)
+}
+
+#' returns required sample size and estimated number of days based on recent traffic and historical
+#'      conversion rates
+#' @param experiment_data list of data-frames from load_data
+#' @param historical_conversion_rates object returned by `get_historical_conversion_rates()`
+#' @param experiment_path the path to filter on and simulate traffic numbers from
+#' @param metrics the metrics to use for the sample size calcualtion
+#' @param minimum_detectable_effect the percent increase you would like to detect
+#' @param alpha the porbability of a false positive
+#' @param power 1 minus the probability of a false negative
+#' @param simulated_experiment_length the length of "simulated experiment" which is how the daily traffic is
+#'      calculated
+#' @param metric the metric to filter on
+
+site__ab_test_calculator <- function(experiment_data,
+                                     historical_conversion_rates,
+                                     experiment_path,
+                                     metrics,
+                                     minimum_detectable_effect=0.05,
+                                     alpha=0.05,
+                                     power=0.8,
+                                     simulated_experiment_length = 30) {
+
+    # get expected traffic; returning users are included in experiment
+    # simulate starting a 30-day experiment; must start the experiment 30 days + max attribution window
+    # prior to the last date of the website traffic available
+    attribution_windows <- experiment_data$attribution_windows %>%
+        filter(metric_id %in% metrics) %>% 
+        group_by(metric_id) %>%
+        summarise(max_attribution_window = max(attribution_window))
+
+    # relative to last date in website traffic (use rather than Sys.Date if data is not refreshed data and/or simulated data)
+    experiment_start_date <- max(experiment_data$website_traffic$visit_date) - 
+        days(simulated_experiment_length) - days(1) - 
+        days(max(attribution_windows$max_attribution_window))
+
+    simulated_experiment_traffic <- experiment_data$website_traffic %>%
+        filter(visit_date >= experiment_start_date &
+                   visit_date <= experiment_start_date + days(simulated_experiment_length),
+               path == experiment_path) %>%
+        group_by(user_id) %>%
+        summarise(first_joined_experiment = min(visit_date))
+    
+    stopif(simulated_experiment_traffic$user_id %>% duplicated() %>% any())
+    
+    daily_experiment_traffic_count <- length(simulated_experiment_traffic$user_id) / simulated_experiment_length
+
+    historical_conversion_rates <- historical_conversion_rates %>%
+        filter(metric_id %in% metrics) %>%
+        select(metric_id, historical_conversion_rate)
+
+    conversion_rates <- historical_conversion_rates$historical_conversion_rate
+    names(conversion_rates) <- historical_conversion_rates$metric_id
+
+    days_required <- ab_test_calculator(daily_traffic=daily_experiment_traffic_count,
+                                        conversion_rates=conversion_rates,  # vector of conversion_rates
+                                        percent_increase=minimum_detectable_effect,
+                                        power=power,
+                                        alpha=alpha)
+    
+    return(c(days_required, list(daily_traffic=daily_experiment_traffic_count)))
 }

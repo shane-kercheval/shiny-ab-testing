@@ -81,19 +81,20 @@ test_that("calculate_total_sample_size", {
     expect_true(is.infinite(result))
 })
 
-test_that("calculate_days_required", {
-    context("helpers_stats::calculate_days_required")
+test_that("ab_test_calculator", {
+    context("helpers_stats::ab_test_calculator")
 
     daily_traffic <- 10000
     total_sample_size_required <- c(29711, 51165, 115526)  # from calculate_total_sample_size unit test
     expected_days_required <- ceiling(total_sample_size_required / daily_traffic)
-    days_required <- calculate_days_required(daily_traffic=daily_traffic,
-                                             conversion_rates=c(0.3, 0.2, 0.1),
-                                             percent_increase=0.05,
-                                             power=0.8,
-                                             alpha=0.05)
+    calc_results <- ab_test_calculator(daily_traffic=daily_traffic,
+                                         conversion_rates=c(0.3, 0.2, 0.1),
+                                         percent_increase=0.05,
+                                         power=0.8,
+                                         alpha=0.05)
 
-    expect_true(all(expected_days_required == days_required))
+    expect_identical(expected_days_required, calc_results$days_required)
+    expect_identical(total_sample_size_required, calc_results$entities_required)
 })
 
 test_that("credible_interval_approx", {

@@ -751,19 +751,13 @@ test_that("historical_conversion_rates",  {
     traffic_conversions <- get__cohorted_traffic_conversions(experiment_data,
                                                                        metric=metric_name,
                                                                        cohort_format=cohort_format)
-    
     snapshots <- c(3, 5, 10)
     cohort_label='Week'
-    
 
     cohorted_snapshots <- get__cohorted_conversions_snapshot(traffic_conversions,
                                                              cohort_label=cohort_label,
                                                              snapshots=snapshots,
                                                              snapshot_max_days=30)
-
-    
-
-
 
     plot_object <- plot__conversion_rates_snapshot_absolute(cohorted_snapshots=cohorted_snapshots,
                                                             cohort_label='Week')
@@ -775,8 +769,8 @@ test_that("historical_conversion_rates",  {
     plot_object %>% test_save_plot(file='data/plot_helpers/plot__conversion_rates/plot__conversion_rates_snapshot_percent.png')
 })
 
-test_that("sample_size_calculator", {
-    context("helpers_processing::sample_size_calculator")
+test_that("ab_test_calculator", {
+    context("helpers_processing::ab_test_calculator")
 
     experiment_data <- load_data()
     
@@ -786,56 +780,27 @@ test_that("sample_size_calculator", {
     duration_calculator__alpha <- 0.05
     duration_calculator__beta <- 0.20
 
-    
-    # get expected traffic; returning users are included in experiment
-    # simulate starting a 30-day experiment; must start the experiment 30 days + max attribution window
-    # prior to the last date of the website traffic available
-    simulated_experiment_length <- 30
-    attribution_windows <- experiment_data$attribution_windows %>%
-        filter(metric_id %in% duration_calculator__metrics) %>% 
-        group_by(metric_id) %>%
-        summarise(max_attribution_window = max(attribution_window))
-    
-    experiment_start_date <- max(experiment_data$website_traffic$visit_date) - days(simulated_experiment_length) - days(1) - days(max(attribution_windows$max_attribution_window))
-    
-    simulated_experiment_traffic <- experiment_data$website_traffic %>%
-        filter(visit_date >= experiment_start_date & visit_date <= experiment_start_date + days(simulated_experiment_length),
-               path == duration_calculator__url) %>%
-        group_by(user_id) %>%
-        summarise(first_joined_experiment = min(visit_date))
-    
-    stopif(simulated_experiment_traffic$user_id %>% duplicated() %>% any())
-    
-    total_experiment_traffic_count <- length(simulated_experiment_traffic$user_id)
-    daily_experiment_traffic_count <- total_experiment_traffic_count / simulated_experiment_length
-    
-    simulated_conversions <- left_join(simulated_experiment_traffic,
-               experiment_data$conversion_events %>%
-                  inner_join(attribution_windows, by='metric_id'),
-               by='user_id') %>%
-        # we have to make sure that the conversion happened after the visit date, since we are allowing
-        # returning users into the experiment
-        mutate(converted_days = as.numeric(difftime(conversion_date,  # negative days means the conversion happened before the experiment started
-                                                    first_joined_experiment,
-                                                    units = 'days')),
-               converted_within_window = conversion_date > first_joined_experiment & conversion_date <= first_joined_experiment + days(max_attribution_window),
-               converted_within_window = ifelse(is.na(converted_within_window), FALSE, converted_within_window))
-    
-    stopif(any(simulated_conversions$converted_days < 0 & simulated_conversions$converted_within_window))
-    stopif(length(unique(simulated_conversions$user_id)) != total_experiment_traffic_count)
-    
+    power <- 1 - duration_calculator__beta
 
-    simulated_conversions %>%
-        filter(!is.na(metric_id)) %>%
-        group_by(metric_id) %>%
-        summarise(conversion_rate=sum(converted_within_window) / total_experiment_traffic_count)
-    
-    
+    historical_conversion_rates <- get_historical_conversion_rates(experiment_data)
 
+    calc_results <- site__ab_test_calculator(experiment_data,
+                                             historical_conversion_rates,
+                                             experiment_path=duration_calculator__url,
+                                             metrics=duration_calculator__metrics,
+                                             minimum_detectable_effect=duration_calculator__mde,
+                                             alpha=duration_calculator__alpha,
+                                             power=power,
+                                             simulated_experiment_length = 30)
+    expect_identical(names(calc_results$days_required), duration_calculator__metrics)
+    expect_identical(names(calc_results$entities_required), duration_calculator__metrics)
+    
+    expect_equal(round(calc_results$daily_traffic / 1000) * 1000, 8000)
 
-    calculate_days_required(daily_traffic=daily_experiment_traffic_count,
-                                    conversion_rates=,  # vector of conversion_rates
-                                    percent_increase=duration_calculator__mde,
-                                    power=1 - duration_calculator__beta,
-                                    alpha=duration_calculator__alpha)
+    expected_sample_size <- calculate_total_sample_size(original_conversion_rate=historical_conversion_rates$historical_conversion_rate[1],
+                                                        percent_increase=duration_calculator__mde,
+                                                        power=power,
+                                                        alpha=duration_calculator__alpha)
+    
+    expect_equal(as.numeric(calc_results$entities_required[1]), expected_sample_size)
 })
