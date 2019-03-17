@@ -71,6 +71,9 @@ website_traffic__to_daily_num_users <- function(experiment_data,
                                                 top_n_paths=NULL,
                                                 only_first_time_visits=FALSE) {
     
+    # use this rather than Sys.Date() in case data is not refreshed daily or we are using simulated data
+    current_date <- as.Date(max(experiment_data$website_traffic$visit_date))
+
     if(only_first_time_visits) {
 
         website_traffic <- website_traffic__get_user_first_visit(experiment_data)
@@ -79,6 +82,10 @@ website_traffic__to_daily_num_users <- function(experiment_data,
 
         website_traffic <- experiment_data$website_traffic
     }
+
+    website_traffic <- website_traffic %>%
+                mutate(visit_date = as.Date(visit_date)) %>%
+                filter(visit_date != current_date)
     
     if(!is.null(top_n_paths)) {
 
@@ -86,11 +93,20 @@ website_traffic__to_daily_num_users <- function(experiment_data,
         website_traffic <- website_traffic %>% mutate(path = fct_lump(path, n=top_n_paths))
         levels(website_traffic$path) <- path_levels
     
-        return (website_traffic %>% count(visit_date, path) %>% rename(num_users=n))
+        return (
+            website_traffic %>%
+                count(visit_date, path) %>% 
+                rename(num_users=n)
+
+        )
 
     } else {
         
-        return ( website_traffic %>% group_by(visit_date) %>% summarise(num_users=n_distinct(user_id)))
+        return ( 
+            website_traffic %>%
+                group_by(visit_date) %>%
+                summarise(num_users=n_distinct(user_id))
+        )
     }
 }
 
@@ -112,6 +128,9 @@ website_traffic__to_cohort_num_users <- function(experiment_data,
                                                  cohort_format='%W',
                                                  top_n_paths=NULL,
                                                  only_first_time_visits=FALSE) {
+    
+    # use this rather than Sys.Date() in case data is not refreshed daily or we are using simulated data
+    current_date <- max(experiment_data$website_traffic$visit_date)
 
     if(only_first_time_visits) {
 
@@ -123,7 +142,8 @@ website_traffic__to_cohort_num_users <- function(experiment_data,
     }
     
     website_traffic <- website_traffic %>%
-        mutate(cohort = create_cohort(visit_date, cohort_format = cohort_format))
+        mutate(cohort = create_cohort(visit_date, cohort_format=cohort_format)) %>%
+        filter(cohort != create_cohort(current_date, cohort_format=cohort_format))
 
     if(!is.null(top_n_paths)) {
 
@@ -824,8 +844,10 @@ get__cohorted_conversions_snapshot <- function(traffic_conversions,
                snapshot_value = value_lookup[snapshot_label],
                conversion_rate_percent_of_all = ifelse(max_first_visit > current_date - days(snapshot_max_days), NA, conversion_rate_percent_of_all))
     
-    expect_dataframes_equal(conversions_absolute %>% select(-max_first_visit, -num_users, -conversion_rate), 
-                            conversions_percent_of_all %>% select(-max_first_visit, -num_users, -conversion_rate_percent_of_all))
+    stopifnot(are_dataframes_equal(conversions_absolute %>%
+                                       select(-max_first_visit, -num_users, -conversion_rate),
+                                   conversions_percent_of_all %>%
+                                       select(-max_first_visit, -num_users, -conversion_rate_percent_of_all)))
     
     conversions_final <- inner_join(conversions_absolute %>%
                                         select(cohort,

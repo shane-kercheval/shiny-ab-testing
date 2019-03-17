@@ -45,19 +45,6 @@ shinyServer(function(session, input, output) {
         #})
     })
 
-    create_traffic_convesions <- function(experiment_data,
-                                          metric,
-                                          cohort_format) {
-        left_join(experiment_data$website_traffic %>%
-                      group_by(user_id) %>%
-                      summarise(first_visit = min(visit_date)) %>%
-                      ungroup() %>%
-                      mutate(cohort = create_cohort(first_visit, cohort_format)),
-                  experiment_data$conversion_events %>%
-                      filter(metric_id == metric),
-                  by='user_id')
-        
-    }
     reactive__traffic_conversions_metric <- reactive({
 
         req(reactive__experiment_data())
@@ -85,10 +72,58 @@ shinyServer(function(session, input, output) {
 
         #withProgress(value=1/2, message="Loading Daily Summary Data", {
         
-        create_traffic_convesions(experiment_data=reactive__experiment_data(),
-                                  metric=input$conversion_rates__metric,
-                                  cohort_format=cohort_format)
+        get__cohorted_traffic_conversions(experiment_data=reactive__experiment_data(),
+                                          metric=input$conversion_rates__metric,
+                                          cohort_format=cohort_format)
         #})
+    })
+
+    reactive__historical_conversion_rates <- reactive({
+
+        #withProgress(value=1/2, message="Loading Daily Summary Data", {
+
+            log_message_block_start("Loading Historical Conversion Rate Data")
+            readRDS('processed_data/historical_conversion_rates.RDS')
+        #})
+    })
+
+    reactive__ab_test_calculator_results <- reactive({
+
+        req(input$duration_calculator__url)
+        req(input$duration_calculator__mde)
+        req(input$duration_calculator__alpha)
+        req(input$duration_calculator__beta)
+
+        log_message_variable("duration_calculator__url", input$duration_calculator__url)
+
+        # if(input$duration_calculator__url == global__select_path) {
+
+        #     return (NULL)
+        # }
+
+        minimum_detectable_effect <- input$duration_calculator__mde / 100
+        alpha <- input$duration_calculator__alpha / 100
+        power <- 1 - (input$duration_calculator__beta / 100)
+
+        # do the calculation for all metrics, then the renderTable can filter as needed
+        metric_names <- reactive__experiments_summary() %>%
+            get_vector('metric_id', return_unique = TRUE) %>%
+            as.character()
+
+        log_message_variable("metric_names", metric_names)
+        log_message_variable("minimum_detectable_effect", minimum_detectable_effect)
+        log_message_variable("alpha", alpha)
+        log_message_variable("power", power)
+
+        calc_results <- site__ab_test_calculator(reactive__experiment_data(),
+                                                 reactive__historical_conversion_rates(),
+                                                 experiment_path=input$duration_calculator__url,
+                                                 metrics=metric_names,
+                                                 minimum_detectable_effect=minimum_detectable_effect,
+                                                 alpha=alpha,
+                                                 power=power,
+                                                 simulated_experiment_length = 30)
+
     })
 
     ##########################################################################################################
@@ -686,30 +721,32 @@ shinyServer(function(session, input, output) {
         session$clientData$output_plot__website_traffic_width * 0.65  # set height to % of width
     })
 
+    reactive__cohorted_snapshots <- reactive({
+
+        log_message_block_start("Building Cohorted Conversion Rates")
+        log_message_variable('conversion_rates__cohort_type', input$conversion_rates__cohort_type)
+        log_message_variable('conversion_rates__max_days_to_convert', input$conversion_rates__max_days_to_convert)
+
+        snapshots <- c(input$conversion_rates__snapshot_1_days,
+                       input$conversion_rates__snapshot_2_days,
+                       input$conversion_rates__snapshot_3_days)
+
+        log_message_variable('snapshots', paste(snapshots, collapse=", "))
+
+        cohorted_snapshots <- get__cohorted_conversions_snapshot(reactive__traffic_conversions_metric(),
+                                                                 cohort_label=input$conversion_rates__cohort_type,
+                                                                 snapshots=snapshots,
+                                                                 snapshot_max_days=input$conversion_rates__max_days_to_convert)
+    })
+
     output$conversion_rates__plot <- renderPlot({
 
-        log_message_block_start("Building Conversion Rate Plots2")
-        log_message_variable('conversion_rates__metric', input$conversion_rates__metric)
-        log_message_variable('conversion_rates__graph_type', input$conversion_rates__graph_type)
-        log_message_variable('conversion_rates__cr_type', input$conversion_rates__cr_type)
-
         req(input$conversion_rates__graph_type)
-        # req(input$conversion_rates__metric)
-        # #req(reactive__traffic_conversions_metric())
-        # req(input$conversion_rates__cr_type)
-
-        # req(input$conversion_rates__cohort_type)
-        # req(input$conversion_rates__snapshot_1_days)
-        # req(input$conversion_rates__snapshot_2_days)
-        # req(input$conversion_rates__snapshot_3_days)
-        # req(input$conversion_rates__max_days_to_convert)
 
         log_message_block_start("Building Conversion Rate Plots")
+        log_message_variable('conversion_rates__graph_type', input$conversion_rates__graph_type)
+        log_message_variable('conversion_rates__cr_type', input$conversion_rates__cr_type)
         log_message_variable('conversion_rates__metric', input$conversion_rates__metric)
-
-        snapshot_1_days <- input$conversion_rates__snapshot_1_days
-        snapshot_2_days <- input$conversion_rates__snapshot_2_days
-        snapshot_3_days <- input$conversion_rates__snapshot_3_days
 
         if(input$conversion_rates__graph_type == "Cohort") {
             
@@ -717,18 +754,12 @@ shinyServer(function(session, input, output) {
 
             if(input$conversion_rates__cr_type == "Absolute") {
 
-                return (plot__conversion_rates_snapshot_absolute(traffic_conversions=reactive__traffic_conversions_metric(),
-                                                         snapshot_1_days,
-                                                         snapshot_2_days,
-                                                         snapshot_3_days,
-                                                         cohort_label=input$conversion_rates__cohort_type))
+                return (plot__conversion_rates_snapshot_absolute(reactive__cohorted_snapshots(),
+                                                                 cohort_label=input$conversion_rates__cohort_type))
 
 
             } else {
-                plot__conversion_rates_snapshot_percent(traffic_conversions=reactive__traffic_conversions_metric(),
-                                                        snapshot_1_days,
-                                                        snapshot_2_days,
-                                                        snapshot_3_days,
+                plot__conversion_rates_snapshot_percent(reactive__cohorted_snapshots(),
                                                         snapshot_max_days=input$conversion_rates__max_days_to_convert,
                                                         cohort_label=input$conversion_rates__cohort_type)
             }
@@ -736,13 +767,11 @@ shinyServer(function(session, input, output) {
 
         } else if(input$conversion_rates__graph_type == "Historical") { 
 
-            plot__conversion_rates_historical(experiment_data=reactive__experiment_data(),
-                                              exclude_last_n_days=input$conversion_rates__exclude_last_n_days)
+            plot__conversion_rates_historical(reactive__historical_conversion_rates())
 
         } else if(input$conversion_rates__graph_type == "Attribution") {
 
-            plot__conversion_rates_attribution(experiment_data=reactive__experiment_data(),
-                                               exclude_last_n_days=input$conversion_rates__exclude_last_n_days) 
+            plot__conversion_rates_attribution(reactive__historical_conversion_rates())
 
         } else {
 
@@ -885,55 +914,6 @@ shinyServer(function(session, input, output) {
         }
 
         return (df %>% head(1000))
-    })
-
-
-    reactive__historical_conversion_rates <- reactive({
-
-        #withProgress(value=1/2, message="Loading Daily Summary Data", {
-
-            log_message_block_start("Loading Historical Conversion Rate Data")
-            readRDS('processed_data/historical_conversion_rates.RDS')
-        #})
-    })
-
-    reactive__ab_test_calculator_results <- reactive({
-
-        req(input$duration_calculator__url)
-        req(input$duration_calculator__mde)
-        req(input$duration_calculator__alpha)
-        req(input$duration_calculator__beta)
-
-        log_message_variable("duration_calculator__url", input$duration_calculator__url)
-
-        # if(input$duration_calculator__url == global__select_path) {
-
-        #     return (NULL)
-        # }
-
-        minimum_detectable_effect <- input$duration_calculator__mde / 100
-        alpha <- input$duration_calculator__alpha / 100
-        power <- 1 - (input$duration_calculator__beta / 100)
-
-        # do the calculation for all metrics, then the renderTable can filter as needed
-        metric_names <- reactive__experiments_summary() %>%
-            get_vector('metric_id', return_unique = TRUE) %>%
-            as.character()
-
-        log_message_variable("metric_names", metric_names)
-        log_message_variable("minimum_detectable_effect", minimum_detectable_effect)
-        log_message_variable("alpha", alpha)
-        log_message_variable("power", power)
-
-        calc_results <- site__ab_test_calculator(reactive__experiment_data(),
-                                                 reactive__historical_conversion_rates(),
-                                                 experiment_path=input$duration_calculator__url,
-                                                 metrics=metric_names,
-                                                 minimum_detectable_effect=minimum_detectable_effect,
-                                                 alpha=alpha,
-                                                 power=power,
-                                                 simulated_experiment_length = 30)
-
     })
 
     output$duration_calculator__results_table <- renderTable({

@@ -66,19 +66,23 @@ test_that("website_traffic__to_xxx_num_users", {
 
     # because we are only counting first-time visits, the sum across all dates should match regardless if
     # counted by daily/cohorted; the sum should also equal the number of distinct users in the dataset
-    expect_equal(min(daily_first_time_num_users$visit_date),
-                 min(experiment_data$website_traffic$visit_date))
-    expect_equal(sum(daily_first_time_num_users$num_users),
-                 length(unique(experiment_data$website_traffic$user_id)))
-    expect_equal(min(daily_first_time_path_num_users$visit_date),
-                 min(experiment_data$website_traffic$visit_date))
-    expect_equal(sum(daily_first_time_path_num_users$num_users),
-                 length(unique(experiment_data$website_traffic$user_id)))
-
-    expect_equal(sum(cohort_first_time_num_users$num_users),
-                 length(unique(experiment_data$website_traffic$user_id)))
-    expect_equal(sum(cohort_first_time_path_num_users$num_users),
-                 length(unique(experiment_data$website_traffic$user_id)))
+    # use this rather than Sys.Date() in case data is not refreshed daily or we are using simulated data
+    current_date <- as.Date(max(experiment_data$website_traffic$visit_date))
+    min_date <- as.Date(min(experiment_data$website_traffic$visit_date))
+    num_users_exclude_current_date <- length(experiment_data$website_traffic %>%
+                                                 filter(as.Date(visit_date) != current_date) %>%
+                                                 get_vector('user_id', return_unique=TRUE))
+    
+    num_users_exclude_current_week <- length(experiment_data$website_traffic %>%
+                                                 filter(create_cohort(visit_date) != create_cohort(current_date)) %>%
+                                                 get_vector('user_id', return_unique=TRUE))
+    
+    expect_equal(min(daily_first_time_num_users$visit_date), min_date)
+    expect_equal(sum(daily_first_time_num_users$num_users), num_users_exclude_current_date)
+    expect_equal(min(daily_first_time_path_num_users$visit_date), min_date)
+    expect_equal(sum(daily_first_time_path_num_users$num_users), num_users_exclude_current_date)
+    expect_equal(sum(cohort_first_time_num_users$num_users), num_users_exclude_current_week)
+    expect_equal(sum(cohort_first_time_path_num_users$num_users), num_users_exclude_current_week)
 })
 
 test_that("plot__website_traffic", {
