@@ -874,12 +874,12 @@ plot__conversion_rates_attribution <- function(historical_crs) {
 
     historical_crs %>%
     ggplot(aes(x=metric_id, y=conversion_rate_within_window, fill=metric_id)) +
+        geom_col(aes(y=historical_conversion_rate), fill='black', alpha=0.2) +
         geom_col() +
         geom_text(aes(label=paste(percent(conversion_rate_within_window), "(within Attribution)")),
                   vjust=-0.5, size=rel(global__text_size)) +
         geom_text(aes(label=paste(percent(percent_cr_window_realized), "of total")),
                   vjust=1.5, size=rel(global__text_size)) +
-        geom_col(aes(y=historical_conversion_rate), fill='black', alpha=0.2) +
         geom_text(aes(y=historical_conversion_rate,
                       label=paste(percent(historical_conversion_rate), "(Historical)")),
                   vjust=-0.5, size=rel(global__text_size)) +
