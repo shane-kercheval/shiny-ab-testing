@@ -299,8 +299,8 @@ shinyServer(function(session, input, output) {
         ui_paths <- selectInput(
             inputId='duration_calculator__url',
             label="Path",
-            choices=c("<Select Path>", paths),
-            selected="<Select Path>")
+            choices=paths,  #c(global__select_path, paths),
+            selected=paths[1])  #global__select_path)
 
         ui_list <- list()
         ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_paths)
@@ -885,5 +885,90 @@ shinyServer(function(session, input, output) {
         }
 
         return (df %>% head(1000))
+    })
+
+
+    reactive__historical_conversion_rates <- reactive({
+
+        #withProgress(value=1/2, message="Loading Daily Summary Data", {
+
+            log_message_block_start("Loading Historical Conversion Rate Data")
+            readRDS('processed_data/historical_conversion_rates.RDS')
+        #})
+    })
+
+    reactive__ab_test_calculator_results <- reactive({
+
+        req(input$duration_calculator__url)
+        req(input$duration_calculator__mde)
+        req(input$duration_calculator__alpha)
+        req(input$duration_calculator__beta)
+
+        log_message_variable("duration_calculator__url", input$duration_calculator__url)
+
+        # if(input$duration_calculator__url == global__select_path) {
+
+        #     return (NULL)
+        # }
+
+        minimum_detectable_effect <- input$duration_calculator__mde / 100
+        alpha <- input$duration_calculator__alpha / 100
+        power <- 1 - (input$duration_calculator__beta / 100)
+
+        # do the calculation for all metrics, then the renderTable can filter as needed
+        metric_names <- reactive__experiments_summary() %>%
+            get_vector('metric_id', return_unique = TRUE) %>%
+            as.character()
+
+        log_message_variable("metric_names", metric_names)
+        log_message_variable("minimum_detectable_effect", minimum_detectable_effect)
+        log_message_variable("alpha", alpha)
+        log_message_variable("power", power)
+
+        calc_results <- site__ab_test_calculator(reactive__experiment_data(),
+                                                 reactive__historical_conversion_rates(),
+                                                 experiment_path=input$duration_calculator__url,
+                                                 metrics=metric_names,
+                                                 minimum_detectable_effect=minimum_detectable_effect,
+                                                 alpha=alpha,
+                                                 power=power,
+                                                 simulated_experiment_length = 30)
+
+    })
+
+    output$duration_calculator__results_table <- renderTable({
+
+        calc_results <- reactive__ab_test_calculator_results()
+
+        if(is.null(calc_results)) {
+
+            return (NULL)
+        }
+
+        log_message_variable("duration_calculator__metrics", paste(input$duration_calculator__metrics,
+                                                                   collapse=', '))
+
+        results_table <- calc_results$results %>%
+            filter(Metric %in% input$duration_calculator__metrics) %>%
+            mutate(`Estimated Days Required` = as.character(`Estimated Days Required`),
+                   `Estimated Users Required` = comma_format()(`Estimated Users Required`),
+                   `Historical Conversion Rate` = percent(`Historical Conversion Rate`),
+                   `Detectable Conversion Rate` = percent(`Detectable Conversion Rate`))
+
+        return (results_table)
+    })
+
+    output$duration_calculator__average_daily_traffic_header <- renderText("Average Daily Traffic")
+    output$duration_calculator__average_daily_traffic_text <- renderText({
+        
+
+        calc_results <- reactive__ab_test_calculator_results()
+
+        if(is.null(calc_results)) {
+
+            return (NULL)
+        }
+
+        return (paste(comma_format()(round(calc_results$daily_traffic)), "Users"))
     })
 })

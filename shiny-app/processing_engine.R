@@ -16,7 +16,11 @@ experiments_summary <- experiments__get_summary(experiment_data,
                                                 days_of_prior_data=global__prior_number_of_days,
                                                 confidence_level=global__confidence_level)
 saveRDS(experiments_summary, file='processed_data/experiments_summary.RDS')
+
 experiments_daily_summary <- experiments__get_daily_summary(experiment_data,
                                                             experiments_summary,
                                                             confidence_level=global__confidence_level)
 saveRDS(experiments_daily_summary, file='processed_data/experiments_daily_summary.RDS')
+
+historical_conversion_rates <- get_historical_conversion_rates(experiment_data)
+saveRDS(historical_conversion_rates, file='processed_data/historical_conversion_rates.RDS')

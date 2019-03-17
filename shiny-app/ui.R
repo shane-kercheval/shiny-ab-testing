@@ -124,7 +124,21 @@ shinyUI(tagList(
                     )
                 ),
                 column(9,
-                    plotOutput(outputId='duration_calculator__plot')
+                    tags$div(id='div_estimated_days_results',
+                        tags$h4('Estimated Days & Sample Size for Running Experiment', style='margin-bottom: 40px'),
+                        fluidRow(style = paste('padding: 19px',
+                                               'padding-top: 1px',
+                                               'margin: 2px',
+                                               sep = ";"),
+                            tableOutput(outputId='duration_calculator__results_table'),
+                            #tags$div(class='results-table', tableOutput(outputId='duration_calculator__results_table'))
+                            tags$br(),
+                            tags$br(),
+                            textOutput(outputId = 'duration_calculator__average_daily_traffic_header', inline = TRUE),
+                            tags$head(tags$style('#duration_calculator__average_daily_traffic_header{font-weight: 700; font-size: 14px; margin-right: 10px}')),
+                            textOutput(outputId = 'duration_calculator__average_daily_traffic_text', inline = TRUE)
+                        )
+                    )
                 )
             ),
             tabPanel("Conversion Rates",

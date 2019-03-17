@@ -37,6 +37,8 @@ global__experiment__tab_names__trends <- "Trends"
 global__experiment__tab_names__bayesian <- "Bayesian Posteriors"
 global__experiment__tab_names__raw_data <- "Raw Data"
 
+#global__select_path <- "<Select Path>"
+
 ##############################################################################################################
 # Statistical Variables
 ##############################################################################################################
