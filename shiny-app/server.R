@@ -475,10 +475,13 @@ shinyServer(function(session, input, output) {
                 shinyjs::show('conversion_rates__max_days_to_convert')    
             }
 
-            shinyjs::hide('conversion_rates__exclude_last_n_days')
+
+            updateCollapse(session, 'conversion_rates__bscollapse', open="Graph Options")
 
         } else if(input$conversion_rates__graph_type == "Historical") {
 
+            updateCollapse(session, 'conversion_rates__bscollapse', close="Graph Options")
+
             shinyjs::hide('conversion_rates__metric')
             shinyjs::hide('conversion_rates__cohort_type')
             shinyjs::hide('conversion_rates__cr_type')
@@ -486,10 +489,11 @@ shinyServer(function(session, input, output) {
             shinyjs::hide('conversion_rates__snapshot_2_days')
             shinyjs::hide('conversion_rates__snapshot_3_days')
             shinyjs::hide('conversion_rates__max_days_to_convert')
-            shinyjs::show('conversion_rates__exclude_last_n_days')
 
         } else if(input$conversion_rates__graph_type == "Attribution") {
 
+            updateCollapse(session, 'conversion_rates__bscollapse', close="Graph Options")
+
             shinyjs::hide('conversion_rates__metric')
             shinyjs::hide('conversion_rates__cohort_type')
             shinyjs::hide('conversion_rates__cr_type')
@@ -497,7 +501,6 @@ shinyServer(function(session, input, output) {
             shinyjs::hide('conversion_rates__snapshot_2_days')
             shinyjs::hide('conversion_rates__snapshot_3_days')
             shinyjs::hide('conversion_rates__max_days_to_convert')
-            shinyjs::show('conversion_rates__exclude_last_n_days')
 
         } else {
 

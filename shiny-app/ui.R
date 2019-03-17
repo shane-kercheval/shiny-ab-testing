@@ -229,20 +229,7 @@ shinyUI(tagList(
                                     step = NA,
                                     width = NULL
                                 )
-                            ),
-                            tags$div(
-                                class="dynamic_filter",
-                                numericInput(
-                                    inputId='conversion_rates__exclude_last_n_days',
-                                    label="Exclude Last N Days",
-                                    value=30,
-                                    min = NA,
-                                    max = NA,
-                                    step = NA,
-                                    width = NULL
-                                )
                             )
-                            
                         )
                     )
                 ),
