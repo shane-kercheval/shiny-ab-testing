@@ -789,3 +789,37 @@ test_that("ab_test_calculator", {
                                                         alpha=duration_calculator__alpha)
     expect_equal(calc_results$results$`Estimated Users Required`[1], expected_sample_size)
 })
+
+# experiment_data <- load_data()
+# experiments_summary <- experiments__get_summary(experiment_data)
+# 
+# experiment <- experiments_summary$experiment_id[1]
+# 
+# # use this rather than Sys.Date() in case data is not refreshed daily or we are using simulated data
+# current_date <- as.Date(max(experiment_data$website_traffic$visit_date))
+# 
+# max(experiment_data$website_traffic$visit_date)
+# 
+# experiments_summary %>%
+#     filter(experiment_id == experiment) %>%
+#     distinct() %>%
+#     get_vector('start_date', return_unique = TRUE) %>%
+#     as.Date()
+# 
+# as.Date(start_end$start_date)
+# as.Date(start_end$end_date)
+# 
+# # still running: end-date within a day of "current" date
+# as.Date(start_end$end_date) >= current_date - days(1)
+# 
+# lag_info <- experiments_summary %>%
+#     group_by(experiment_id, metric_id) %>%
+#     summarise(collection_lag = as.numeric(difftime(end_date, last_join_date, units='days'))) %>%
+#     ungroup() %>%
+#     mutate(has_lag=ifelse(collection_lag > 0, TRUE, FALSE),
+#            label=ifelse(collection_lag > 0, paste(round(collection_lag), "day lag"), "No Lag"),
+#            label=ifelse(label == "0 day lag", "<1 day lag", label)) %>%
+#     mutate(label=ifelse(has_lag, paste0("<font color=\"#FF0000\"><b>", label, "</b></font>"), label)) %>%
+#     filter(experiment_id == experiment)
+# 
+# paste0(lag_info$label, collapse = '<br>')    

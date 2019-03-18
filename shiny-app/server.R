@@ -45,6 +45,14 @@ shinyServer(function(session, input, output) {
         #})
     })
 
+    reactive__latest_traffic_datetime <- reactive({
+
+        #withProgress(value=1/2, message="Loading Daily Summary Data", {
+
+            readRDS('processed_data/latest_website_traffic_datetime.RDS')
+        #})
+    })
+
     reactive__traffic_conversions_metric <- reactive({
 
         req(reactive__experiment_data())
@@ -145,6 +153,71 @@ shinyServer(function(session, input, output) {
                     selectize=TRUE,
                     width=500,
                     size=NULL)
+    })
+
+    output$experiment_info__start_date__UI <- renderText({
+
+        req(reactive__experiments_summary())
+        req(input$experiment__select)
+
+        reactive__experiments_summary() %>%
+            filter(experiment_id == input$experiment__select) %>%
+            distinct() %>%
+            get_vector('start_date', return_unique = TRUE) %>%
+            as.Date() %>%
+            as.character()
+    })
+
+    output$experiment_info__end_date__UI <- renderText({
+
+        req(reactive__experiments_summary())
+        req(input$experiment__select)
+
+        end_date <- reactive__experiments_summary() %>%
+            filter(experiment_id == input$experiment__select) %>%
+            distinct() %>%
+            get_vector('end_date', return_unique = TRUE) %>%
+            as.Date()
+
+        # still running: end-date within a day of "current" date
+        if(end_date >= reactive__latest_traffic_datetime() - days(1)) {
+
+            return ("<font color=\"#FF0000\"><b>Running...</b></font>")
+
+        } else {
+
+            return (end_date %>% as.character())
+        }
+    })
+
+    output$experiment_info__data_collection_metrics__UI <- renderText({
+
+        req(input$experiment__select)
+
+        metric_names <- reactive__experiments_summary() %>%
+        filter(experiment_id == input$experiment__select) %>%
+            get_vector('metric_id', return_unique = TRUE) %>%
+            as.character()
+
+
+        return(paste0(metric_names, collapse='<br>'))
+    })
+
+    output$experiment_info__data_collection_lags__UI <- renderText({
+
+        req(input$experiment__select)
+
+        lag_info <- reactive__experiments_summary() %>%
+            group_by(experiment_id, metric_id) %>%
+            summarise(collection_lag = as.numeric(difftime(end_date, last_join_date, units='days'))) %>%
+            ungroup() %>%
+            mutate(has_lag=ifelse(collection_lag > 0, TRUE, FALSE),
+                   label=ifelse(collection_lag > 0, paste(round(collection_lag), "day lag"), "All data included."),
+                   label=ifelse(label == "0 day lag", "<1 day lag", label)) %>%
+            mutate(label=ifelse(has_lag, paste0("<font color=\"#FF0000\"><b>", label, "</b></font>"), label)) %>%
+            filter(experiment_id == input$experiment__select)
+
+        return (paste0("<br><br>", paste0(lag_info$label, collapse = "<br>")))
     })
 
     ##########################################################################################################

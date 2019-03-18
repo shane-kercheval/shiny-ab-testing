@@ -7,6 +7,10 @@ source('r_scripts/definitions.R')
 global__progress_bar_message <- "Loading/Processing Data"
 global__progress_bar_html <- HTML(paste0('"<div id="shiny-notification-panel"><div id="shiny-notification-42ec5661c2722d29" class="shiny-notification"><div class="shiny-notification-close">×</div><div class="shiny-notification-content"><div class="shiny-notification-content-text"><div id="shiny-progress-42ec5661c2722d29" class="shiny-progress-notification"><div class="progress progress-striped active" style=""><div class="progress-bar" style="width: 50%;"></div></div><div class="progress-text"><span class="progress-message">', global__progress_bar_message,'</span> <span class="progress-detail"></span></div></div></div><div class="shiny-notification-content-action"></div></div></div></div>"'))
 
+create_menu_label <- function(label, font_weight=700) {
+    HTML(paste0('<span style="font-weight: ', font_weight,'; font-size: 14px;" class="shiny-text-output">', label,':</span>'))
+}
+
 shinyUI(tagList(
     useShinyjs(),
     navbarPage("A/B Test Dashboard", theme="custom.css",
@@ -14,10 +18,34 @@ shinyUI(tagList(
             "Experiment Analysis",
             column(3,
                 class='column-input-control-style',
-                bsCollapse(id='main__bscollapse', open=c("Experiment", "Graph Options"), multiple=TRUE,
+                bsCollapse(id='main__bscollapse', open=c("Experiment", "Experiment Information", "Graph Options"), multiple=TRUE,
                     bsCollapsePanel(
-                        "Experiment",
+                        "Experiment",                            
                         uiOutput('experiment__select__UI')
+                    ),
+                    bsCollapsePanel(
+                        "Experiment Information",
+                        column(6,
+                            style='padding-left: 0px',
+                            create_menu_label('Start Date'),
+                            tags$br(),
+                            create_menu_label('End Date'),
+                            tags$br(),tags$br(),
+                            create_menu_label('Attribution Lag'),
+                            tags$br(),tags$br(),
+                            uiOutput('experiment_info__data_collection_metrics__UI')
+                            # create_menu_label('Sign Up', font_weight=400),
+                            # tags$br(),
+                            # create_menu_label('Use Feature 1', font_weight=400)
+                        ),
+                        column(6,
+                            style='padding-left: 0px',
+                            uiOutput('experiment_info__start_date__UI', inline = TRUE),
+                            tags$br(),
+                            uiOutput('experiment_info__end_date__UI', inline = TRUE),
+                            tags$br(),tags$br(),
+                            uiOutput('experiment_info__data_collection_lags__UI', inline = TRUE)
+                        )
                     ),
                     bsCollapsePanel(
                         "Graph Options",

@@ -24,3 +24,5 @@ saveRDS(experiments_daily_summary, file='processed_data/experiments_daily_summar
 
 historical_conversion_rates <- get_historical_conversion_rates(experiment_data)
 saveRDS(historical_conversion_rates, file='processed_data/historical_conversion_rates.RDS')
+
+saveRDS(max(experiment_data$website_traffic$visit_date), file='processed_data/latest_website_traffic_datetime.RDS')
