@@ -25,26 +25,37 @@ shinyUI(tagList(
                     ),
                     bsCollapsePanel(
                         "Experiment Information",
-                        column(6,
-                            style='padding-left: 0px',
-                            create_menu_label('Start Date'),
-                            tags$br(),
-                            create_menu_label('End Date'),
-                            tags$br(),tags$br(),
-                            create_menu_label('Attribution Lag'),
-                            tags$br(),tags$br(),
-                            uiOutput('experiment_info__data_collection_metrics__UI')
-                            # create_menu_label('Sign Up', font_weight=400),
-                            # tags$br(),
-                            # create_menu_label('Use Feature 1', font_weight=400)
+                        fluidRow(
+                            column(6,
+                                #style='padding-left: 10px',
+                                create_menu_label('Start Date'),
+                                tags$br(),
+                                create_menu_label('End Date')
+                            ),
+                            column(6,
+                                style='padding-left: 0px',
+                                uiOutput('experiment_info__start_date__UI', inline = TRUE),
+                                tags$br(),
+                                uiOutput('experiment_info__end_date__UI', inline = TRUE)
+                            )
                         ),
-                        column(6,
-                            style='padding-left: 0px',
-                            uiOutput('experiment_info__start_date__UI', inline = TRUE),
-                            tags$br(),
-                            uiOutput('experiment_info__end_date__UI', inline = TRUE),
-                            tags$br(),tags$br(),
-                            uiOutput('experiment_info__data_collection_lags__UI', inline = TRUE)
+                        fluidRow(
+                            column(12,
+                                tags$br(),tags$br(),
+                                create_menu_label('Attribution Lag'),
+                                tags$br(),tags$br()
+                            )
+                        ),
+                        fluidRow(
+                            column(6,
+                                #align='right',
+                                #style='padding-right: 50px',
+                                uiOutput('experiment_info__data_collection_metrics__UI')
+                            ),
+                            column(6,
+                                style='padding-left: 0px',
+                                uiOutput('experiment_info__data_collection_lags__UI', inline = TRUE)
+                            )
                         )
                     ),
                     bsCollapsePanel(

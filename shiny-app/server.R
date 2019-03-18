@@ -200,7 +200,7 @@ shinyServer(function(session, input, output) {
             as.character()
 
 
-        return(paste0(metric_names, collapse='<br>'))
+        return(paste0(paste0(metric_names, collapse=':<br>'), ':'))
     })
 
     output$experiment_info__data_collection_lags__UI <- renderText({
@@ -217,7 +217,7 @@ shinyServer(function(session, input, output) {
             mutate(label=ifelse(has_lag, paste0("<font color=\"#FF0000\"><b>", label, "</b></font>"), label)) %>%
             filter(experiment_id == input$experiment__select)
 
-        return (paste0("<br><br>", paste0(lag_info$label, collapse = "<br>")))
+        return (paste0("", paste0(lag_info$label, collapse = "<br>")))
     })
 
     ##########################################################################################################
