@@ -20,37 +20,29 @@ shinyServer(function(session, input, output) {
     ##########################################################################################################
     reactive__experiment_data <- reactive({
 
-        #withProgress(value=1/2, message="Loading Data", {
+        withProgress(value=1/2, message="Loading Experiment Data", {
             
-            log_message_block_start("Loading Data")
+            log_message_block_start("Loading Experiment Data")
             load_data()
-        #})
+        })
     })
 
     reactive__experiments_summary <- reactive({
 
-        #withProgress(value=1/2, message="Loading Experiments Summary Data", {
-
-            log_message_block_start("Loading Experiments Summary Data")
-            readRDS('processed_data/experiments_summary.RDS')
-        #})
+        log_message_block_start("Loading Experiments Summary Data")
+        readRDS('processed_data/experiments_summary.RDS')
     })
 
     reactive__experiments_daily_summary <- reactive({
 
-        #withProgress(value=1/2, message="Loading Daily Summary Data", {
-
-            log_message_block_start("Loading Daily Summary Data")
-            readRDS('processed_data/experiments_daily_summary.RDS')
-        #})
+        log_message_block_start("Loading Daily Summary Data")
+        readRDS('processed_data/experiments_daily_summary.RDS')
     })
 
     reactive__latest_traffic_datetime <- reactive({
 
-        #withProgress(value=1/2, message="Loading Daily Summary Data", {
-
-            readRDS('processed_data/latest_website_traffic_datetime.RDS')
-        #})
+        log_message_block_start("Loading Current Date/Time")
+        readRDS('processed_data/latest_website_traffic_datetime.RDS')
     })
 
     reactive__traffic_conversions_metric <- reactive({
@@ -78,21 +70,15 @@ shinyServer(function(session, input, output) {
 
         log_message_variable("cohort_format", cohort_format)
 
-        #withProgress(value=1/2, message="Loading Daily Summary Data", {
-        
         get__cohorted_traffic_conversions(experiment_data=reactive__experiment_data(),
                                           metric=input$conversion_rates__metric,
                                           cohort_format=cohort_format)
-        #})
     })
 
     reactive__historical_conversion_rates <- reactive({
 
-        #withProgress(value=1/2, message="Loading Daily Summary Data", {
-
-            log_message_block_start("Loading Historical Conversion Rate Data")
-            readRDS('processed_data/historical_conversion_rates.RDS')
-        #})
+        log_message_block_start("Loading Historical Conversion Rate Data")
+        readRDS('processed_data/historical_conversion_rates.RDS')
     })
 
     reactive__ab_test_calculator_results <- reactive({
@@ -102,36 +88,33 @@ shinyServer(function(session, input, output) {
         req(input$duration_calculator__alpha)
         req(input$duration_calculator__beta)
 
-        log_message_variable("duration_calculator__url", input$duration_calculator__url)
+        withProgress(value=1/2, message="Calculating AB Duration & Sample Size", {
 
-        # if(input$duration_calculator__url == global__select_path) {
+            log_message_variable("duration_calculator__url", input$duration_calculator__url)
 
-        #     return (NULL)
-        # }
+            minimum_detectable_effect <- input$duration_calculator__mde / 100
+            alpha <- input$duration_calculator__alpha / 100
+            power <- 1 - (input$duration_calculator__beta / 100)
 
-        minimum_detectable_effect <- input$duration_calculator__mde / 100
-        alpha <- input$duration_calculator__alpha / 100
-        power <- 1 - (input$duration_calculator__beta / 100)
+            # do the calculation for all metrics, then the renderTable can filter as needed
+            metric_names <- reactive__experiments_summary() %>%
+                get_vector('metric_id', return_unique = TRUE) %>%
+                as.character()
 
-        # do the calculation for all metrics, then the renderTable can filter as needed
-        metric_names <- reactive__experiments_summary() %>%
-            get_vector('metric_id', return_unique = TRUE) %>%
-            as.character()
+            log_message_variable("metric_names", metric_names)
+            log_message_variable("minimum_detectable_effect", minimum_detectable_effect)
+            log_message_variable("alpha", alpha)
+            log_message_variable("power", power)
 
-        log_message_variable("metric_names", metric_names)
-        log_message_variable("minimum_detectable_effect", minimum_detectable_effect)
-        log_message_variable("alpha", alpha)
-        log_message_variable("power", power)
-
-        calc_results <- site__ab_test_calculator(reactive__experiment_data(),
-                                                 reactive__historical_conversion_rates(),
-                                                 experiment_path=input$duration_calculator__url,
-                                                 metrics=metric_names,
-                                                 minimum_detectable_effect=minimum_detectable_effect,
-                                                 alpha=alpha,
-                                                 power=power,
-                                                 simulated_experiment_length = 30)
-
+            calc_results <- site__ab_test_calculator(reactive__experiment_data(),
+                                                     reactive__historical_conversion_rates(),
+                                                     experiment_path=input$duration_calculator__url,
+                                                     metrics=metric_names,
+                                                     minimum_detectable_effect=minimum_detectable_effect,
+                                                     alpha=alpha,
+                                                     power=power,
+                                                     simulated_experiment_length = 30)
+        })
     })
 
     ##########################################################################################################
@@ -226,7 +209,7 @@ shinyServer(function(session, input, output) {
     output$graph_options__percent_change__UI <- renderUI({
         NULL
     })
-    output$graph_options__percent_change_conidence__UI <- renderUI({
+    output$graph_options__percent_change_confidence__UI <- renderUI({
         NULL
     })
     output$graph_options__conversion_rates__UI <- renderUI({
@@ -255,94 +238,80 @@ shinyServer(function(session, input, output) {
         req(reactive__experiments_summary())
         req(input$experiment__select)
 
-        #withProgress(value=1/2, message="Generating Graph Options", {
+        log_message_variable('experiment__select', input$experiment__select)
 
-            log_message_variable('experiment__select', input$experiment__select)
+        ui_graph_type <- radioButtons(
+            inputId='experiment__trend_graph_type',
+            label="Trend Type",
+            choices=c("Percent Change", "Statistic"),
+            selected="Percent Change",
+            inline=TRUE,
+            width=NULL, choiceNames=NULL,
+            choiceValues=NULL) %>%
+        #For the Frequentist graph, the 'Statistic' options shows the p-value over time.\n\nFor the Bayesian graph, the 'Statistic' options shows the `probability that the Variant is better than the Control`, over time.
+        add_tooltip("For the Frequentist graph, the `Statistic` option shows the p-value over time. For the Bayesian graph, the `Statistic` option shows the `probability that the Variant is better than the Control`, over time.")
 
-            ui_graph_type <- radioButtons(
-                inputId='experiment__trend_graph_type',
-                label="Trend Type",
-                choices=c("Percent Change", "Statistic"),
-                selected="Percent Change",
-                inline=TRUE,
-                width=NULL, choiceNames=NULL,
-                choiceValues=NULL) %>%
-            #For the Frequentist graph, the 'Statistic' options shows the p-value over time.\n\nFor the Bayesian graph, the 'Statistic' options shows the `probability that the Variant is better than the Control`, over time.
-            add_tooltip("For the Frequentist graph, the `Statistic` option shows the p-value over time. For the Bayesian graph, the `Statistic` option shows the `probability that the Variant is better than the Control`, over time.")
+        metrics <- reactive__experiments_summary() %>%
+            filter(experiment_id == input$experiment__select) %>%
+            arrange(desc(control_conversion_rate)) %>%
+            get_vector('metric_id', return_unique=TRUE)
 
-            metrics <- reactive__experiments_summary() %>%
-                filter(experiment_id == input$experiment__select) %>%
-                arrange(desc(control_conversion_rate)) %>%
-                get_vector('metric_id', return_unique=TRUE)
+        log_message_variable('metrics', paste(metrics, collapse='; '))
 
-            log_message_variable('metrics', paste(metrics, collapse='; '))
-
-            ui_metric <- selectInput(inputId='experiment__trends__metric_select',
-                    label="Choose Metric",
-                    choices=metrics,
-                    selected=metrics[1],
-                    multiple=FALSE,
-                    selectize=TRUE,
-                    width=500,
-                    size=NULL) %>%
-            add_tooltip("Choose the metric to analyze.")
+        ui_metric <- selectInput(inputId='experiment__trends__metric_select',
+                label="Choose Metric",
+                choices=metrics,
+                selected=metrics[1],
+                multiple=FALSE,
+                selectize=TRUE,
+                width=500,
+                size=NULL) %>%
+        add_tooltip("Choose the metric to analyze.")
 
 
-            ui_list <- list()
-            ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_graph_type)
-            ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_metric)
+        ui_list <- list()
+        ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_graph_type)
+        ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_metric)
 
-            return (tagList(list=ui_list))
-        #})
+        return (tagList(list=ui_list))
     })
 
     output$graph_options__bayesian_posteriors__UI <- renderUI({
 
-        log_message_block_start("Creating Bayesian Posterior Graph")
         req(reactive__experiments_summary())
         req(input$experiment__select)
 
-        #withProgress(value=1/2, message="Generating Graph Options", {
+        log_message_block_start("Creating Bayesian Posterior Graph Options")
+        log_message_variable('experiment__select', input$experiment__select)
 
-            log_message_variable('experiment__select', input$experiment__select)
+        ui_show_prior <- checkboxInput(
+            inputId='experiment__bayesian_posterior__show_prior',
+            label="Show Prior Distribution",
+            value=TRUE)
 
-            ui_show_prior <- checkboxInput(
-                inputId='experiment__bayesian_posterior__show_prior',
-                label="Show Prior Distribution",
-                value=TRUE)
-            # ui_show_prior <- radioButtons(
-            #         inputId='experiment__bayesian_posterior__show_prior',
-            #         label="Show Prior Distribution",
-            #         choices=c("Yes", "No"),
-            #         selected="Yes",
-            #         inline=TRUE,
-            #         width=NULL, choiceNames=NULL,
-            #         choiceValues=NULL)
+        metrics <- reactive__experiments_summary() %>%
+            filter(experiment_id == input$experiment__select) %>%
+            arrange(desc(control_conversion_rate)) %>%
+            get_vector('metric_id', return_unique=TRUE)
 
-            metrics <- reactive__experiments_summary() %>%
-                filter(experiment_id == input$experiment__select) %>%
-                arrange(desc(control_conversion_rate)) %>%
-                get_vector('metric_id', return_unique=TRUE)
+        log_message_variable('metrics', paste(metrics, collapse='; '))
 
-            log_message_variable('metrics', paste(metrics, collapse='; '))
-
-            ui_metric <- selectInput(inputId='experiment__bayesian_posterior__metric_select',
-                    label="Choose Metric",
-                    choices=metrics,
-                    selected=metrics[1],
-                    multiple=FALSE,
-                    selectize=TRUE,
-                    width=500,
-                    size=NULL) %>%
-            add_tooltip("Choose the metric to analyze.")
+        ui_metric <- selectInput(inputId='experiment__bayesian_posterior__metric_select',
+                label="Choose Metric",
+                choices=metrics,
+                selected=metrics[1],
+                multiple=FALSE,
+                selectize=TRUE,
+                width=500,
+                size=NULL) %>%
+        add_tooltip("Choose the metric to analyze.")
 
 
-            ui_list <- list()
-            ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_show_prior)
-            ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_metric)
+        ui_list <- list()
+        ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_show_prior)
+        ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_metric)
 
-            return (tagList(list=ui_list))
-        #})
+        return (tagList(list=ui_list))
     })
 
     graph_options__raw_data__choices <- c(
@@ -436,13 +405,39 @@ shinyServer(function(session, input, output) {
     })
 
 
+    insert_custom_progress_bar <- function(message="Loading/Processing Data") {
+        # this function is a hack so that the progress bar works for ggplots that take a long time to render
+        # because ggplot objects don't attempt to render under they are displayed
+        global__progress_bar_html <- HTML(paste0('"<div id="shiny-notification-panel"><div id="shiny-notification-42ec5661c2722d29" class="shiny-notification"><div class="shiny-notification-close">×</div><div class="shiny-notification-content"><div class="shiny-notification-content-text"><div id="shiny-progress-42ec5661c2722d29" class="shiny-progress-notification"><div class="progress progress-striped active" style=""><div class="progress-bar" style="width: 50%;"></div></div><div class="progress-text"><span class="progress-message">', message,'</span> <span class="progress-detail"></span></div></div></div><div class="shiny-notification-content-action"></div></div></div></div>"'))
+        progress_html <- conditionalPanel(condition="$('html').hasClass('shiny-busy')",
+                                          global__progress_bar_html,
+                                          id='custom_progress_bar')
+        remove_custom_progress_bar()
+        insertUI(selector="#custom_progress_bar_placeholder", where = c("afterEnd"), progress_html, immediate=TRUE)
+    }
+
+    remove_custom_progress_bar <- function() {
+
+        # remove the custom progress bar that works with long ggplot 
+        removeUI(selector="#custom_progress_bar", immediate = TRUE)
+    }
+
     ##########################################################################################################
     # Update Dynamic Graph Options based on the Selected Tab
     ##########################################################################################################
+    observeEvent(input$nav_bar_page, {
+
+        # remove the custom progress bar when navigating to a different tab
+        remove_custom_progress_bar()
+    })
+
     observeEvent(input$experiment_tabs, {
 
         req(input$experiment_tabs)
         log_message_variable('Selected New Tab', input$experiment_tabs)
+
+        # remove the custom progress bar when navigating to a different tab
+        remove_custom_progress_bar()
 
         if(input$experiment_tabs == global__experiment__tab_names__percent_change) {
 
@@ -450,7 +445,7 @@ shinyServer(function(session, input, output) {
 
             #updateCollapse(session, 'main__bscollapse', close="Graph Options")
             shinyjs::show('graph_options__percent_change__UI')
-            shinyjs::hide('graph_options__percent_change_conidence__UI')
+            shinyjs::hide('graph_options__percent_change_confidence__UI')
             shinyjs::hide('graph_options__conversion_rates__UI')
             shinyjs::hide('graph_options__trends__UI')
             shinyjs::hide('graph_options__bayesian_posteriors__UI')
@@ -461,7 +456,7 @@ shinyServer(function(session, input, output) {
             shinyjs::show('experiment__stat_type_select')
 
             shinyjs::hide('graph_options__percent_change__UI')
-            shinyjs::show('graph_options__percent_change_conidence__UI')
+            shinyjs::show('graph_options__percent_change_confidence__UI')
             shinyjs::hide('graph_options__conversion_rates__UI')
             shinyjs::hide('graph_options__trends__UI')
             shinyjs::hide('graph_options__bayesian_posteriors__UI')
@@ -473,7 +468,7 @@ shinyServer(function(session, input, output) {
             shinyjs::show('experiment__stat_type_select')
 
             shinyjs::hide('graph_options__percent_change__UI')
-            shinyjs::hide('graph_options__percent_change_conidence__UI')
+            shinyjs::hide('graph_options__percent_change_confidence__UI')
             shinyjs::show('graph_options__conversion_rates__UI')
             shinyjs::hide('graph_options__trends__UI')
             shinyjs::hide('graph_options__bayesian_posteriors__UI')
@@ -485,7 +480,7 @@ shinyServer(function(session, input, output) {
             shinyjs::show('experiment__stat_type_select')
 
             shinyjs::hide('graph_options__percent_change__UI')
-            shinyjs::hide('graph_options__percent_change_conidence__UI')
+            shinyjs::hide('graph_options__percent_change_confidence__UI')
             shinyjs::hide('graph_options__conversion_rates__UI')
             shinyjs::show('graph_options__trends__UI')
             shinyjs::hide('graph_options__bayesian_posteriors__UI')
@@ -497,7 +492,7 @@ shinyServer(function(session, input, output) {
             shinyjs::hide('experiment__stat_type_select')
 
             shinyjs::hide('graph_options__percent_change__UI')
-            shinyjs::hide('graph_options__percent_change_conidence__UI')
+            shinyjs::hide('graph_options__percent_change_confidence__UI')
             shinyjs::hide('graph_options__conversion_rates__UI')
             shinyjs::hide('graph_options__trends__UI')
             shinyjs::show('graph_options__bayesian_posteriors__UI')
@@ -509,7 +504,7 @@ shinyServer(function(session, input, output) {
             shinyjs::hide('experiment__stat_type_select')
 
             shinyjs::hide('graph_options__percent_change__UI')
-            shinyjs::hide('graph_options__percent_change_conidence__UI')
+            shinyjs::hide('graph_options__percent_change_confidence__UI')
             shinyjs::hide('graph_options__conversion_rates__UI')
             shinyjs::hide('graph_options__trends__UI')
             shinyjs::hide('graph_options__bayesian_posteriors__UI')
@@ -590,26 +585,24 @@ shinyServer(function(session, input, output) {
         req(input$experiment__select)
         req(input$experiment__stat_type_select)
 
-        #withProgress(value=1/2, message="Creating Percent Change Graph", {
+        insert_custom_progress_bar("Rendering Percent Change Graph")
+        log_message_block_start("Rendering Percent Change Graph")
 
-            log_message_block_start("Creating Percent Change Graph")
+        log_message_variable('experiment__select', input$experiment__select)
+        log_message_variable('experiment__stat_type_select', input$experiment__stat_type_select)
 
-            log_message_variable('experiment__select', input$experiment__select)
-            log_message_variable('experiment__stat_type_select', input$experiment__stat_type_select)
+        if(input$experiment__stat_type_select == "Frequentist") {
 
-            if(input$experiment__stat_type_select == "Frequentist") {
+            plot__percent_change_frequentist(reactive__experiments_summary(),
+                                             input$experiment__select,
+                                             p_value_threshold=global__p_value_threshold)
+        } else {
 
-                plot__percent_change_frequentist(reactive__experiments_summary(),
-                                                 input$experiment__select,
-                                                 p_value_threshold=global__p_value_threshold)
-            } else {
-
-                plot__percent_change_bayesian(reactive__experiments_summary(), input$experiment__select)
-            }
-        #})
+            plot__percent_change_bayesian(reactive__experiments_summary(), input$experiment__select)
+        }
     }, height=function() {
 
-        session$clientData$output_plot__percent_change_width * 0.65  # set height to % of width
+        session$clientData$output_plot__percent_change_width * 0.55  # set height to % of width
     })
     addPopover(
         session,
@@ -624,26 +617,24 @@ shinyServer(function(session, input, output) {
         req(input$experiment__select)
         req(input$experiment__stat_type_select)
 
-        #withProgress(value=1/2, message="Creating Percent Change Conf. Graph", {
+        insert_custom_progress_bar("Rendering Percent Change Conf. Graph")
+        log_message_block_start("Rendering Percent Change Conf. Graph")
 
-            log_message_block_start("Creating Percent Change Conf. Graph")
+        log_message_variable('experiment__select', input$experiment__select)
+        log_message_variable('experiment__stat_type_select', input$experiment__stat_type_select)
 
-            log_message_variable('experiment__select', input$experiment__select)
-            log_message_variable('experiment__stat_type_select', input$experiment__stat_type_select)
+        if(input$experiment__stat_type_select == "Frequentist") {
 
-            if(input$experiment__stat_type_select == "Frequentist") {
+            plot__percent_change_conf_frequentist(reactive__experiments_summary(),
+                                                  input$experiment__select,
+                                                  p_value_threshold=global__p_value_threshold)
+        } else {
 
-                plot__percent_change_conf_frequentist(reactive__experiments_summary(),
-                                                      input$experiment__select,
-                                                      p_value_threshold=global__p_value_threshold)
-            } else {
-
-                plot__percent_change_conf_bayesian(reactive__experiments_summary(), input$experiment__select)
-            }
-        #})
+            plot__percent_change_conf_bayesian(reactive__experiments_summary(), input$experiment__select)
+        }
     }, height=function() {
 
-        session$clientData$output_plot__percent_change_confidence_width * 0.65  # set height to % of width
+        session$clientData$output_plot__percent_change_confidence_width * 0.55  # set height to % of width
     })
     addPopover(
         session,
@@ -658,24 +649,22 @@ shinyServer(function(session, input, output) {
         req(input$experiment__select)
         req(input$experiment__stat_type_select)
 
-        #withProgress(value=1/2, message="Creating Conversion Rates Graph", {
+        insert_custom_progress_bar("Rendering Conversion Rates Graph")
+        log_message_block_start("Rendering Conversion Rates Graph")
 
-            log_message_block_start("Creating Conversion Rates Graph")
+        log_message_variable('experiment__select', input$experiment__select)
+        log_message_variable('experiment__stat_type_select', input$experiment__stat_type_select)
 
-            log_message_variable('experiment__select', input$experiment__select)
-            log_message_variable('experiment__stat_type_select', input$experiment__stat_type_select)
+        if(input$experiment__stat_type_select == "Frequentist") {
 
-            if(input$experiment__stat_type_select == "Frequentist") {
+            plot__conversion_rates(reactive__experiments_summary(), input$experiment__select)
+        } else {
 
-                plot__conversion_rates(reactive__experiments_summary(), input$experiment__select)
-            } else {
-
-                plot__conversion_rates_bayesian(reactive__experiments_summary(), input$experiment__select)
-            }
-        #})
+            plot__conversion_rates_bayesian(reactive__experiments_summary(), input$experiment__select)
+        }
     }, height=function() {
 
-        session$clientData$output_plot__conversion_rates_width * 0.65  # set height to % of width
+        session$clientData$output_plot__conversion_rates_width * 0.55  # set height to % of width
     })
     addPopover(
         session,
@@ -692,48 +681,46 @@ shinyServer(function(session, input, output) {
         req(input$experiment__stat_type_select)
         req(input$experiment__trend_graph_type)
 
-        #withProgress(value=1/2, message="Creating Trends Graph", {
+        insert_custom_progress_bar("Rendering Trends Graphs")
+        log_message_block_start("Rendering Trends Graph")
 
-            log_message_block_start("Creating Trends Graph")
+        log_message_variable('experiment__select', input$experiment__select)
+        log_message_variable('experiment__trends__metric_select', input$experiment__trends__metric_select)
+        log_message_variable('experiment__stat_type_select', input$experiment__stat_type_select)
+        log_message_variable('experiment__trend_graph_type', input$experiment__trend_graph_type)
 
-            log_message_variable('experiment__select', input$experiment__select)
-            log_message_variable('experiment__trends__metric_select', input$experiment__trends__metric_select)
-            log_message_variable('experiment__stat_type_select', input$experiment__stat_type_select)
-            log_message_variable('experiment__trend_graph_type', input$experiment__trend_graph_type)
+        if(input$experiment__stat_type_select == "Frequentist") {
 
-            if(input$experiment__stat_type_select == "Frequentist") {
-
-                if(input$experiment__trend_graph_type == "Percent Change") {
-                    
-                    plot__daily_percent_change_frequentist(reactive__experiments_daily_summary(),
-                                                           input$experiment__select,
-                                                           input$experiment__trends__metric_select,
-                                                           p_value_threshold=global__p_value_threshold)
-                } else {
-
-                    plot__daily_p_value(reactive__experiments_daily_summary(),
-                                        input$experiment__select,
-                                        input$experiment__trends__metric_select,
-                                        p_value_threshold=global__p_value_threshold)
-                }
-
+            if(input$experiment__trend_graph_type == "Percent Change") {
+                
+                plot__daily_percent_change_frequentist(reactive__experiments_daily_summary(),
+                                                       input$experiment__select,
+                                                       input$experiment__trends__metric_select,
+                                                       p_value_threshold=global__p_value_threshold)
             } else {
 
-                if(input$experiment__trend_graph_type == "Percent Change") {
-                    plot__daily_percent_change_bayesian(reactive__experiments_daily_summary(),
-                                                        input$experiment__select,
-                                                        input$experiment__trends__metric_select)
-                } else {
-
-                    plot__daily_prob_variant_gt_control(reactive__experiments_daily_summary(),
-                                                        input$experiment__select,
-                                                        input$experiment__trends__metric_select)
-                }
+                plot__daily_p_value(reactive__experiments_daily_summary(),
+                                    input$experiment__select,
+                                    input$experiment__trends__metric_select,
+                                    p_value_threshold=global__p_value_threshold)
             }
-        #})
+
+        } else {
+
+            if(input$experiment__trend_graph_type == "Percent Change") {
+                plot__daily_percent_change_bayesian(reactive__experiments_daily_summary(),
+                                                    input$experiment__select,
+                                                    input$experiment__trends__metric_select)
+            } else {
+
+                plot__daily_prob_variant_gt_control(reactive__experiments_daily_summary(),
+                                                    input$experiment__select,
+                                                    input$experiment__trends__metric_select)
+            }
+        }
     }, height=function() {
 
-        session$clientData$output_plot__trends_width * 0.65  # set height to % of width
+        session$clientData$output_plot__trends_width * 0.55  # set height to % of width
     })
     addPopover(
         session,
@@ -742,31 +729,27 @@ shinyServer(function(session, input, output) {
         content=HTML("Shows the percent change (i.e. Lift) from the Control to the Variant over the lifetime of the experiment.<br><br>There will be a lag between the start of the experiment and when data will start appearing, due to the attribution window.<br><br>The colored area is the confidence interval where red indicates that '0% Lift' is within the interval, and green indicates '0% Lift' is outside the interval.<br><br>The conversion rates will differ between the Frequentist and Bayesian graphs because the Bayesian methodology will anchor the conversion rates toward the prior rates.<br><br>The conversion rates will be lower than the historical values because of the attribution windows."),
         placement="left", trigger="hover", options=NULL)
 
-
-
     output$plot__bayesian_posteriors <- renderPlot({
 
         req(reactive__experiments_summary())
         req(input$experiment__select)
         req(input$experiment__bayesian_posterior__metric_select)
 
-        #withProgress(value=1/2, message="Creating Bayesian Posterior Graph", {
+        insert_custom_progress_bar("Rendering Bayesian Posterior Graph")
+        log_message_block_start("Rendering Bayesian Posterior Graph")
 
-            log_message_block_start("Creating Bayesian Posterior Graph")
+        log_message_variable('experiment__select', input$experiment__select)
+        log_message_variable('experiment__bayesian_posterior__metric_select', input$experiment__bayesian_posterior__metric_select)
+        log_message_variable('experiment__bayesian_posterior__show_prior', input$experiment__bayesian_posterior__show_prior)
 
-            log_message_variable('experiment__select', input$experiment__select)
-            log_message_variable('experiment__bayesian_posterior__metric_select', input$experiment__bayesian_posterior__metric_select)
-            log_message_variable('experiment__bayesian_posterior__show_prior', input$experiment__bayesian_posterior__show_prior)
-
-            plot__bayesian_posterior(reactive__experiments_summary(),
-                                     input$experiment__select,
-                                     input$experiment__bayesian_posterior__metric_select,
-                                     confidence_level=global__confidence_level,
-                                     show_prior_distribution=input$experiment__bayesian_posterior__show_prior)
-        #})
+        plot__bayesian_posterior(reactive__experiments_summary(),
+                                 input$experiment__select,
+                                 input$experiment__bayesian_posterior__metric_select,
+                                 confidence_level=global__confidence_level,
+                                 show_prior_distribution=input$experiment__bayesian_posterior__show_prior)
     }, height=function() {
 
-        session$clientData$output_plot__bayesian_posteriors_width * 0.65  # set height to % of width
+        session$clientData$output_plot__bayesian_posteriors_width * 0.55  # set height to % of width
     })
     addPopover(
         session,
@@ -776,6 +759,9 @@ shinyServer(function(session, input, output) {
         placement="left", trigger="hover", options=NULL)
 
     output$plot__website_traffic <- renderPlot({
+
+        insert_custom_progress_bar("Rendering Website Traffic Graph")
+        log_message_block_start("Rendering Website Traffic Graph")
 
         req(reactive__experiment_data())
 
@@ -794,32 +780,36 @@ shinyServer(function(session, input, output) {
 
     }, height=function() {
 
-        session$clientData$output_plot__website_traffic_width * 0.65  # set height to % of width
+        session$clientData$output_plot__website_traffic_width * 0.55  # set height to % of width
     })
 
     reactive__cohorted_snapshots <- reactive({
 
-        log_message_block_start("Building Cohorted Conversion Rates")
-        log_message_variable('conversion_rates__cohort_type', input$conversion_rates__cohort_type)
-        log_message_variable('conversion_rates__max_days_to_convert', input$conversion_rates__max_days_to_convert)
+        withProgress(value=1/2, message="Creating Cohorted Snapshots", {
 
-        snapshots <- c(input$conversion_rates__snapshot_1_days,
-                       input$conversion_rates__snapshot_2_days,
-                       input$conversion_rates__snapshot_3_days)
+            log_message_block_start("Building Cohorted Conversion Rates")
+            log_message_variable('conversion_rates__cohort_type', input$conversion_rates__cohort_type)
+            log_message_variable('conversion_rates__max_days_to_convert', input$conversion_rates__max_days_to_convert)
 
-        log_message_variable('snapshots', paste(snapshots, collapse=", "))
+            snapshots <- c(input$conversion_rates__snapshot_1_days,
+                           input$conversion_rates__snapshot_2_days,
+                           input$conversion_rates__snapshot_3_days)
 
-        cohorted_snapshots <- get__cohorted_conversions_snapshot(reactive__traffic_conversions_metric(),
-                                                                 cohort_label=input$conversion_rates__cohort_type,
-                                                                 snapshots=snapshots,
-                                                                 snapshot_max_days=input$conversion_rates__max_days_to_convert)
+            log_message_variable('snapshots', paste(snapshots, collapse=", "))
+
+            cohorted_snapshots <- get__cohorted_conversions_snapshot(reactive__traffic_conversions_metric(),
+                                                                     cohort_label=input$conversion_rates__cohort_type,
+                                                                     snapshots=snapshots,
+                                                                     snapshot_max_days=input$conversion_rates__max_days_to_convert)
+        })
     })
 
     output$conversion_rates__plot <- renderPlot({
 
         req(input$conversion_rates__graph_type)
 
-        log_message_block_start("Building Conversion Rate Plots")
+        insert_custom_progress_bar("Rendering Conversion Rate Plots")
+        log_message_block_start("Rendering Conversion Rate Plots")
         log_message_variable('conversion_rates__graph_type', input$conversion_rates__graph_type)
         log_message_variable('conversion_rates__cr_type', input$conversion_rates__cr_type)
         log_message_variable('conversion_rates__metric', input$conversion_rates__metric)
@@ -856,7 +846,7 @@ shinyServer(function(session, input, output) {
 
     }, height=function() {
 
-        session$clientData$output_conversion_rates__plot_width * 0.65  # set height to % of width
+        session$clientData$output_conversion_rates__plot_width * 0.55  # set height to % of width
     })
 
 

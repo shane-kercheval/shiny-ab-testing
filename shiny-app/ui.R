@@ -4,8 +4,6 @@ library(shinyjs)
 library(shinyBS)
 
 source('r_scripts/definitions.R')
-global__progress_bar_message <- "Loading/Processing Data"
-global__progress_bar_html <- HTML(paste0('"<div id="shiny-notification-panel"><div id="shiny-notification-42ec5661c2722d29" class="shiny-notification"><div class="shiny-notification-close">×</div><div class="shiny-notification-content"><div class="shiny-notification-content-text"><div id="shiny-progress-42ec5661c2722d29" class="shiny-progress-notification"><div class="progress progress-striped active" style=""><div class="progress-bar" style="width: 50%;"></div></div><div class="progress-text"><span class="progress-message">', global__progress_bar_message,'</span> <span class="progress-detail"></span></div></div></div><div class="shiny-notification-content-action"></div></div></div></div>"'))
 
 create_menu_label <- function(label, font_weight=700) {
     HTML(paste0('<span style="font-weight: ', font_weight,'; font-size: 14px;" class="shiny-text-output">', label,':</span>'))
@@ -13,7 +11,9 @@ create_menu_label <- function(label, font_weight=700) {
 
 shinyUI(tagList(
     useShinyjs(),
-    navbarPage("A/B Test Dashboard", theme="custom.css",
+    navbarPage("A/B Test Dashboard",
+        theme="custom.css",
+        id='nav_bar_page',
         tabPanel(
             "Experiment Analysis",
             column(3,
@@ -79,7 +79,7 @@ shinyUI(tagList(
                                   title="Choose to display the Frequentist or Bayesian methodology.",
                                   placement='top', trigger='hover'),
                         uiOutput('graph_options__percent_change__UI'),
-                        uiOutput('graph_options__percent_change_conidence__UI'),
+                        uiOutput('graph_options__percent_change_confidence__UI'),
                         uiOutput('graph_options__conversion_rates__UI'),
                         uiOutput('graph_options__trends__UI'),
                         uiOutput('graph_options__bayesian_posteriors__UI'),
@@ -406,5 +406,5 @@ shinyUI(tagList(
     ),
     # this is a hack because ggplot takes a long time to process some graphs, but withProgress doesn't block
     # because the ggplot object doesn't "load" until it is being rendered.
-    conditionalPanel(condition="$('html').hasClass('shiny-busy')", global__progress_bar_html)
+    tags$div(id = "custom_progress_bar_placeholder")
 ))
