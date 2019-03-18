@@ -39,24 +39,29 @@ shinyUI(tagList(
                                 uiOutput('experiment_info__end_date__UI', inline = TRUE)
                             )
                         ),
-                        fluidRow(
-                            column(12,
-                                tags$br(),tags$br(),
-                                create_menu_label('Attribution Lag'),
-                                tags$br(),tags$br()
+                        tags$br(),tags$br(),
+                        tags$div(id='asdfasdf',
+                            fluidRow(
+                                column(12,
+                                    create_menu_label('Attribution Lag'),
+                                    tags$br(),tags$br()
+                                )
+                            ),
+                            fluidRow(
+                                column(6,
+                                    #align='right',
+                                    #style='padding-right: 50px',
+                                    uiOutput('experiment_info__data_collection_metrics__UI')
+                                ),
+                                column(6,
+                                    style='padding-left: 0px',
+                                    uiOutput('experiment_info__data_collection_lags__UI', inline = TRUE)
+                                )
                             )
                         ),
-                        fluidRow(
-                            column(6,
-                                #align='right',
-                                #style='padding-right: 50px',
-                                uiOutput('experiment_info__data_collection_metrics__UI')
-                            ),
-                            column(6,
-                                style='padding-left: 0px',
-                                uiOutput('experiment_info__data_collection_lags__UI', inline = TRUE)
-                            )
-                        )
+                        bsTooltip(id='asdfasdf',
+                                  title="Users that have joined the experiment in the last N days, where N is the attribution window per metric, will not count towards the conversion rates and will be excluded from the data until the attribution window has expired.<br><br>This section shows how many days of data is still excluded from each metric (i.e. the lag).",
+                                  placement='top', trigger='hover')
                     ),
                     bsCollapsePanel(
                         "Graph Options",
