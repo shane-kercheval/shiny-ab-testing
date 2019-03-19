@@ -27,7 +27,6 @@ shinyUI(tagList(
                         "Experiment Information",
                         fluidRow(
                             column(6,
-                                #style='padding-left: 10px',
                                 create_menu_label('Start Date'),
                                 tags$br(),
                                 create_menu_label('End Date')
@@ -49,8 +48,6 @@ shinyUI(tagList(
                             ),
                             fluidRow(
                                 column(6,
-                                    #align='right',
-                                    #style='padding-right: 50px',
                                     uiOutput('experiment_info__data_collection_metrics__UI')
                                 ),
                                 column(6,
@@ -140,7 +137,7 @@ shinyUI(tagList(
                             tags$div(
                                 class="dynamic_filter",
                                 sliderTextInput(inputId='duration_calculator__mde',
-                                   label='Minimum Detectable Effect', ## percent increase
+                                   label='Minimum Detectable Effect',
                                    choices = c(1, seq(5, 50, 5)),
                                    selected = 5, 
                                    grid = TRUE,
@@ -184,7 +181,6 @@ shinyUI(tagList(
                                                'margin: 2px',
                                                sep = ";"),
                             tableOutput(outputId='duration_calculator__results_table'),
-                            #tags$div(class='results-table', tableOutput(outputId='duration_calculator__results_table'))
                             tags$br(),
                             tags$br(),
                             textOutput(outputId = 'duration_calculator__average_daily_traffic_header', inline = TRUE),
@@ -217,17 +213,6 @@ shinyUI(tagList(
                             tags$div(
                                 class="dynamic_filter",
                                 radioButtons(
-                                    inputId='conversion_rates__cohort_type',
-                                    label="Cohort Type",
-                                    choices=c("Week", "Month"),
-                                    #choiceValues=c('%W', '%m'),
-                                    selected="Week",
-                                    inline=TRUE
-                                )
-                            ),
-                            tags$div(
-                                class="dynamic_filter",
-                                radioButtons(
                                     inputId='conversion_rates__cr_type',
                                     label="Conversion Rate Type",
                                     choices=c("Actual", "Percent of All Conversions"),
@@ -238,6 +223,16 @@ shinyUI(tagList(
                             bsTooltip(id='conversion_rates__cr_type',
                                       title="Show either the \\'actual\\' conversion rates at each snapshot, or show the \\'percent of all conversions\\' that are captured at each snapshot, relative to the \\'maximum days allowed to convert\\'.<br><br>A cohort will have a corresponding value only if all users within the cohort have had at least N days from their first visit to the site, where N is the number of days for the given snapshot, or the \\'Max Days to Convert\\' days.",
                                       placement='top', trigger='hover'),
+                            tags$div(
+                                class="dynamic_filter",
+                                radioButtons(
+                                    inputId='conversion_rates__cohort_type',
+                                    label="Cohort Type",
+                                    choices=c("Week", "Month"),
+                                    selected="Week",
+                                    inline=TRUE
+                                )
+                            ),
                             tags$div(
                                 class="dynamic_filter",
                                 numericInput(
@@ -376,20 +371,18 @@ shinyUI(tagList(
                         )
                     )
                 ),
-                column(9, #align="center",
+                column(9,
                     tags$h2('First 1000 Records of Selected Dataset'),
                     tags$div(class='results-table', dataTableOutput(outputId='raw_data__table'))
                 )      
-
-              #DT::dataTableOutput("table")
             ),
             tabPanel("Settings",
                 tags$br(),
                 fluidRow(
-                    column(1, #align="center",
+                    column(1,
                         tags$br()
                     ),
-                    column(11, #align="center",
+                    column(11,
                         tags$h2('Settings'),
                         tags$div(class='results-table',
                             dataTableOutput(outputId='more__settings__table'))
@@ -402,14 +395,6 @@ shinyUI(tagList(
                         style='padding-left: 50px',
                         includeMarkdown("about.md")
                     )
-                #   tags$small(
-                #     "Source: Photographed at the Bay State Antique ",
-                #     "Automobile Club's July 10, 2005 show at the ",
-                #     "Endicott Estate in Dedham, MA by ",
-                #     a(href="http://commons.wikimedia.org/wiki/User:Sfoskett",
-                #       "User:Sfoskett")
-                #   )
-                # )
                 )
             )
         )
