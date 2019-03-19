@@ -308,8 +308,8 @@ shinyServer(function(session, input, output) {
 
 
         ui_list <- list()
-        ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_show_prior)
         ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_metric)
+        ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_show_prior)
 
         return (tagList(list=ui_list))
     })
