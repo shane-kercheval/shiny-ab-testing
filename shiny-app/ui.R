@@ -398,15 +398,10 @@ shinyUI(tagList(
             ),
             tabPanel("About",
                 fluidRow(
-                    tags$br()
-                #     column(6,
-                #            includeMarkdown("about.md")
-                #     ),
-                #     column(3,
-                #            img(class="img-polaroid",
-                #            src=paste0("http://upload.wikimedia.org/",
-                #            "wikipedia/commons/9/92/",
-                #            "1919_Ford_Model_T_Highboy_Coupe.jpg")),
+                    column(9,
+                        style='padding-left: 50px',
+                        includeMarkdown("about.md")
+                    )
                 #   tags$small(
                 #     "Source: Photographed at the Bay State Antique ",
                 #     "Automobile Club's July 10, 2005 show at the ",
