@@ -406,6 +406,9 @@ shinyServer(function(session, input, output) {
 
 
     insert_custom_progress_bar <- function(message="Loading/Processing Data") {
+
+        log_message_block_start(message)
+
         # this function is a hack so that the progress bar works for ggplots that take a long time to render
         # because ggplot objects don't attempt to render under they are displayed
         global__progress_bar_html <- HTML(paste0('"<div id="shiny-notification-panel"><div id="shiny-notification-42ec5661c2722d29" class="shiny-notification"><div class="shiny-notification-close">×</div><div class="shiny-notification-content"><div class="shiny-notification-content-text"><div id="shiny-progress-42ec5661c2722d29" class="shiny-progress-notification"><div class="progress progress-striped active" style=""><div class="progress-bar" style="width: 50%;"></div></div><div class="progress-text"><span class="progress-message">', message,'</span> <span class="progress-detail"></span></div></div></div><div class="shiny-notification-content-action"></div></div></div></div>"'))
@@ -586,7 +589,6 @@ shinyServer(function(session, input, output) {
         req(input$experiment__stat_type_select)
 
         insert_custom_progress_bar("Rendering Percent Change Graph")
-        log_message_block_start("Rendering Percent Change Graph")
 
         log_message_variable('experiment__select', input$experiment__select)
         log_message_variable('experiment__stat_type_select', input$experiment__stat_type_select)
@@ -618,7 +620,6 @@ shinyServer(function(session, input, output) {
         req(input$experiment__stat_type_select)
 
         insert_custom_progress_bar("Rendering Percent Change Conf. Graph")
-        log_message_block_start("Rendering Percent Change Conf. Graph")
 
         log_message_variable('experiment__select', input$experiment__select)
         log_message_variable('experiment__stat_type_select', input$experiment__stat_type_select)
@@ -650,7 +651,6 @@ shinyServer(function(session, input, output) {
         req(input$experiment__stat_type_select)
 
         insert_custom_progress_bar("Rendering Conversion Rates Graph")
-        log_message_block_start("Rendering Conversion Rates Graph")
 
         log_message_variable('experiment__select', input$experiment__select)
         log_message_variable('experiment__stat_type_select', input$experiment__stat_type_select)
@@ -682,7 +682,6 @@ shinyServer(function(session, input, output) {
         req(input$experiment__trend_graph_type)
 
         insert_custom_progress_bar("Rendering Trends Graphs")
-        log_message_block_start("Rendering Trends Graph")
 
         log_message_variable('experiment__select', input$experiment__select)
         log_message_variable('experiment__trends__metric_select', input$experiment__trends__metric_select)
@@ -736,7 +735,6 @@ shinyServer(function(session, input, output) {
         req(input$experiment__bayesian_posterior__metric_select)
 
         insert_custom_progress_bar("Rendering Bayesian Posterior Graph")
-        log_message_block_start("Rendering Bayesian Posterior Graph")
 
         log_message_variable('experiment__select', input$experiment__select)
         log_message_variable('experiment__bayesian_posterior__metric_select', input$experiment__bayesian_posterior__metric_select)
@@ -761,7 +759,6 @@ shinyServer(function(session, input, output) {
     output$plot__website_traffic <- renderPlot({
 
         insert_custom_progress_bar("Rendering Website Traffic Graph")
-        log_message_block_start("Rendering Website Traffic Graph")
 
         req(reactive__experiment_data())
 
@@ -809,7 +806,6 @@ shinyServer(function(session, input, output) {
         req(input$conversion_rates__graph_type)
 
         insert_custom_progress_bar("Rendering Conversion Rate Plots")
-        log_message_block_start("Rendering Conversion Rate Plots")
         log_message_variable('conversion_rates__graph_type', input$conversion_rates__graph_type)
         log_message_variable('conversion_rates__cr_type', input$conversion_rates__cr_type)
         log_message_variable('conversion_rates__metric', input$conversion_rates__metric)
