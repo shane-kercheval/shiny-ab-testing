@@ -377,7 +377,8 @@ shinyServer(function(session, input, output) {
             inputId='duration_calculator__url',
             label="Path",
             choices=paths,  #c(global__select_path, paths),
-            selected=paths[1])  #global__select_path)
+            selected=paths[1]) %>% #global__select_path)
+        add_tooltip("The number of daily users joining the experiment (and in the future, the conversion rate) is determined by the path.")
 
         ui_list <- list()
         ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_paths)
@@ -537,7 +538,7 @@ shinyServer(function(session, input, output) {
             shinyjs::show('conversion_rates__snapshot_2_days')
             shinyjs::show('conversion_rates__snapshot_3_days')
 
-            if(input$conversion_rates__cr_type == "Absolute") {
+            if(input$conversion_rates__cr_type == "Actual") {
 
                 shinyjs::hide('conversion_rates__max_days_to_convert')
             
@@ -814,7 +815,7 @@ shinyServer(function(session, input, output) {
             
             req(input$conversion_rates__metric)
 
-            if(input$conversion_rates__cr_type == "Absolute") {
+            if(input$conversion_rates__cr_type == "Actual") {
 
                 return (plot__conversion_rates_snapshot_absolute(reactive__cohorted_snapshots(),
                                                                  cohort_label=input$conversion_rates__cohort_type))
@@ -844,6 +845,12 @@ shinyServer(function(session, input, output) {
 
         session$clientData$output_conversion_rates__plot_width * 0.55  # set height to % of width
     })
+    addPopover(
+        session,
+        'conversion_rates__plot', 
+        title="Conversion Rate Plots",
+        content=HTML("The 'Attribution' graph shows the conversion rates when allowing each user N days to convert, from their first visit to the site, where N is the attribution window (days) for each metric. It also shows the percent of conversions captured relative to the historical conversion rates.<br><br>The 'Historical' graph shows the historical conversion rates over the last 180 days, excluding users that first came to the site in the last 30 days.<br><br>The 'Cohort' graph shows the conversion rates over time, cohorted by week, at various 'snapshots', where each snapshot is the number of days allowed to convert, after the user first visits the site."),
+        placement="left", trigger="hover", options=NULL)
 
 
     output$experiment__raw_data_table <- renderDataTable({
@@ -1000,7 +1007,7 @@ shinyServer(function(session, input, output) {
         return (results_table)
     })
 
-    output$duration_calculator__average_daily_traffic_header <- renderText("Average Daily Traffic")
+    output$duration_calculator__average_daily_traffic_header <- renderText("Average Daily Users Joining Experiment:")
     output$duration_calculator__average_daily_traffic_text <- renderText({
         
 

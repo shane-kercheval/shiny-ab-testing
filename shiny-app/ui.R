@@ -40,7 +40,7 @@ shinyUI(tagList(
                             )
                         ),
                         tags$br(),tags$br(),
-                        tags$div(id='asdfasdf',
+                        tags$div(id='attribution_lag_tooltip_div',
                             fluidRow(
                                 column(12,
                                     create_menu_label('Attribution Lag'),
@@ -59,7 +59,7 @@ shinyUI(tagList(
                                 )
                             )
                         ),
-                        bsTooltip(id='asdfasdf',
+                        bsTooltip(id='attribution_lag_tooltip_div',
                                   title="Users that have joined the experiment in the last N days, where N is the attribution window per metric, will not count towards the conversion rates and will be excluded from the data until the attribution window has expired.<br><br>This section shows how many days of data is still excluded from each metric (i.e. the lag).",
                                   placement='top', trigger='hover')
                     ),
@@ -163,7 +163,16 @@ shinyUI(tagList(
                                    selected = 20, 
                                    grid = TRUE,
                                    post  = " %")
-                            )
+                            ),
+                            bsTooltip(id='duration_calculator__mde',
+                                      title="Choose the \\'minimum detectable effect\\' (MDE) i.e. the smallest percent change from the control to the variant that can be detected for a given sample size.<br><br>The smaller the MDE, the larger the sample size needed to detect the change.",
+                                      placement='top', trigger='hover'),
+                            bsTooltip(id='duration_calculator__alpha',
+                                      title="The probability of a false positive is the probability that the percent change from the control to the variant will be labeled as a statistically significant change, when it is actually not statistically significant.<br><br>The smaller the probability, the larger the sample size needed to detect the change.",
+                                      placement='top', trigger='hover'),
+                            bsTooltip(id='duration_calculator__beta',
+                                      title="The probability of a false negative is the probability that the percent change from the control to the variant will be labeled as *not* being statistically significant, when it is actually statistically significant.<br><br>The smaller the probability, the larger the sample size needed to detect the change.",
+                                      placement='top', trigger='hover')
                         )
                     )
                 ),
@@ -221,11 +230,14 @@ shinyUI(tagList(
                                 radioButtons(
                                     inputId='conversion_rates__cr_type',
                                     label="Conversion Rate Type",
-                                    choices=c("Absolute", "Percent of All Conversions"),
-                                    selected="Absolute",
+                                    choices=c("Actual", "Percent of All Conversions"),
+                                    selected="Actual",
                                     inline=TRUE
                                 )
                             ),
+                            bsTooltip(id='conversion_rates__cr_type',
+                                      title="Show either the \\'actual\\' conversion rates at each snapshot, or show the \\'percent of all conversions\\' that are captured at each snapshot, relative to the \\'maximum days allowed to convert\\'.<br><br>A cohort will have a corresponding value only if all users within the cohort have had at least N days from their first visit to the site, where N is the number of days for the given snapshot, or the \\'Max Days to Convert\\' days.",
+                                      placement='top', trigger='hover'),
                             tags$div(
                                 class="dynamic_filter",
                                 numericInput(
@@ -273,7 +285,10 @@ shinyUI(tagList(
                                     step = NA,
                                     width = NULL
                                 )
-                            )
+                            ),
+                            bsTooltip(id='conversion_rates__max_days_to_convert',
+                                      title="The \\'maximum days allowed to convert\\' relative to the user\\'s first visit to the site. Only conversions within the specified number of days will count towards the maximum conversion rate.",
+                                      placement='top', trigger='hover')
                         )
                     )
                 ),
