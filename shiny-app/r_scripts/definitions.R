@@ -30,6 +30,8 @@ global__metric_colors <- c('#40C6EE', '#EBB13E', '#2AADB7', '#F28E2B', '#C396E8'
 global__text_size <- 4
 global__theme_base_size <- 16
 
+global__plot_height_percent_of_width <- 0.55
+
 global__experiment__tab_names__percent_change <- "Percent Change"
 global__experiment__tab_names__percent_change_conf <- "Percent Change Confidence"
 global__experiment__tab_names__conversion_rates <- "Conversion Rates"

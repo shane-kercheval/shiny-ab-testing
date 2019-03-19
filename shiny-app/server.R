@@ -17,7 +17,7 @@ options(scipen=999)
 shinyServer(function(session, input, output) {
 
     ##########################################################################################################
-    # LOAD DATA
+    # REACTIVE DATASETS
     ##########################################################################################################
     reactive__experiment_data <- reactive({
 
@@ -118,9 +118,34 @@ shinyServer(function(session, input, output) {
         })
     })
 
+    reactive__cohorted_snapshots <- reactive({
+
+        withProgress(value=1/2, message="Creating Cohorted Snapshots", {
+
+            log_message_block_start("Building Cohorted Conversion Rates")
+            log_message_variable('conversion_rates__cohort_type', input$conversion_rates__cohort_type)
+            log_message_variable('conversion_rates__max_days_to_convert', input$conversion_rates__max_days_to_convert)
+
+            snapshots <- c(input$conversion_rates__snapshot_1_days,
+                           input$conversion_rates__snapshot_2_days,
+                           input$conversion_rates__snapshot_3_days)
+
+            log_message_variable('snapshots', paste(snapshots, collapse=", "))
+
+            cohorted_snapshots <- get__cohorted_conversions_snapshot(reactive__traffic_conversions_metric(),
+                                                                     cohort_label=input$conversion_rates__cohort_type,
+                                                                     snapshots=snapshots,
+                                                                     snapshot_max_days=input$conversion_rates__max_days_to_convert)
+        })
+    })
+
     ##########################################################################################################
-    # UI
+    # EXPERIMENT ANALYSIS
     ##########################################################################################################
+
+    #####################################################
+    # Experiment Analysis Menu Options
+    #####################################################
     output$experiment__select__UI <- renderUI({
 
         req(reactive__experiments_summary())
@@ -166,7 +191,7 @@ shinyServer(function(session, input, output) {
         # still running: end-date within a day of "current" date
         if(end_date >= reactive__latest_traffic_datetime() - days(1)) {
 
-            return ("<font color=\"#FF0000\"><b>Running...</b></font>")
+            return (red_font("Running..."))
 
         } else {
 
@@ -198,15 +223,15 @@ shinyServer(function(session, input, output) {
             mutate(has_lag=ifelse(collection_lag > 0, TRUE, FALSE),
                    label=ifelse(collection_lag > 0, paste(round(collection_lag), "day lag"), "All data included."),
                    label=ifelse(label == "0 day lag", "<1 day lag", label)) %>%
-            mutate(label=ifelse(has_lag, paste0("<font color=\"#FF0000\"><b>", label, "</b></font>"), label)) %>%
+            mutate(label=ifelse(has_lag, red_font(label), label)) %>%
             filter(experiment_id == input$experiment__select)
 
         return (paste0("", paste0(lag_info$label, collapse = "<br>")))
     })
 
-    ##########################################################################################################
-    # DYNAMIC GRAPH OPTIONS
-    ##########################################################################################################
+    #####################################################
+    # Experiment Analysis Dynamcic Graph Options
+    #####################################################
     output$graph_options__percent_change__UI <- renderUI({
         NULL
     })
@@ -232,7 +257,6 @@ shinyServer(function(session, input, output) {
             inline=TRUE,
             width=NULL, choiceNames=NULL,
             choiceValues=NULL) %>%
-        #For the Frequentist graph, the 'Statistic' options shows the p-value over time.\n\nFor the Bayesian graph, the 'Statistic' options shows the `probability that the Variant is better than the Control`, over time.
         add_tooltip("For the Frequentist graph, the `Statistic` option shows the p-value over time. For the Bayesian graph, the `Statistic` option shows the `probability that the Variant is better than the Control`, over time.")
 
         metrics <- reactive__experiments_summary() %>%
@@ -378,9 +402,9 @@ shinyServer(function(session, input, output) {
         return (tagList(list=ui_list))
     })
 
-    ##########################################################################################################
-    # Update Dynamic Graph Options based on the Selected Tab
-    ##########################################################################################################
+    #####################################################
+    # Experiment Analysis - Update Dynamic Graph Options based on the Selected Tab
+    #####################################################
     observeEvent(input$nav_bar_page, {
 
         # remove the custom progress bar when navigating to a different tab
@@ -473,68 +497,9 @@ shinyServer(function(session, input, output) {
         }
     })
 
-    observe({
-
-        req(input$conversion_rates__graph_type)
-
-        log_message_block_start('Hide/Show Conversion Rate Options')
-        log_message_variable('conversion_rates__graph_type', input$conversion_rates__graph_type)
-
-        if(input$conversion_rates__graph_type == "Cohort") {
-
-            shinyjs::show('conversion_rates__metric__UI')
-            shinyjs::show('conversion_rates__metric')
-            shinyjs::show('conversion_rates__cohort_type')
-            shinyjs::show('conversion_rates__cr_type')
-            shinyjs::show('conversion_rates__snapshot_1_days')
-            shinyjs::show('conversion_rates__snapshot_2_days')
-            shinyjs::show('conversion_rates__snapshot_3_days')
-
-            if(input$conversion_rates__cr_type == "Actual") {
-
-                shinyjs::hide('conversion_rates__max_days_to_convert')
-            
-            } else {
-
-                shinyjs::show('conversion_rates__max_days_to_convert')    
-            }
-
-
-            updateCollapse(session, 'conversion_rates__bscollapse', open="Graph Options")
-
-        } else if(input$conversion_rates__graph_type == "Historical") {
-
-            updateCollapse(session, 'conversion_rates__bscollapse', close="Graph Options")
-
-            shinyjs::hide('conversion_rates__metric')
-            shinyjs::hide('conversion_rates__cohort_type')
-            shinyjs::hide('conversion_rates__cr_type')
-            shinyjs::hide('conversion_rates__snapshot_1_days')
-            shinyjs::hide('conversion_rates__snapshot_2_days')
-            shinyjs::hide('conversion_rates__snapshot_3_days')
-            shinyjs::hide('conversion_rates__max_days_to_convert')
-
-        } else if(input$conversion_rates__graph_type == "Attribution") {
-
-            updateCollapse(session, 'conversion_rates__bscollapse', close="Graph Options")
-
-            shinyjs::hide('conversion_rates__metric')
-            shinyjs::hide('conversion_rates__cohort_type')
-            shinyjs::hide('conversion_rates__cr_type')
-            shinyjs::hide('conversion_rates__snapshot_1_days')
-            shinyjs::hide('conversion_rates__snapshot_2_days')
-            shinyjs::hide('conversion_rates__snapshot_3_days')
-            shinyjs::hide('conversion_rates__max_days_to_convert')
-
-        } else {
-
-            stopifnot(FALSE)
-        }
-    })
-
-    ##########################################################################################################
-    # PLOTS & TABLES
-    ##########################################################################################################
+    #####################################################
+    # Experiment Analysis Graphs & Tables
+    #####################################################
     output$plot__percent_change <- renderPlot({
 
         req(reactive__experiments_summary())
@@ -557,7 +522,7 @@ shinyServer(function(session, input, output) {
         }
     }, height=function() {
 
-        session$clientData$output_plot__percent_change_width * 0.55  # set height to % of width
+        session$clientData$output_plot__percent_change_width * global__plot_height_percent_of_width
     })
     addPopover(
         session,
@@ -588,7 +553,7 @@ shinyServer(function(session, input, output) {
         }
     }, height=function() {
 
-        session$clientData$output_plot__percent_change_confidence_width * 0.55  # set height to % of width
+        session$clientData$output_plot__percent_change_confidence_width * global__plot_height_percent_of_width
     })
     addPopover(
         session,
@@ -617,7 +582,7 @@ shinyServer(function(session, input, output) {
         }
     }, height=function() {
 
-        session$clientData$output_plot__conversion_rates_width * 0.55  # set height to % of width
+        session$clientData$output_plot__conversion_rates_width * global__plot_height_percent_of_width
     })
     addPopover(
         session,
@@ -672,7 +637,7 @@ shinyServer(function(session, input, output) {
         }
     }, height=function() {
 
-        session$clientData$output_plot__trends_width * 0.55  # set height to % of width
+        session$clientData$output_plot__trends_width * global__plot_height_percent_of_width
     })
     addPopover(
         session,
@@ -700,7 +665,7 @@ shinyServer(function(session, input, output) {
                                  show_prior_distribution=input$experiment__bayesian_posterior__show_prior)
     }, height=function() {
 
-        session$clientData$output_plot__bayesian_posteriors_width * 0.55  # set height to % of width
+        session$clientData$output_plot__bayesian_posteriors_width * global__plot_height_percent_of_width
     })
     addPopover(
         session,
@@ -708,102 +673,6 @@ shinyServer(function(session, input, output) {
         title="Posterior Probability Distributions of the Control & Variant",
         content=HTML("This graph shows the posterior probability distributions of the Control, Variant, and if selected, the Priors. It also shows a confidence intervals for the Control and Variant distributions below."),
         placement="left", trigger="hover", options=NULL)
-
-    output$plot__website_traffic <- renderPlot({
-
-        insert_custom_progress_bar("Rendering Website Traffic Graph")
-
-        req(reactive__experiment_data())
-
-        top_n_paths <- NULL
-
-        if(input$website_traffic__show_path_breakdown) {
-            top_n_paths <- input$website_traffic__top_n_paths
-        }
-
-        plot__website_traffic(
-            experiment_data=reactive__experiment_data(),
-            only_first_time_visits=input$website_traffic__show_first_time_visits,
-            is_weekly=input$website_traffic__cohort_type == "Week",
-            filter_year_end_beginning_weeks=input$website_traffic__cohort_type == "Week",
-            top_n_paths=top_n_paths)
-
-    }, height=function() {
-
-        session$clientData$output_plot__website_traffic_width * 0.55  # set height to % of width
-    })
-
-    reactive__cohorted_snapshots <- reactive({
-
-        withProgress(value=1/2, message="Creating Cohorted Snapshots", {
-
-            log_message_block_start("Building Cohorted Conversion Rates")
-            log_message_variable('conversion_rates__cohort_type', input$conversion_rates__cohort_type)
-            log_message_variable('conversion_rates__max_days_to_convert', input$conversion_rates__max_days_to_convert)
-
-            snapshots <- c(input$conversion_rates__snapshot_1_days,
-                           input$conversion_rates__snapshot_2_days,
-                           input$conversion_rates__snapshot_3_days)
-
-            log_message_variable('snapshots', paste(snapshots, collapse=", "))
-
-            cohorted_snapshots <- get__cohorted_conversions_snapshot(reactive__traffic_conversions_metric(),
-                                                                     cohort_label=input$conversion_rates__cohort_type,
-                                                                     snapshots=snapshots,
-                                                                     snapshot_max_days=input$conversion_rates__max_days_to_convert)
-        })
-    })
-
-    output$conversion_rates__plot <- renderPlot({
-
-        req(input$conversion_rates__graph_type)
-
-        insert_custom_progress_bar("Rendering Conversion Rate Plots")
-        log_message_variable('conversion_rates__graph_type', input$conversion_rates__graph_type)
-        log_message_variable('conversion_rates__cr_type', input$conversion_rates__cr_type)
-        log_message_variable('conversion_rates__metric', input$conversion_rates__metric)
-
-        if(input$conversion_rates__graph_type == "Cohort") {
-            
-            req(input$conversion_rates__metric)
-
-            if(input$conversion_rates__cr_type == "Actual") {
-
-                return (plot__conversion_rates_snapshot_absolute(reactive__cohorted_snapshots(),
-                                                                 cohort_label=input$conversion_rates__cohort_type))
-
-
-            } else {
-                plot__conversion_rates_snapshot_percent(reactive__cohorted_snapshots(),
-                                                        snapshot_max_days=input$conversion_rates__max_days_to_convert,
-                                                        cohort_label=input$conversion_rates__cohort_type)
-            }
-
-
-        } else if(input$conversion_rates__graph_type == "Historical") { 
-
-            plot__conversion_rates_historical(reactive__historical_conversion_rates())
-
-        } else if(input$conversion_rates__graph_type == "Attribution") {
-
-            plot__conversion_rates_attribution(reactive__historical_conversion_rates())
-
-        } else {
-
-            stopifnot(FALSE)
-        }
-
-    }, height=function() {
-
-        session$clientData$output_conversion_rates__plot_width * 0.55  # set height to % of width
-    })
-    addPopover(
-        session,
-        'conversion_rates__plot', 
-        title="Conversion Rate Plots",
-        content=HTML("The 'Attribution' graph shows the conversion rates when allowing each user N days to convert, from their first visit to the site, where N is the attribution window (days) for each metric. It also shows the percent of conversions captured relative to the historical conversion rates.<br><br>The 'Historical' graph shows the historical conversion rates over the last 180 days, excluding users that first came to the site in the last 30 days.<br><br>The 'Cohort' graph shows the conversion rates over time, cohorted by week or month, at various 'snapshots', where each snapshot is the number of days allowed to convert, after the user first visits the site."),
-        placement="left", trigger="hover", options=NULL)
-
 
     output$experiment__raw_data_table <- renderDataTable({
 
@@ -880,21 +749,210 @@ shinyServer(function(session, input, output) {
         )
     })
 
-    output$more__settings__table <- renderDataTable({
+    ##########################################################################################################
+    # PLANNING:
+    #-------------------------
+    # Sample Size Calculator
+    # Conversion Rates
+    # WEbsite Traffic
+    ##########################################################################################################
 
-        return (
-            tribble(
-                ~Name, ~Value,
-                #--|--
-                "Confidence Level", global__confidence_level,
-                "P-Value Threshold", global__p_value_threshold,
-                "Days of Prior Information", global__prior_number_of_days
-            )
-        )
-    },
-    options = list(paging = FALSE, info = TRUE)
-    )
+    #####################################################
+    # SAMPLE SIZE CALCULATOR
+    #####################################################
+    output$duration_calculator__results_table <- renderTable({
 
+        calc_results <- reactive__ab_test_calculator_results()
+
+        if(is.null(calc_results)) {
+
+            return (NULL)
+        }
+
+        log_message_variable("duration_calculator__metrics", paste(input$duration_calculator__metrics,
+                                                                   collapse=', '))
+
+        results_table <- calc_results$results %>%
+            filter(Metric %in% input$duration_calculator__metrics) %>%
+            mutate(`Estimated Days Required` = as.character(`Estimated Days Required`),
+                   `Estimated Users Required` = comma_format()(`Estimated Users Required`),
+                   `Historical Conversion Rate` = percent(`Historical Conversion Rate`),
+                   `Detectable Conversion Rate` = percent(`Detectable Conversion Rate`))
+
+        return (results_table)
+    })
+
+    output$duration_calculator__average_daily_traffic_header <- renderText("Estimated Average Daily Users Joining Experiment:")
+    output$duration_calculator__average_daily_traffic_text <- renderText({
+
+        calc_results <- reactive__ab_test_calculator_results()
+
+        if(is.null(calc_results)) {
+
+            return (NULL)
+        }
+
+        return (paste(comma_format()(round(calc_results$daily_traffic)), "Users"))
+    })
+
+    #####################################################
+    # CONVERSION RATES
+    #####################################################
+
+    #####################################################
+    # Conversion Rates Menu Options
+    #####################################################
+    # Update the Conversion Rate Menu "Graph Options" based on the graph type selected.
+    observe({
+
+        req(input$conversion_rates__graph_type)
+
+        log_message_block_start('Hide/Show Conversion Rate Options')
+        log_message_variable('conversion_rates__graph_type', input$conversion_rates__graph_type)
+
+        if(input$conversion_rates__graph_type == "Cohort") {
+
+            shinyjs::show('conversion_rates__metric__UI')
+            shinyjs::show('conversion_rates__metric')
+            shinyjs::show('conversion_rates__cohort_type')
+            shinyjs::show('conversion_rates__cr_type')
+            shinyjs::show('conversion_rates__snapshot_1_days')
+            shinyjs::show('conversion_rates__snapshot_2_days')
+            shinyjs::show('conversion_rates__snapshot_3_days')
+
+            if(input$conversion_rates__cr_type == "Actual") {
+
+                shinyjs::hide('conversion_rates__max_days_to_convert')
+            
+            } else {
+
+                shinyjs::show('conversion_rates__max_days_to_convert')    
+            }
+
+
+            updateCollapse(session, 'conversion_rates__bscollapse', open="Graph Options")
+
+        } else if(input$conversion_rates__graph_type == "Historical") {
+
+            updateCollapse(session, 'conversion_rates__bscollapse', close="Graph Options")
+
+            shinyjs::hide('conversion_rates__metric')
+            shinyjs::hide('conversion_rates__cohort_type')
+            shinyjs::hide('conversion_rates__cr_type')
+            shinyjs::hide('conversion_rates__snapshot_1_days')
+            shinyjs::hide('conversion_rates__snapshot_2_days')
+            shinyjs::hide('conversion_rates__snapshot_3_days')
+            shinyjs::hide('conversion_rates__max_days_to_convert')
+
+        } else if(input$conversion_rates__graph_type == "Attribution") {
+
+            updateCollapse(session, 'conversion_rates__bscollapse', close="Graph Options")
+
+            shinyjs::hide('conversion_rates__metric')
+            shinyjs::hide('conversion_rates__cohort_type')
+            shinyjs::hide('conversion_rates__cr_type')
+            shinyjs::hide('conversion_rates__snapshot_1_days')
+            shinyjs::hide('conversion_rates__snapshot_2_days')
+            shinyjs::hide('conversion_rates__snapshot_3_days')
+            shinyjs::hide('conversion_rates__max_days_to_convert')
+
+        } else {
+
+            stopifnot(FALSE)
+        }
+    })
+
+    #####################################################
+    # Conversion Rates Graphs
+    #####################################################
+    output$conversion_rates__plot <- renderPlot({
+
+        req(input$conversion_rates__graph_type)
+
+        insert_custom_progress_bar("Rendering Conversion Rate Plots")
+        log_message_variable('conversion_rates__graph_type', input$conversion_rates__graph_type)
+        log_message_variable('conversion_rates__cr_type', input$conversion_rates__cr_type)
+        log_message_variable('conversion_rates__metric', input$conversion_rates__metric)
+
+        if(input$conversion_rates__graph_type == "Cohort") {
+            
+            req(input$conversion_rates__metric)
+
+            if(input$conversion_rates__cr_type == "Actual") {
+
+                return (plot__conversion_rates_snapshot_absolute(reactive__cohorted_snapshots(),
+                                                                 cohort_label=input$conversion_rates__cohort_type))
+
+
+            } else {
+                plot__conversion_rates_snapshot_percent(reactive__cohorted_snapshots(),
+                                                        snapshot_max_days=input$conversion_rates__max_days_to_convert,
+                                                        cohort_label=input$conversion_rates__cohort_type)
+            }
+
+
+        } else if(input$conversion_rates__graph_type == "Historical") { 
+
+            plot__conversion_rates_historical(reactive__historical_conversion_rates())
+
+        } else if(input$conversion_rates__graph_type == "Attribution") {
+
+            plot__conversion_rates_attribution(reactive__historical_conversion_rates())
+
+        } else {
+
+            stopifnot(FALSE)
+        }
+
+    }, height=function() {
+
+        session$clientData$output_conversion_rates__plot_width * global__plot_height_percent_of_width
+    })
+    addPopover(
+        session,
+        'conversion_rates__plot', 
+        title="Conversion Rate Plots",
+        content=HTML("The 'Attribution' graph shows the conversion rates when allowing each user N days to convert, from their first visit to the site, where N is the attribution window (days) for each metric. It also shows the percent of conversions captured relative to the historical conversion rates.<br><br>The 'Historical' graph shows the historical conversion rates over the last 180 days, excluding users that first came to the site in the last 30 days.<br><br>The 'Cohort' graph shows the conversion rates over time, cohorted by week or month, at various 'snapshots', where each snapshot is the number of days allowed to convert, after the user first visits the site."),
+        placement="left", trigger="hover", options=NULL)
+
+    #####################################################
+    # Website Traffic
+    #####################################################
+    output$plot__website_traffic <- renderPlot({
+
+        insert_custom_progress_bar("Rendering Website Traffic Graph")
+
+        req(reactive__experiment_data())
+
+        top_n_paths <- NULL
+
+        if(input$website_traffic__show_path_breakdown) {
+            top_n_paths <- input$website_traffic__top_n_paths
+        }
+
+        plot__website_traffic(
+            experiment_data=reactive__experiment_data(),
+            only_first_time_visits=input$website_traffic__show_first_time_visits,
+            is_weekly=input$website_traffic__cohort_type == "Week",
+            filter_year_end_beginning_weeks=input$website_traffic__cohort_type == "Week",
+            top_n_paths=top_n_paths)
+
+    }, height=function() {
+
+        session$clientData$output_plot__website_traffic_width * global__plot_height_percent_of_width
+    })
+
+    ##########################################################################################################
+    # MORE
+    #------------------------
+    # View Raw Data
+    # Settings
+    # About (no server side code needed)
+    ##########################################################################################################
+
+    #####################################################
+    # View Raw Data
+    #####################################################
     output$raw_data__table <- renderDataTable({
 
         req(input$raw_data__select_dataset)
@@ -937,38 +995,18 @@ shinyServer(function(session, input, output) {
         return (df %>% head(1000))
     })
 
-    output$duration_calculator__results_table <- renderTable({
+    #####################################################
+    # Settings
+    #####################################################
+    output$more__settings__table <- renderDataTable({
 
-        calc_results <- reactive__ab_test_calculator_results()
-
-        if(is.null(calc_results)) {
-
-            return (NULL)
-        }
-
-        log_message_variable("duration_calculator__metrics", paste(input$duration_calculator__metrics,
-                                                                   collapse=', '))
-
-        results_table <- calc_results$results %>%
-            filter(Metric %in% input$duration_calculator__metrics) %>%
-            mutate(`Estimated Days Required` = as.character(`Estimated Days Required`),
-                   `Estimated Users Required` = comma_format()(`Estimated Users Required`),
-                   `Historical Conversion Rate` = percent(`Historical Conversion Rate`),
-                   `Detectable Conversion Rate` = percent(`Detectable Conversion Rate`))
-
-        return (results_table)
-    })
-
-    output$duration_calculator__average_daily_traffic_header <- renderText("Estimated Average Daily Users Joining Experiment:")
-    output$duration_calculator__average_daily_traffic_text <- renderText({
-
-        calc_results <- reactive__ab_test_calculator_results()
-
-        if(is.null(calc_results)) {
-
-            return (NULL)
-        }
-
-        return (paste(comma_format()(round(calc_results$daily_traffic)), "Users"))
-    })
+        return (
+            tribble(
+                ~Name, ~Value,
+                "Confidence Level", global__confidence_level,
+                "P-Value Threshold", global__p_value_threshold,
+                "Days of Prior Information", global__prior_number_of_days
+            )
+        )
+    }, options = list(paging = FALSE, info = TRUE))
 })

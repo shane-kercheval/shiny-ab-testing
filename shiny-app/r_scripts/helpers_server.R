@@ -14,9 +14,9 @@ insert_custom_progress_bar <- function(message="Loading/Processing Data") {
 
     log_message_block_start(message)
 
-    global__progress_bar_html <- HTML(paste0('"<div id="shiny-notification-panel"><div id="shiny-notification-42ec5661c2722d29" class="shiny-notification"><div class="shiny-notification-close">×</div><div class="shiny-notification-content"><div class="shiny-notification-content-text"><div id="shiny-progress-42ec5661c2722d29" class="shiny-progress-notification"><div class="progress progress-striped active" style=""><div class="progress-bar" style="width: 50%;"></div></div><div class="progress-text"><span class="progress-message">', message,'</span> <span class="progress-detail"></span></div></div></div><div class="shiny-notification-content-action"></div></div></div></div>"'))
+    progress_bar_html <- HTML(paste0('"<div id="shiny-notification-panel"><div id="shiny-notification-42ec5661c2722d29" class="shiny-notification"><div class="shiny-notification-close">×</div><div class="shiny-notification-content"><div class="shiny-notification-content-text"><div id="shiny-progress-42ec5661c2722d29" class="shiny-progress-notification"><div class="progress progress-striped active" style=""><div class="progress-bar" style="width: 50%;"></div></div><div class="progress-text"><span class="progress-message">', message,'</span> <span class="progress-detail"></span></div></div></div><div class="shiny-notification-content-action"></div></div></div></div>"'))
     progress_html <- conditionalPanel(condition="$('html').hasClass('shiny-busy')",
-                                      global__progress_bar_html,
+                                      progress_bar_html,
                                       id='custom_progress_bar')
     remove_custom_progress_bar()
     insertUI(selector="#custom_progress_bar_placeholder", where = c("afterEnd"), progress_html, immediate=TRUE)
@@ -51,4 +51,8 @@ ui_list_append <- function(l, ui_item, div_class=NULL) {
 
         return (c(l, list(tags$div(class=div_class, ui_item))))
     }
+}
+
+red_font <- function(text) {
+    return (paste0("<font color=\"#FF0000\"><b>", text, "</b></font>"))
 }
