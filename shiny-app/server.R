@@ -7,6 +7,7 @@ library(scales)
 source('r_scripts/helpers_check_data_integrity.R', chdir=TRUE)
 source('r_scripts/helpers_plots.R', chdir=TRUE)
 source('r_scripts/helpers_processing.R', chdir=TRUE)
+source('r_scripts/helpers_server.R', chdir=TRUE)
 source('r_scripts/definitions.R')
 source('r_scripts/helpers_logging.R', chdir=TRUE)
 
@@ -216,23 +217,6 @@ shinyServer(function(session, input, output) {
         NULL
     })
 
-    #' defualt placement is 'bottom', but I want the default to be 'top'
-    add_tooltip <- function(element, tooltip_text, placement='top', trigger='hover') {
-        return ( tipify(element, title=tooltip_text, placement=placement, trigger=trigger) )
-    }
-
-    ui_list_append <- function(l, ui_item, div_class=NULL) {
-
-        if(is.null(div_class)) {
-
-            return (c(l, list(ui_item)))
-
-        } else {
-
-            return (c(l, list(tags$div(class=div_class, ui_item))))
-        }
-    }
-
     output$graph_options__trends__UI <- renderUI({
 
         req(reactive__experiments_summary())
@@ -314,17 +298,6 @@ shinyServer(function(session, input, output) {
         return (tagList(list=ui_list))
     })
 
-    graph_options__raw_data__choices <- c(
-        "Date Info",
-        "Variation Names",
-        "Raw Counts",
-        "Frequentist",
-        "Frequentist Conf. Int.",
-        "Bayesian",
-        "Bayesian Conf. Int.",
-        "Bayesian Alpha/Beta"
-    )
-
     output$graph_options__raw_data__UI <- renderUI({
         selected <- c(
             "Frequentist",
@@ -404,27 +377,6 @@ shinyServer(function(session, input, output) {
         ui_list <- ui_list_append(ui_list, div_class='dynamic_filter', ui_metric)
         return (tagList(list=ui_list))
     })
-
-
-    insert_custom_progress_bar <- function(message="Loading/Processing Data") {
-
-        log_message_block_start(message)
-
-        # this function is a hack so that the progress bar works for ggplots that take a long time to render
-        # because ggplot objects don't attempt to render under they are displayed
-        global__progress_bar_html <- HTML(paste0('"<div id="shiny-notification-panel"><div id="shiny-notification-42ec5661c2722d29" class="shiny-notification"><div class="shiny-notification-close">×</div><div class="shiny-notification-content"><div class="shiny-notification-content-text"><div id="shiny-progress-42ec5661c2722d29" class="shiny-progress-notification"><div class="progress progress-striped active" style=""><div class="progress-bar" style="width: 50%;"></div></div><div class="progress-text"><span class="progress-message">', message,'</span> <span class="progress-detail"></span></div></div></div><div class="shiny-notification-content-action"></div></div></div></div>"'))
-        progress_html <- conditionalPanel(condition="$('html').hasClass('shiny-busy')",
-                                          global__progress_bar_html,
-                                          id='custom_progress_bar')
-        remove_custom_progress_bar()
-        insertUI(selector="#custom_progress_bar_placeholder", where = c("afterEnd"), progress_html, immediate=TRUE)
-    }
-
-    remove_custom_progress_bar <- function() {
-
-        # remove the custom progress bar that works with long ggplot 
-        removeUI(selector="#custom_progress_bar", immediate = TRUE)
-    }
 
     ##########################################################################################################
     # Update Dynamic Graph Options based on the Selected Tab
@@ -1007,9 +959,8 @@ shinyServer(function(session, input, output) {
         return (results_table)
     })
 
-    output$duration_calculator__average_daily_traffic_header <- renderText("Average Daily Users Joining Experiment:")
+    output$duration_calculator__average_daily_traffic_header <- renderText("Estimated Average Daily Users Joining Experiment:")
     output$duration_calculator__average_daily_traffic_text <- renderText({
-        
 
         calc_results <- reactive__ab_test_calculator_results()
 

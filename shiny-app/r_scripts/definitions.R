@@ -39,6 +39,17 @@ global__experiment__tab_names__raw_data <- "Raw Data"
 
 #global__select_path <- "<Select Path>"
 
+graph_options__raw_data__choices <- c(
+    "Date Info",
+    "Variation Names",
+    "Raw Counts",
+    "Frequentist",
+    "Frequentist Conf. Int.",
+    "Bayesian",
+    "Bayesian Conf. Int.",
+    "Bayesian Alpha/Beta"
+)
+
 ##############################################################################################################
 # Statistical Variables
 ##############################################################################################################
@@ -46,3 +57,4 @@ global__confidence_level <- 0.95
 global__p_value_threshold <- 1 - global__confidence_level
 
 global__prior_number_of_days <- 5
+
