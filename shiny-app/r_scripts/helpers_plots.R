@@ -355,11 +355,20 @@ plot__percent_change_frequentist <- function(experiments_summary, experiment, p_
                                              nearest_x))
     max_perc_change <- ceiling_nearest_x(max(current_experiments$percent_change_from_control),
                                          nearest_x)
+
+    current_experiments <- current_experiments %>%
+        mutate(p_value_sig_category=case_when(
+            p_value > p_value_threshold ~ 'No',
+            p_value <= p_value_threshold & percent_change_from_control > 0 ~ 'Yes - Increase',
+            p_value <= p_value_threshold & percent_change_from_control < 0 ~ 'Yes - Decrease',
+            TRUE ~ 'Unknown'
+        ))
     
     plot_object <- current_experiments %>%
-        ggplot(aes(x=metric_id, y=percent_change_from_control, fill=p_value <= p_value_threshold)) +
-        geom_col()
-    
+        ggplot(aes(x=metric_id, y=percent_change_from_control, fill=p_value_sig_category)) +
+        geom_hline(yintercept=0, color='#EB5424', size=0.5, alpha=0.5) +
+        geom_col(alpha=0.85)
+
     # if there are any experiments where the percent change is greater than 0, add text
     # if i don't do the check, i get an error
     t <- current_experiments %>% filter(percent_change_from_control >= 0)
@@ -386,15 +395,9 @@ plot__percent_change_frequentist <- function(experiments_summary, experiment, p_
                       vjust=1.2, size=rel(global__text_size), check_overlap=TRUE)   
     }
     
-    # in the case that that all the p-values are statistically significant, the colors will be wrong
-    if(all(current_experiments$p_value <= p_value_threshold)) {
-
-        fill_colors <- global__colors_good
-
-    } else {
-
-        fill_colors <- c(global__colors_bad, global__colors_good)
-    }
+    bad_good_colors <- c('#B4B7B9', '#DF585C', '#37B57F')
+    names(bad_good_colors) <- c("No", "Yes - Decrease", "Yes - Increase")
+    fill_colors <- bad_good_colors[sort(unique(current_experiments$p_value_sig_category))]
 
     plot_object +
         coord_cartesian(ylim=c(min_perc_change - 0.02, max_perc_change + 0.02)) +
@@ -430,7 +433,7 @@ plot__percent_change_bayesian <- function(experiments_summary, experiment) {
 
     plot_object <- current_experiments %>%
         ggplot(aes(x=metric_id, y=percent_change_from_control, fill=bayesian_prob_variant_gt_control)) +
-        geom_col()
+        geom_col(alpha=0.85)
 
     # if there are any experiments where the percent change is greater than 0, add text
     # if i don't do the check, i get an error
@@ -492,23 +495,25 @@ plot__percent_change_conf_frequentist <- function(experiments_summary, experimen
                percent_change_conf_high=frequentist_conf_high / control_conversion_rate,
                p_value_sig = p_value <= p_value_threshold) %>%
         select(metric_id, contains('percent_change'), p_value, p_value_sig)
-    
+
+    current_experiments <- current_experiments %>%
+        mutate(p_value_sig_category=case_when(
+            p_value > p_value_threshold ~ 'No',
+            p_value <= p_value_threshold & percent_change_from_control > 0 ~ 'Yes - Increase',
+            p_value <= p_value_threshold & percent_change_from_control < 0 ~ 'Yes - Decrease',
+            TRUE ~ 'Unknown'
+        ))
+
     y_expand <- 0.10
     min_y <- ceiling_nearest_x(min(current_experiments$percent_change_conf_low), y_expand)
     max_y <- ceiling_nearest_x(max(current_experiments$percent_change_conf_high), y_expand)
     
-    # in the case that that all the p-values are statistically significant, the colors will be wrong
-    if(all(current_experiments$p_value_sig)) {
-
-        fill_colors <- global__colors_good
-
-    } else {
-
-        fill_colors <- c(global__colors_bad, global__colors_good)
-    }
+    bad_good_colors <- c('#B4B7B9', '#DF585C', '#37B57F')
+    names(bad_good_colors) <- c("No", "Yes - Decrease", "Yes - Increase")
+    fill_colors <- bad_good_colors[sort(unique(current_experiments$p_value_sig_category))]
 
     current_experiments %>%
-        ggplot(aes(x=metric_id, y=percent_change_from_control, color=p_value_sig)) +
+        ggplot(aes(x=metric_id, y=percent_change_from_control, color=p_value_sig_category)) +
         geom_point(size=2) +
         geom_errorbar(aes(ymin=percent_change_conf_low, ymax=percent_change_conf_high), size=0.8) +
         geom_text(aes(label=percent(percent_change_from_control)),
@@ -645,33 +650,71 @@ plot__daily_percent_change_frequentist <- function(experiments_daily_summary,
                               'Lag from\nAttribution\nWindow',
                               NA))
 
-    plot_object <- current_daily_summary %>%
-        ggplot(aes(x=day_expired_attribution, y=perc_change)) +
-        geom_line(na.rm = TRUE) +
-        #coord_cartesian(ylim=c(-0.10, 0.3)) +
-        scale_y_continuous(labels = percent_format()) +
-        scale_x_date(date_breaks = '1 days') + 
-        geom_ribbon(aes(ymin = perc_change_conf_low, ymax = perc_change_conf_high), fill = 'green', alpha=0.15)
+    # plot_object <- current_daily_summary %>%
+    #     ggplot(aes(x=day_expired_attribution, y=perc_change)) +
+    #     geom_line(na.rm = TRUE) +
+    #     #coord_cartesian(ylim=c(-0.10, 0.3)) +
+    #     scale_y_continuous(labels = percent_format()) +
+    #     scale_x_date(date_breaks = '1 days') + 
+    #     geom_ribbon(aes(ymin = perc_change_conf_low, ymax = perc_change_conf_high), fill = 'green', alpha=0.15)
 
-    if(any(current_daily_summary$p_value > p_value_threshold, na.rm=TRUE)) {
+    # if(any(current_daily_summary$p_value > p_value_threshold, na.rm=TRUE)) {
     
-        plot_object <- plot_object +
-            geom_ribbon(aes(ymin = ifelse(p_value > p_value_threshold, perc_change_conf_low, NA),
-                            ymax = ifelse(p_value > p_value_threshold, perc_change_conf_high, NA)),
-                        fill = 'red', alpha=0.45)
+    #     plot_object <- plot_object +
+    #         geom_ribbon(aes(ymin = ifelse(p_value > p_value_threshold, perc_change_conf_low, NA),
+    #                         ymax = ifelse(p_value > p_value_threshold, perc_change_conf_high, NA)),
+    #                     fill = 'red', alpha=0.45)
+    # }
+
+    # if(any(current_daily_summary$p_value <= p_value_threshold, na.rm=TRUE)) {
+    
+    #     plot_object <- plot_object +
+    #         geom_ribbon(aes(ymin = ifelse(p_value <= p_value_threshold, perc_change_conf_low, NA),
+    #                         ymax = ifelse(p_value <= p_value_threshold, perc_change_conf_high, NA)),
+    #                     fill = 'green', alpha=0.2)
+
+    # }
+
+    date_breaks_width <- '1 day'
+    if(nrow(current_daily_summary) >= 90) {
+
+        date_breaks_width <- '14 day'
+
+    } else if(nrow(current_daily_summary) >= 60) {
+
+        date_breaks_width <- '5 day'
+    
+    } else if(nrow(current_daily_summary) >= 30) {
+
+        date_breaks_width <- '2 day'
     }
 
-    if(any(current_daily_summary$p_value <= p_value_threshold, na.rm=TRUE)) {
+    plot_object <- current_daily_summary %>%
+        ggplot(aes(x=day_expired_attribution, y=perc_change)) +
+        #coord_cartesian(ylim=c(-0.10, 0.3)) +
+        scale_y_continuous(labels = percent_format()) +
+        scale_x_date(labels = date_format('%Y-%m-%d'), breaks=date_breaks_width) +
+        geom_ribbon(aes(ymin = perc_change_conf_low, ymax = perc_change_conf_high), fill = '#7A7A7A', alpha=0.35)
+
+    if(any(current_daily_summary$p_value <= p_value_threshold & current_daily_summary$perc_change < 0, na.rm=TRUE)) {
     
         plot_object <- plot_object +
-            geom_ribbon(aes(ymin = ifelse(p_value <= p_value_threshold, perc_change_conf_low, NA),
-                            ymax = ifelse(p_value <= p_value_threshold, perc_change_conf_high, NA)),
-                        fill = 'green', alpha=0.2)
+            geom_ribbon(aes(ymin = ifelse(p_value <= p_value_threshold & perc_change < 0, perc_change_conf_low, NA),
+                            ymax = ifelse(p_value <= p_value_threshold & perc_change < 0, perc_change_conf_high, NA)),
+                        fill = 'red', alpha=0.35)
+    }
 
+    if(any(current_daily_summary$p_value <= p_value_threshold & current_daily_summary$perc_change > 0, na.rm=TRUE)) {
+    
+        plot_object <- plot_object +
+            geom_ribbon(aes(ymin = ifelse(p_value <= p_value_threshold & perc_change > 0, perc_change_conf_low, NA),
+                            ymax = ifelse(p_value <= p_value_threshold & perc_change > 0, perc_change_conf_high, NA)),
+                        fill = 'green', alpha=0.35)
     }
     
     plot_object +
         geom_hline(yintercept = 0, color='red', alpha=0.5, size=1.5) +
+        geom_line(na.rm = TRUE) +
         geom_text(aes(label=percent(perc_change)),
                   vjust=-1, check_overlap = TRUE, na.rm=TRUE, size=rel(global__text_size)) +
         geom_errorbarh(data=missing_dates, aes(y = y_axis_location,
@@ -757,29 +800,47 @@ plot__daily_percent_change_bayesian <- function(experiments_daily_summary, exper
                               'Lag from\nAttribution\nWindow',
                               NA))
 
-    plot_object <- current_daily_summary %>%
-        ggplot(aes(x=day_expired_attribution, y=perc_change), na.rm=TRUE) +
-        geom_line(na.rm=TRUE) +
-        #coord_cartesian(ylim=c(-0.10, 0.3)) +
-        scale_y_continuous(labels = percent_format()) +
-        scale_x_date(date_breaks = '1 days') + 
-        geom_ribbon(aes(ymin = perc_change_conf_low, ymax = perc_change_conf_high), fill = 'green', alpha=0.15)
+    date_breaks_width <- '1 day'
+    if(nrow(current_daily_summary) >= 90) {
 
-    if(any(!current_daily_summary$is_stat_sig, na.rm=TRUE)) {
+        date_breaks_width <- '14 day'
+
+    } else if(nrow(current_daily_summary) >= 60) {
+
+        date_breaks_width <- '5 day'
     
-        plot_object <- plot_object +
-            geom_ribbon(aes(ymin = ifelse(!is_stat_sig, perc_change_conf_low, NA), ymax = ifelse(!is_stat_sig, perc_change_conf_high, NA)), fill = 'red', alpha=0.45)
+    } else if(nrow(current_daily_summary) >= 30) {
+
+        date_breaks_width <- '2 day'
     }
 
-    if(any(current_daily_summary$is_stat_sig, na.rm=TRUE)) {
+    plot_object <- current_daily_summary %>%
+        ggplot(aes(x=day_expired_attribution, y=perc_change)) +
+        #coord_cartesian(ylim=c(-0.10, 0.3)) +
+        scale_y_continuous(labels = percent_format()) +
+        scale_x_date(labels = date_format('%Y-%m-%d'), breaks=date_breaks_width) +
+        geom_ribbon(aes(ymin = perc_change_conf_low, ymax = perc_change_conf_high), fill = '#7A7A7A', alpha=0.35)
+
+
+    if(any(current_daily_summary$is_stat_sig & current_daily_summary$perc_change < 0, na.rm=TRUE)) {
     
         plot_object <- plot_object +
-            geom_ribbon(aes(ymin = ifelse(is_stat_sig, perc_change_conf_low, NA), ymax = ifelse(is_stat_sig, perc_change_conf_high, NA)), fill = 'green', alpha=0.2)
+            geom_ribbon(aes(ymin = ifelse(current_daily_summary$is_stat_sig & perc_change < 0, perc_change_conf_low, NA),
+                            ymax = ifelse(current_daily_summary$is_stat_sig & perc_change < 0, perc_change_conf_high, NA)),
+                        fill = 'red', alpha=0.35)
+    }
 
+    if(any(current_daily_summary$is_stat_sig & current_daily_summary$perc_change > 0, na.rm=TRUE)) {
+    
+        plot_object <- plot_object +
+            geom_ribbon(aes(ymin = ifelse(current_daily_summary$is_stat_sig & perc_change > 0, perc_change_conf_low, NA),
+                            ymax = ifelse(current_daily_summary$is_stat_sig & perc_change > 0, perc_change_conf_high, NA)),
+                        fill = 'green', alpha=0.35)
     }
 
     plot_object +
         geom_hline(yintercept = 0, color='red', alpha=0.5, size=1.5) +
+        geom_line(na.rm=TRUE) +
         geom_text(aes(label=percent(perc_change)),
                   vjust=-1, check_overlap = TRUE, na.rm=TRUE, size=rel(global__text_size)) +
         geom_errorbarh(data=missing_dates, aes(y = y_axis_location,
